@@ -1,6 +1,8 @@
 // src/utils/logger.js - Sistem logging terpusat dengan Winston
 const winston = require('winston');
 const path = require('path');
+const fs = require('fs');
+const { redactSensitiveData } = require('./logRedactor');
 
 // Definisikan level log
 const levels = {
@@ -23,12 +25,22 @@ winston.addColors(colors);
 
 // Buat direktori logs jika belum ada
 const logsDir = path.join(__dirname, '../../logs');
-require('fs').mkdirSync(logsDir, { recursive: true });
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// PII Redaction Format using redactSensitiveData from logRedactor.js
+const piiRedactionFormat = winston.format((info) => {
+  // Apply PII redaction to the entire log info object
+  // This will handle both top-level fields and nested metadata
+  return redactSensitiveData(info);
+})();
 
 // Definisikan format log
 const format = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
+  piiRedactionFormat, // PII redaction enabled!
   winston.format.json()
 );
 

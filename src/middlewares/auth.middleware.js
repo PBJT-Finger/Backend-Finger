@@ -1,13 +1,15 @@
 // src/middlewares/auth.middleware.js - Middleware autentikasi JWT
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
+const { isBlacklisted } = require('../utils/tokenBlacklist');
 
 /**
  * JWT Authentication Middleware
  * Validasi JWT token dari Authorization header
  * Keamanan: Bearer token wajib untuk semua protected routes
+ * Phase 2: Added token blacklist checking untuk revocation support
  */
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -21,6 +23,20 @@ const authenticateToken = (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'Access token diperlukan'
+      });
+    }
+
+    // Phase 2: Check if token is blacklisted (revoked)
+    const blacklisted = await isBlacklisted(token);
+    if (blacklisted) {
+      logger.warn('Autentikasi gagal: Token has been revoked', {
+        ip: req.ip,
+        tokenPrefix: token.substring(0, 15) + '...',
+        path: req.path
+      });
+      return res.status(401).json({
+        success: false,
+        message: 'Token has been revoked. Please login again.'
       });
     }
 

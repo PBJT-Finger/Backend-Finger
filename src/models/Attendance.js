@@ -21,24 +21,17 @@ const Attendance = sequelize.define('Attendance', {
   user_id: {
     type: DataTypes.STRING(50),
     allowNull: false,
-    comment: 'ID pengguna (NIP)'
+    comment: 'Nomor Induk Pegawai'
   },
   nama: {
     type: DataTypes.STRING(255),
     allowNull: false,
     comment: 'Nama lengkap pengguna'
   },
-  nip: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    comment: 'Nomor Induk Pegawai',
-    field: 'user_id' // Map to database column name
-  },
-  jabatan: {
+  kategori_user: {
     type: DataTypes.ENUM('DOSEN', 'KARYAWAN'),
     allowNull: false,
-    comment: 'Jabatan pengguna',
-    field: 'kategori_user' // Map to database column name
+    comment: 'Jabatan pengguna'
   },
   tanggal_absensi: {
     type: DataTypes.DATEONLY,

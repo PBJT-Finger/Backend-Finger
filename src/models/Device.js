@@ -1,6 +1,7 @@
 // src/models/Device.js
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
+const bcrypt = require('bcrypt');
 
 const Device = sequelize.define('Device', {
   id: {
@@ -51,5 +52,25 @@ const Device = sequelize.define('Device', {
     { fields: ['is_active'] }
   ]
 });
+
+// Phase 3: Hash API key before creating device
+Device.beforeCreate(async (device) => {
+  if (device.api_key && !device.api_key.startsWith('$2b$')) {
+    // Hash API key with 10 rounds (slightly less than passwords for performance)
+    device.api_key = await bcrypt.hash(device.api_key, 10);
+  }
+});
+
+// Phase 3: Hash API key before updating if changed
+Device.beforeUpdate(async (device) => {
+  if (device.changed('api_key') && !device.api_key.startsWith('$2b$')) {
+    device.api_key = await bcrypt.hash(device.api_key, 10);
+  }
+});
+
+// Phase 3: Instance method to verify API key
+Device.prototype.verifyApiKey = async function (plainApiKey) {
+  return await bcrypt.compare(plainApiKey, this.api_key);
+};
 
 module.exports = Device;

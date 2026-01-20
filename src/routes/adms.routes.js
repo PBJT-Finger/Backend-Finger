@@ -13,7 +13,7 @@ const router = express.Router();
  *       Internal endpoint for fingerprint machines to push attendance data.
  *       Requires valid API key and device validation.
  *       Not intended for direct API calls.
- *     tags: [ADMS - Machine Only]
+ *     tags: [Device]
  *     requestBody:
  *       required: true
  *       content:
@@ -95,7 +95,7 @@ router.post('/push', ADMSController.pushAttendance);
  *   get:
  *     summary: ADMS service health check
  *     description: Health check endpoint for fingerprint machines
- *     tags: [ADMS - Machine Only]
+ *     tags: [Device]
  *     responses:
  *       200:
  *         description: Service is healthy

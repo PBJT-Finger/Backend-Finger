@@ -1,439 +1,538 @@
-// src/controllers/attendance.controller.js
-const { Attendance, Device } = require('../models');
-const { Op } = require('sequelize');
+// src/controllers/attendance.controller.js - Attendance Management with Prisma
+const { prisma } = require('../lib/prisma');
+const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 
 class AttendanceController {
   /**
-   * GET /api/attendance
-   * Get all attendance records with filtering and pagination
-   * Security: Admin access required
+   * Get comprehensive attendance summary
+   * Used by frontend for rekap/dashboard
    */
-  static getAttendance = async (req, res) => {
+  static async getSummary(req, res) {
+    try {
+      const { start_date, end_date, nip, jabatan } = req.query;
+
+      // Build where clause
+      const where = {
+        is_deleted: false
+      };
+
+      if (start_date && end_date) {
+        where.tanggal = {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
+        };
+      }
+
+      if (nip) where.nip = nip;
+      if (jabatan) where.jabatan = jabatan;
+
+      // Get attendance records
+      const attendance = await prisma.attendance.findMany({
+        where,
+        include: {
+          employee: {
+            select: {
+              nip: true,
+              nama: true,
+              jabatan: true,
+              department: true,
+              fakultas: true
+            }
+          }
+        },
+        orderBy: { tanggal: 'desc' }
+      });
+
+      // Calculate statistics
+      const totalRecords = attendance.length;
+      const uniqueDays = new Set(attendance.map(a => a.tanggal.toISOString().split('T')[0])).size;
+      const hadirCount = attendance.filter(a => a.jam_masuk !== null).length;
+      const terlambatCount = attendance.filter(a => a.status === 'TERLAMBAT').length;
+
+      const summary = {
+        total_records: totalRecords,
+        total_days: uniqueDays,
+        hadir: hadirCount,
+        terlambat: terlambatCount,
+        percentage: uniqueDays > 0 ? Math.round((hadirCount / uniqueDays) * 100) : 0
+      };
+
+      return successResponse(res, {
+        summary,
+        attendance,
+        filters: { start_date, end_date, nip, jabatan }
+      }, 'Attendance summary retrieved successfully');
+
+    } catch (error) {
+      logger.error('Get attendance summary error', { error: error.message, stack: error.stack });
+      return errorResponse(res, 'Failed to retrieve attendance summary', 500);
+    }
+  }
+
+  /**
+   * Get lecturer (dosen) attendance
+   * Frontend API: GET /api/attendance/dosen?start_date=X&end_date=Y&dosen_id=Z
+   */
+  static async getLecturerAttendance(req, res) {
+    try {
+      const { start_date, end_date, dosen_id, page = 1, limit = 50 } = req.query;
+
+      // Build where clause
+      const where = {
+        jabatan: 'DOSEN',
+        is_deleted: false
+      };
+
+      // Date range filter
+      if (start_date && end_date) {
+        where.tanggal = {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
+        };
+      }
+
+      // Specific dosen filter
+      if (dosen_id) {
+        where.nip = dosen_id;
+      }
+
+      // Pagination
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const take = parseInt(limit);
+
+      // Get total count
+      const total = await prisma.attendance.count({ where });
+
+      // Get attendance records
+      const attendance = await prisma.attendance.findMany({
+        where,
+        include: {
+          employee: {
+            select: {
+              nip: true,
+              nama: true,
+              jabatan: true,
+              department: true,
+              fakultas: true,
+              email: true
+            }
+          },
+          device: {
+            select: {
+              device_name: true,
+              device_id: true,
+              location: true
+            }
+          }
+        },
+        orderBy: [
+          { tanggal: 'desc' },
+          { jam_masuk: 'asc' }
+        ],
+        skip,
+        take
+      });
+
+      // Calculate summary statistics
+      const summary = {
+        total_records: total,
+        total_returned: attendance.length,
+        unique_dosen: new Set(attendance.map(a => a.nip)).size,
+        hadir: attendance.filter(a => a.jam_masuk !== null).length,
+        terlambat: attendance.filter(a => a.status === 'TERLAMBAT').length
+      };
+
+      return successResponse(res, {
+        data: attendance,
+        summary,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          total_pages: Math.ceil(total / parseInt(limit))
+        },
+        filters: { start_date, end_date, dosen_id }
+      }, 'Lecturer attendance retrieved successfully');
+
+    } catch (error) {
+      logger.error('Get lecturer attendance error', { error: error.message, stack: error.stack });
+      return errorResponse(res, 'Failed to retrieve lecturer attendance', 500);
+    }
+  }
+
+  /**
+   * Get employee (karyawan) attendance
+   * Frontend API: GET /api/attendance/karyawan?start_date=X&end_date=Y&karyawan_id=Z
+   */
+  static async getEmployeeAttendance(req, res) {
+    try {
+      const { start_date, end_date, karyawan_id, page = 1, limit = 50 } = req.query;
+
+      // Build where clause
+      const where = {
+        jabatan: 'KARYAWAN',
+        is_deleted: false
+      };
+
+      // Date range filter
+      if (start_date && end_date) {
+        where.tanggal = {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
+        };
+      }
+
+      // Specific karyawan filter
+      if (karyawan_id) {
+        where.nip = karyawan_id;
+      }
+
+      // Pagination
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const take = parseInt(limit);
+
+      // Get total count
+      const total = await prisma.attendance.count({ where });
+
+      // Get attendance records
+      const attendance = await prisma.attendance.findMany({
+        where,
+        include: {
+          employee: {
+            select: {
+              nip: true,
+              nama: true,
+              jabatan: true,
+              department: true,
+              email: true,
+              shift: {
+                select: {
+                  nama_shift: true,
+                  jam_masuk: true,
+                  toleransi_menit: true
+                }
+              }
+            }
+          },
+          device: {
+            select: {
+              device_name: true,
+              device_id: true,
+              location: true
+            }
+          }
+        },
+        orderBy: [
+          { tanggal: 'desc' },
+          { jam_masuk: 'asc' }
+        ],
+        skip,
+        take
+      });
+
+      // Calculate summary statistics
+      const summary = {
+        total_records: total,
+        total_returned: attendance.length,
+        unique_karyawan: new Set(attendance.map(a => a.nip)).size,
+        hadir: attendance.filter(a => a.jam_masuk !== null).length,
+        terlambat: attendance.filter(a => a.status === 'TERLAMBAT').length
+      };
+
+      return successResponse(res, {
+        data: attendance,
+        summary,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          total_pages: Math.ceil(total / parseInt(limit))
+        },
+        filters: { start_date, end_date, karyawan_id }
+      }, 'Employee attendance retrieved successfully');
+
+    } catch (error) {
+      logger.error('Get employee attendance error', { error: error.message, stack: error.stack });
+      return errorResponse(res, 'Failed to retrieve employee attendance', 500);
+    }
+  }
+
+  /**
+   * Get all attendance (generic endpoint)
+   * With flexible filtering
+   */
+  static async getAttendance(req, res) {
     try {
       const {
-        page = 1,
-        limit = 50,
-        user_id,
-        device_id,
+        start_date,
+        end_date,
+        nip,
         jabatan,
-        tanggal_mulai,
-        tanggal_akhir,
-        tipe_absensi
+        status,
+        page = 1,
+        limit = 50
       } = req.query;
 
-      const offset = (page - 1) * limit;
-      const whereClause = { is_deleted: false };
+      // Build where clause
+      const where = { is_deleted: false };
 
-      // Apply filters
-      if (user_id) whereClause.user_id = user_id;
-      if (device_id) whereClause.device_id = device_id;
-      if (jabatan) whereClause.jabatan = jabatan;
-      if (tipe_absensi) whereClause.tipe_absensi = tipe_absensi;
-
-      if (tanggal_mulai && tanggal_akhir) {
-        whereClause.tanggal_absensi = {
-          [Op.between]: [tanggal_mulai, tanggal_akhir]
+      if (start_date && end_date) {
+        where.tanggal = {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
         };
-      } else if (tanggal_mulai) {
-        whereClause.tanggal_absensi = { [Op.gte]: tanggal_mulai };
-      } else if (tanggal_akhir) {
-        whereClause.tanggal_absensi = { [Op.lte]: tanggal_akhir };
       }
 
-      const { count, rows } = await Attendance.findAndCountAll({
-        where: whereClause,
-        include: [
-          {
-            model: Device,
-            as: 'device',
-            attributes: ['location'],
-            required: false
+      if (nip) where.nip = nip;
+      if (jabatan) where.jabatan = jabatan;
+      if (status) where.status = status;
+
+      // Pagination
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const take = parseInt(limit);
+
+      const total = await prisma.attendance.count({ where });
+
+      const attendance = await prisma.attendance.findMany({
+        where,
+        include: {
+          employee: true,
+          device: true
+        },
+        orderBy: { tanggal: 'desc' },
+        skip,
+        take
+      });
+
+      return successResponse(res, {
+        data: attendance,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          total_pages: Math.ceil(total / parseInt(limit))
+        }
+      }, 'Attendance retrieved successfully');
+
+    } catch (error) {
+      logger.error('Get attendance error', { error: error.message });
+      return errorResponse(res, 'Failed to retrieve attendance', 500);
+    }
+  }
+
+  /**
+   * Get attendance summary/rekap
+   * Aggregated statistics
+   */
+  static async getAttendanceSummary(req, res) {
+    try {
+      const { start_date, end_date, nip } = req.query;
+
+      if (!start_date || !end_date) {
+        return errorResponse(res, 'start_date and end_date are required', 400);
+      }
+
+      const where = {
+        tanggal: {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
+        },
+        is_deleted: false
+      };
+
+      if (nip) where.nip = nip;
+
+      // Get all attendance in range
+      const attendance = await prisma.attendance.findMany({
+        where,
+        include: {
+          employee: {
+            select: {
+              nip: true,
+              nama: true,
+              jabatan: true
+            }
           }
-        ],
-        order: [['tanggal_absensi', 'DESC'], ['waktu_absensi', 'DESC']],
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+        },
+        orderBy: [
+          { tanggal: 'desc' },
+          { jam_masuk: 'desc' }
+        ]
       });
 
-      // Audit log
-      logger.audit('VIEW_ATTENDANCE', req.user.id, {
-        filters: req.query,
-        totalRecords: count
-      });
+      // Group by employee
+      const employeeStats = {};
 
-      res.json({
-        success: true,
-        data: {
-          records: rows,
-          pagination: {
-            current_page: parseInt(page),
-            total_pages: Math.ceil(count / limit),
-            total_records: count,
-            per_page: parseInt(limit)
+      attendance.forEach(record => {
+        const key = record.nip;
+        if (!employeeStats[key]) {
+          employeeStats[key] = {
+            nip: record.nip,
+            nama: record.nama,
+            jabatan: record.jabatan,
+            total_hadir: 0,
+            total_terlambat: 0,
+            total_days: 0,
+            last_check_in: null,
+            last_check_out: null
+          };
+        }
+
+        employeeStats[key].total_days++;
+        if (record.jam_masuk) {
+          employeeStats[key].total_hadir++;
+          // Update last check-in if this is more recent
+          if (!employeeStats[key].last_check_in || new Date(record.jam_masuk) > new Date(employeeStats[key].last_check_in)) {
+            employeeStats[key].last_check_in = record.jam_masuk;
           }
         }
+
+        // Update last check-out if this is more recent
+        if (record.jam_keluar) {
+          if (!employeeStats[key].last_check_out || new Date(record.jam_keluar) > new Date(employeeStats[key].last_check_out)) {
+            employeeStats[key].last_check_out = record.jam_keluar;
+          }
+        }
+
+        // Track late attendance
+        if (record.status === 'TERLAMBAT') {
+          employeeStats[key].total_terlambat++;
+        }
       });
+
+      // Convert to array, add percentage, and filter fields
+      const summary = Object.values(employeeStats).map((emp, index) => ({
+        no: index + 1,
+        nama: emp.nama,
+        nip: emp.nip,
+        jabatan: emp.jabatan,
+        check_in_terakhir: emp.last_check_in ? emp.last_check_in.toISOString() : null,
+        check_out_terakhir: emp.last_check_out ? emp.last_check_out.toISOString() : null,
+        total_hadir: emp.total_hadir,
+        total_terlambat: emp.total_terlambat,
+        total_days: emp.total_days,
+        persentase: emp.total_days > 0
+          ? Math.round((emp.total_hadir / emp.total_days) * 100)
+          : 0
+      }));
+
+      return successResponse(res, {
+        summary,
+        period: { start_date, end_date },
+        total_employees: summary.length
+      }, 'Attendance summary calculated successfully');
+
     } catch (error) {
-      logger.error('Get attendance error', {
-        error: error.message,
-        stack: error.stack,
-        userId: req.user.id
-      });
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      logger.error('Get attendance summary error', { error: error.message });
+      return errorResponse(res, 'Failed to calculate attendance summary', 500);
     }
-  };
+  }
 
   /**
-   * GET /api/attendance/dosen
-   * Get attendance records for lecturers only
+   * Get monthly report
+   * Grouped by month
    */
-  static getLecturerAttendance = async (req, res) => {
+  static async getMonthlyReport(req, res) {
     try {
-      req.query.jabatan = 'DOSEN';
-      await AttendanceController.getAttendance(req, res);
-    } catch (error) {
-      logger.error('Get lecturer attendance error', {
-        error: error.message,
-        userId: req.user.id
-      });
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
-    }
-  };
+      const { year, month, jabatan } = req.query;
 
-  /**
-   * GET /api/attendance/karyawan
-   * Get attendance records for employees only
-   */
-  static getEmployeeAttendance = async (req, res) => {
-    try {
-      req.query.jabatan = 'KARYAWAN';
-      await AttendanceController.getAttendance(req, res);
-    } catch (error) {
-      logger.error('Get employee attendance error', {
-        error: error.message,
-        userId: req.user.id
-      });
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
-    }
-  };
-
-  /**
-   * GET /api/attendance/rekap
-   * Get attendance summary report
-   */
-  static getAttendanceSummary = async (req, res) => {
-    try {
-      const { bulan, tahun } = req.query;
-
-      if (!bulan || !tahun) {
-        return res.status(400).json({
-          success: false,
-          message: 'Bulan dan tahun diperlukan'
-        });
+      if (!year || !month) {
+        return errorResponse(res, 'year and month are required', 400);
       }
 
-      const startDate = `${tahun}-${bulan.padStart(2, '0')}-01`;
-      const endDate = new Date(tahun, bulan, 0).toISOString().split('T')[0];
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
 
-      // Get summary data
-      const summary = await AttendanceController.calculateAttendanceSummary(
-        startDate,
-        endDate,
-        bulan,
-        tahun
-      );
+      const where = {
+        tanggal: {
+          gte: startDate,
+          lte: endDate
+        },
+        is_deleted: false
+      };
 
-      // Audit log
-      logger.audit('VIEW_ATTENDANCE_SUMMARY', req.user.id, {
-        bulan,
-        tahun,
-        totalUsers: summary.data.length
+      if (jabatan) where.jabatan = jabatan;
+
+      const attendance = await prisma.attendance.findMany({
+        where,
+        include: {
+          employee: true
+        },
+        orderBy: { tanggal: 'asc' }
       });
 
-      res.json({
-        success: true,
-        data: summary
+      // Group by day
+      const dailyStats = {};
+
+      attendance.forEach(record => {
+        const day = record.tanggal.toISOString().split('T')[0];
+        if (!dailyStats[day]) {
+          dailyStats[day] = {
+            date: day,
+            total: 0,
+            hadir: 0,
+            terlambat: 0
+          };
+        }
+
+        dailyStats[day].total++;
+        if (record.jam_masuk) dailyStats[day].hadir++;
+        if (record.status === 'TERLAMBAT') dailyStats[day].terlambat++;
       });
+
+      const report = Object.values(dailyStats);
+
+      return successResponse(res, {
+        report,
+        period: { year: parseInt(year), month: parseInt(month) },
+        summary: {
+          total_days: report.length,
+          total_attendance: attendance.length,
+          total_unique_employees: new Set(attendance.map(a => a.nip)).size
+        }
+      }, 'Monthly report generated successfully');
+
     } catch (error) {
-      logger.error('Get attendance summary error', {
-        error: error.message,
-        userId: req.user.id
-      });
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      logger.error('Get monthly report error', { error: error.message });
+      return errorResponse(res, 'Failed to generate monthly report', 500);
     }
-  };
+  }
 
   /**
-   * GET /api/attendance/rekap/bulanan
-   * Get monthly attendance report with detailed breakdown
+   * Delete attendance record
+   * Soft delete (mark as deleted)
    */
-  static getMonthlyReport = async (req, res) => {
-    try {
-      const { bulan, tahun } = req.query;
-
-      if (!bulan || !tahun) {
-        return res.status(400).json({
-          success: false,
-          message: 'Bulan dan tahun diperlukan'
-        });
-      }
-
-      const startDate = `${tahun}-${bulan.padStart(2, '0')}-01`;
-      const endDate = new Date(tahun, bulan, 0).toISOString().split('T')[0];
-
-      // Get detailed monthly report
-      const report = await AttendanceController.generateMonthlyReport(
-        startDate,
-        endDate,
-        bulan,
-        tahun
-      );
-
-      // Audit log
-      logger.audit('VIEW_MONTHLY_REPORT', req.user.id, {
-        bulan,
-        tahun
-      });
-
-      res.json({
-        success: true,
-        data: report
-      });
-    } catch (error) {
-      logger.error('Get monthly report error', {
-        error: error.message,
-        userId: req.user.id
-      });
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
-    }
-  };
-
-  /**
-   * DELETE /api/attendance/{id}
-   * Soft delete attendance record
-   * Security: Admin only, audit logging
-   */
-  static deleteAttendance = async (req, res) => {
+  static async deleteAttendance(req, res) {
     try {
       const { id } = req.params;
 
-      const attendance = await Attendance.findByPk(id);
+      const attendance = await prisma.attendance.findUnique({
+        where: { id: parseInt(id) }
+      });
+
       if (!attendance) {
-        return res.status(404).json({
-          success: false,
-          message: 'Attendance record not found'
-        });
+        return errorResponse(res, 'Attendance record not found', 404);
       }
 
       // Soft delete
-      await attendance.destroy();
-
-      // Audit log
-      logger.audit('DELETE_ATTENDANCE', req.user.id, {
-        attendanceId: id,
-        userId: attendance.user_id,
-        nama: attendance.nama,
-        tanggal: attendance.tanggal_absensi
+      await prisma.attendance.update({
+        where: { id: parseInt(id) },
+        data: { is_deleted: true }
       });
 
-      res.json({
-        success: true,
-        message: 'Attendance record deleted successfully'
+      logger.audit('ATTENDANCE_DELETED', req.user?.id, {
+        attendance_id: id,
+        nip: attendance.nip,
+        tanggal: attendance.tanggal
       });
+
+      return successResponse(res, null, 'Attendance record deleted successfully');
+
     } catch (error) {
-      logger.error('Delete attendance error', {
-        error: error.message,
-        attendanceId: req.params.id,
-        userId: req.user.id
-      });
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+      logger.error('Delete attendance error', { error: error.message });
+      return errorResponse(res, 'Failed to delete attendance record', 500);
     }
-  };
-
-  /**
-   * Helper: Calculate attendance summary
-   */
-  static calculateAttendanceSummary = async (startDate, endDate, bulan, tahun) => {
-    const workingDays = AttendanceController.calculateWorkingDays(parseInt(bulan), parseInt(tahun));
-
-    const records = await Attendance.findAll({
-      where: {
-        tanggal_absensi: { [Op.between]: [startDate, endDate] },
-        is_deleted: false
-      },
-      attributes: [
-        'user_id',
-        'nama',
-        'nip',
-        'jabatan',
-        [Attendance.sequelize.fn('COUNT', Attendance.sequelize.col('id')), 'total_records'],
-        [Attendance.sequelize.fn('SUM',
-          Attendance.sequelize.literal('CASE WHEN tipe_absensi = "MASUK" THEN 1 ELSE 0 END')
-        ), 'total_masuk'],
-        [Attendance.sequelize.fn('SUM',
-          Attendance.sequelize.literal('CASE WHEN tipe_absensi = "PULANG" THEN 1 ELSE 0 END')
-        ), 'total_pulang'],
-        [Attendance.sequelize.fn('SUM',
-          Attendance.sequelize.literal('CASE WHEN tipe_absensi = "MASUK" AND TIME(waktu_absensi) > "08:00:00" THEN 1 ELSE 0 END')
-        ), 'total_terlambat']
-      ],
-      group: ['user_id', 'nama', 'nip', 'jabatan'],
-      order: [['nama', 'ASC']]
-    });
-
-    // Get last check-in and check-out
-    const userIds = records.map(r => r.user_id);
-    const lastCheckIns = await Attendance.findAll({
-      where: {
-        user_id: { [Op.in]: userIds },
-        tanggal_absensi: { [Op.between]: [startDate, endDate] },
-        tipe_absensi: 'MASUK',
-        is_deleted: false
-      },
-      attributes: ['user_id', 'tanggal_absensi', 'waktu_absensi'],
-      order: [['user_id'], ['tanggal_absensi', 'DESC'], ['waktu_absensi', 'DESC']]
-    });
-
-    const lastCheckOuts = await Attendance.findAll({
-      where: {
-        user_id: { [Op.in]: userIds },
-        tanggal_absensi: { [Op.between]: [startDate, endDate] },
-        tipe_absensi: 'PULANG',
-        is_deleted: false
-      },
-      attributes: ['user_id', 'tanggal_absensi', 'waktu_absensi'],
-      order: [['user_id'], ['tanggal_absensi', 'DESC'], ['waktu_absensi', 'DESC']]
-    });
-
-    // Process last check times
-    const lastCheckInMap = {};
-    const lastCheckOutMap = {};
-
-    lastCheckIns.forEach(record => {
-      if (!lastCheckInMap[record.user_id]) {
-        lastCheckInMap[record.user_id] = `${record.tanggal_absensi} ${record.waktu_absensi}`;
-      }
-    });
-
-    lastCheckOuts.forEach(record => {
-      if (!lastCheckOutMap[record.user_id]) {
-        lastCheckOutMap[record.user_id] = `${record.tanggal_absensi} ${record.waktu_absensi}`;
-      }
-    });
-
-    // Process summary
-    const summary = records.map((record, index) => {
-      const data = record.dataValues;
-      const hadir = Math.min(data.total_masuk, data.total_pulang);
-      const persentase = ((hadir / workingDays) * 100).toFixed(2);
-
-      return {
-        no: index + 1,
-        user_id: data.user_id,
-        nama: data.nama,
-        nip: data.nip,
-        jabatan: data.jabatan,
-        hadir: hadir,
-        total_hari_kerja: workingDays,
-        terlambat: data.total_terlambat || 0,
-        persentase: persentase,
-        check_in_terakhir: lastCheckInMap[data.user_id] || null,
-        check_out_terakhir: lastCheckOutMap[data.user_id] || null
-      };
-    });
-
-    return {
-      bulan: parseInt(bulan),
-      tahun: parseInt(tahun),
-      total_hari_kerja: workingDays,
-      data: summary
-    };
-  };
-
-  /**
-   * Helper: Generate detailed monthly report
-   */
-  static generateMonthlyReport = async (startDate, endDate, bulan, tahun) => {
-    const workingDays = AttendanceController.calculateWorkingDays(parseInt(bulan), parseInt(tahun));
-
-    // Get all attendance records for the month
-    const records = await Attendance.findAll({
-      where: {
-        tanggal_absensi: { [Op.between]: [startDate, endDate] },
-        is_deleted: false
-      },
-      order: [['tanggal_absensi', 'ASC'], ['waktu_absensi', 'ASC']]
-    });
-
-    // Group by user and date
-    const report = {};
-    records.forEach(record => {
-      const key = `${record.user_id}_${record.tanggal_absensi}`;
-      if (!report[key]) {
-        report[key] = {
-          user_id: record.user_id,
-          nama: record.nama,
-          nip: record.nip,
-          jabatan: record.jabatan,
-          tanggal: record.tanggal_absensi,
-          check_in: null,
-          check_out: null,
-          terlambat: false
-        };
-      }
-
-      if (record.tipe_absensi === 'MASUK') {
-        report[key].check_in = record.waktu_absensi;
-        report[key].terlambat = record.waktu_absensi > '08:00:00';
-      } else if (record.tipe_absensi === 'PULANG') {
-        report[key].check_out = record.waktu_absensi;
-      }
-    });
-
-    return {
-      bulan: parseInt(bulan),
-      tahun: parseInt(tahun),
-      total_hari_kerja: workingDays,
-      records: Object.values(report)
-    };
-  };
-
-  /**
-   * Helper: Calculate working days in month
-   */
-  static calculateWorkingDays(month, year) {
-    const daysInMonth = new Date(year, month, 0).getDate();
-    let workingDays = 0;
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month - 1, day);
-      const dayOfWeek = date.getDay();
-      // Exclude Sunday (0) and Saturday (6)
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        workingDays++;
-      }
-    }
-
-    return workingDays;
   }
 }
 

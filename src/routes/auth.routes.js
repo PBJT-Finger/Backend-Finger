@@ -121,4 +121,129 @@ router.post('/refresh', AuthController.refreshToken);
  */
 router.post('/logout', authenticateToken, AuthController.logout);
 
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register new admin account
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 description: Unique username
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Admin email address
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: Strong password (min 8 chars, uppercase, lowercase, number)
+ *     responses:
+ *       201:
+ *         description: Registration successful
+ *       400:
+ *         description: Validation error or username/email already exists
+ */
+router.post('/register', AuthController.register);
+
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Request password reset code
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Admin email address
+ *     responses:
+ *       200:
+ *         description: Reset code sent to email
+ *       400:
+ *         description: Invalid email format
+ */
+router.post('/forgot-password', AuthController.forgotPassword);
+
+/**
+ * @swagger
+ * /api/auth/verify-code:
+ *   post:
+ *     summary: Verify password reset code
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - code
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Admin email address
+ *               code:
+ *                 type: string
+ *                 description: 6-digit verification code
+ *     responses:
+ *       200:
+ *         description: Code verified, reset token returned
+ *       400:
+ *         description: Invalid or expired code
+ */
+router.post('/verify-code', AuthController.verifyCode);
+
+/**
+ * @swagger
+ * /api/auth/reset-password:
+ *   post:
+ *     summary: Reset password with verification token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - resetToken
+ *               - newPassword
+ *             properties:
+ *               resetToken:
+ *                 type: string
+ *                 description: Token received from verify-code endpoint
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 description: New password (min 8 chars, uppercase, lowercase, number)
+ *     responses:
+ *       200:
+ *         description: Password reset successful
+ *       400:
+ *         description: Invalid or expired token
+ */
+router.post('/reset-password', AuthController.resetPassword);
+
 module.exports = router;

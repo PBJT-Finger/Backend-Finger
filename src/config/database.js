@@ -1,18 +1,19 @@
 // src/config/database.js
 const { Sequelize } = require('sequelize');
 const mysql = require('mysql2/promise');
+const logger = require('../utils/logger');
 require('dotenv').config();
 
 // Sequelize instance for ORM operations (non-real-time CRUD)
 const sequelize = new Sequelize(
   process.env.DB_NAME,
-  process.env.DB_USER,
+  process.env.DB_USERNAME,  // Fixed: Changed from DB_USER to DB_USERNAME
   process.env.DB_PASSWORD,
   {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    logging: false,  // Disabled all query logging for cleaner output
     pool: {
       max: 10,        // Maximum connections
       min: 2,         // Minimum connections
@@ -33,7 +34,7 @@ let rawPool;
 const createRawPool = async () => {
   rawPool = mysql.createPool({
     host: process.env.DB_HOST,
-    user: process.env.DB_USER,
+    user: process.env.DB_USERNAME,  // Fixed: Changed from DB_USER to DB_USERNAME
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: process.env.DB_PORT || 3306,
@@ -45,11 +46,10 @@ const createRawPool = async () => {
 
   // Test connection
   try {
-    const connection = await rawPool.getConnection();
-    console.log('Raw MySQL pool connected successfully');
-    connection.release();
+    await rawPool.query('SELECT 1');
+    logger.info('Raw MySQL pool connected successfully');
   } catch (error) {
-    console.error('Raw MySQL pool connection failed:', error);
+    logger.error('Raw MySQL pool connection failed', { error: error.message, stack: error.stack });
     throw error;
   }
 };
@@ -65,9 +65,9 @@ const getRawPool = () => {
 const testSequelizeConnection = async () => {
   try {
     await sequelize.authenticate();
-    console.log('Sequelize connection established successfully');
+    logger.info('Sequelize connection established successfully');
   } catch (error) {
-    console.error('Sequelize connection failed:', error);
+    logger.error('Sequelize connection failed', { error: error.message, stack: error.stack });
     throw error;
   }
 };
