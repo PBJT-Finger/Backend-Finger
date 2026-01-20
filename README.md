@@ -312,7 +312,7 @@ NODE_ENV=production
 ## 📞 Kontak & Support
 
 - **Dokumentasi API:** http://localhost:3000/finger-api/docs
-- **Email:** admin@kampus.edu
+- **Email:** info@pbjt.ac.id
 - **Status:** Production Ready ✅
 
 ---
