@@ -45,15 +45,7 @@ const validateSummary = [
         .isLength({ min: 5, max: 50 }).withMessage('nip must be 5-50 characters')
         .trim(),
 
-    query('department')
-        .optional()
-        .isLength({ max: 100 }).withMessage('department must be max 100 characters')
-        .trim(),
 
-    query('fakultas')
-        .optional()
-        .isLength({ max: 100 }).withMessage('fakultas must be max 100 characters')
-        .trim(),
 
     query('page')
         .optional()

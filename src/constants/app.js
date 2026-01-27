@@ -42,20 +42,6 @@ module.exports = {
         NON_AKTIF: 'NON_AKTIF'
     },
 
-    // Holiday Types
-    HOLIDAY_TYPE: {
-        FIXED: 'FIXED',
-        LUNAR: 'LUNAR',
-        FORMULA: 'FORMULA'
-    },
-
-    // Holiday Categories
-    TIPE_LIBUR: {
-        NASIONAL: 'NASIONAL',
-        CUTI_BERSAMA: 'CUTI_BERSAMA',
-        HARI_RAYA: 'HARI_RAYA',
-        KAMPUS: 'KAMPUS'
-    },
 
     // Validation Constraints
     VALIDATION: {

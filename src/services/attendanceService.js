@@ -15,8 +15,7 @@ class AttendanceService {
                 endDate,
                 jabatan, // 'DOSEN' or 'KARYAWAN'
                 nip,
-                department,
-                fakultas,
+                nip,
                 page = 1,
                 limit = 50
             } = filters;
@@ -29,8 +28,7 @@ class AttendanceService {
 
             if (jabatan) employeeWhere.jabatan = jabatan;
             if (nip) employeeWhere.nip = nip;
-            if (department) employeeWhere.department = department;
-            if (fakultas) employeeWhere.fakultas = fakultas;
+
 
             // Get employees with pagination
             const { count, rows: employees } = await Employee.findAndCountAll({
@@ -170,8 +168,6 @@ class AttendanceService {
                 nip: employee.nip,
                 nama: employee.nama,
                 jabatan: employee.jabatan,
-                department: employee.department,
-                fakultas: employee.fakultas,
                 shift: employee.shift?.nama_shift || 'Fleksibel',
                 hadir,
                 totalHariKerja: totalWorkingDays,
@@ -197,8 +193,6 @@ class AttendanceService {
                 nip: employee.nip,
                 nama: employee.nama,
                 jabatan: employee.jabatan,
-                department: employee.department,
-                fakultas: employee.fakultas,
                 shift: employee.shift?.nama_shift || 'Fleksibel',
                 hadir: 0,
                 totalHariKerja: totalWorkingDays,

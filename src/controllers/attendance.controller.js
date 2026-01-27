@@ -1,75 +1,9 @@
-// src/controllers/attendance.controller.js - Attendance Management with Prisma
-const { prisma } = require('../lib/prisma');
+// src/controllers/attendance.controller.js - Attendance Management with MySQL
+const { query } = require('../lib/db');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 
 class AttendanceController {
-  /**
-   * Get comprehensive attendance summary
-   * Used by frontend for rekap/dashboard
-   */
-  static async getSummary(req, res) {
-    try {
-      const { start_date, end_date, nip, jabatan } = req.query;
-
-      // Build where clause
-      const where = {
-        is_deleted: false
-      };
-
-      if (start_date && end_date) {
-        where.tanggal = {
-          gte: new Date(start_date),
-          lte: new Date(end_date)
-        };
-      }
-
-      if (nip) where.nip = nip;
-      if (jabatan) where.jabatan = jabatan;
-
-      // Get attendance records
-      const attendance = await prisma.attendance.findMany({
-        where,
-        include: {
-          employee: {
-            select: {
-              nip: true,
-              nama: true,
-              jabatan: true,
-              department: true,
-              fakultas: true
-            }
-          }
-        },
-        orderBy: { tanggal: 'desc' }
-      });
-
-      // Calculate statistics
-      const totalRecords = attendance.length;
-      const uniqueDays = new Set(attendance.map(a => a.tanggal.toISOString().split('T')[0])).size;
-      const hadirCount = attendance.filter(a => a.jam_masuk !== null).length;
-      const terlambatCount = attendance.filter(a => a.status === 'TERLAMBAT').length;
-
-      const summary = {
-        total_records: totalRecords,
-        total_days: uniqueDays,
-        hadir: hadirCount,
-        terlambat: terlambatCount,
-        percentage: uniqueDays > 0 ? Math.round((hadirCount / uniqueDays) * 100) : 0
-      };
-
-      return successResponse(res, {
-        summary,
-        attendance,
-        filters: { start_date, end_date, nip, jabatan }
-      }, 'Attendance summary retrieved successfully');
-
-    } catch (error) {
-      logger.error('Get attendance summary error', { error: error.message, stack: error.stack });
-      return errorResponse(res, 'Failed to retrieve attendance summary', 500);
-    }
-  }
-
   /**
    * Get lecturer (dosen) attendance
    * Frontend API: GET /api/attendance/dosen?start_date=X&end_date=Y&dosen_id=Z
@@ -78,82 +12,38 @@ class AttendanceController {
     try {
       const { start_date, end_date, dosen_id, page = 1, limit = 50 } = req.query;
 
-      // Build where clause
-      const where = {
-        jabatan: 'DOSEN',
-        is_deleted: false
-      };
+      let sql = `
+        SELECT a.* 
+        FROM attendance a
+        WHERE a.jabatan = 'DOSEN' AND a.is_deleted = 0
+      `;
+      const params = [];
 
-      // Date range filter
       if (start_date && end_date) {
-        where.tanggal = {
-          gte: new Date(start_date),
-          lte: new Date(end_date)
-        };
+        sql += ' AND a.tanggal >= ? AND a.tanggal <= ?';
+        params.push(start_date, end_date);
       }
 
-      // Specific dosen filter
       if (dosen_id) {
-        where.nip = dosen_id;
+        sql += ' AND a.nip = ?';
+        params.push(dosen_id);
       }
 
-      // Pagination
+      sql += ' ORDER BY a.tanggal DESC, a.jam_masuk ASC';
+
+      const attendance = await query(sql, params);
+
+      // Transform to aggregated data
+      const { transformDosenAttendance } = require('../utils/attendanceTransformer');
+      const transformedData = transformDosenAttendance(attendance);
+
+      // Apply pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
       const take = parseInt(limit);
+      const paginatedData = transformedData.slice(skip, skip + take);
 
-      // Get total count
-      const total = await prisma.attendance.count({ where });
-
-      // Get attendance records
-      const attendance = await prisma.attendance.findMany({
-        where,
-        include: {
-          employee: {
-            select: {
-              nip: true,
-              nama: true,
-              jabatan: true,
-              department: true,
-              fakultas: true,
-              email: true
-            }
-          },
-          device: {
-            select: {
-              device_name: true,
-              device_id: true,
-              location: true
-            }
-          }
-        },
-        orderBy: [
-          { tanggal: 'desc' },
-          { jam_masuk: 'asc' }
-        ],
-        skip,
-        take
-      });
-
-      // Calculate summary statistics
-      const summary = {
-        total_records: total,
-        total_returned: attendance.length,
-        unique_dosen: new Set(attendance.map(a => a.nip)).size,
-        hadir: attendance.filter(a => a.jam_masuk !== null).length,
-        terlambat: attendance.filter(a => a.status === 'TERLAMBAT').length
-      };
-
-      return successResponse(res, {
-        data: attendance,
-        summary,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          total_pages: Math.ceil(total / parseInt(limit))
-        },
-        filters: { start_date, end_date, dosen_id }
-      }, 'Lecturer attendance retrieved successfully');
+      // Return array directly in data field for frontend compatibility
+      return successResponse(res, paginatedData, 'Lecturer attendance retrieved successfully');
 
     } catch (error) {
       logger.error('Get lecturer attendance error', { error: error.message, stack: error.stack });
@@ -169,88 +59,38 @@ class AttendanceController {
     try {
       const { start_date, end_date, karyawan_id, page = 1, limit = 50 } = req.query;
 
-      // Build where clause
-      const where = {
-        jabatan: 'KARYAWAN',
-        is_deleted: false
-      };
+      let sql = `
+        SELECT a.* 
+        FROM attendance a
+        WHERE a.jabatan = 'KARYAWAN' AND a.is_deleted = 0
+      `;
+      const params = [];
 
-      // Date range filter
       if (start_date && end_date) {
-        where.tanggal = {
-          gte: new Date(start_date),
-          lte: new Date(end_date)
-        };
+        sql += ' AND a.tanggal >= ? AND a.tanggal <= ?';
+        params.push(start_date, end_date);
       }
 
-      // Specific karyawan filter
       if (karyawan_id) {
-        where.nip = karyawan_id;
+        sql += ' AND a.nip = ?';
+        params.push(karyawan_id);
       }
 
-      // Pagination
+      sql += ' ORDER BY a.tanggal DESC, a.jam_masuk ASC';
+
+      const attendance = await query(sql, params);
+
+      // Transform to aggregated data
+      const { transformKaryawanAttendance } = require('../utils/attendanceTransformer');
+      const transformedData = transformKaryawanAttendance(attendance);
+
+      // Apply pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
       const take = parseInt(limit);
+      const paginatedData = transformedData.slice(skip, skip + take);
 
-      // Get total count
-      const total = await prisma.attendance.count({ where });
-
-      // Get attendance records
-      const attendance = await prisma.attendance.findMany({
-        where,
-        include: {
-          employee: {
-            select: {
-              nip: true,
-              nama: true,
-              jabatan: true,
-              department: true,
-              email: true,
-              shift: {
-                select: {
-                  nama_shift: true,
-                  jam_masuk: true,
-                  toleransi_menit: true
-                }
-              }
-            }
-          },
-          device: {
-            select: {
-              device_name: true,
-              device_id: true,
-              location: true
-            }
-          }
-        },
-        orderBy: [
-          { tanggal: 'desc' },
-          { jam_masuk: 'asc' }
-        ],
-        skip,
-        take
-      });
-
-      // Calculate summary statistics
-      const summary = {
-        total_records: total,
-        total_returned: attendance.length,
-        unique_karyawan: new Set(attendance.map(a => a.nip)).size,
-        hadir: attendance.filter(a => a.jam_masuk !== null).length,
-        terlambat: attendance.filter(a => a.status === 'TERLAMBAT').length
-      };
-
-      return successResponse(res, {
-        data: attendance,
-        summary,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          total_pages: Math.ceil(total / parseInt(limit))
-        },
-        filters: { start_date, end_date, karyawan_id }
-      }, 'Employee attendance retrieved successfully');
+      // Return array directly in data field for frontend compatibility
+      return successResponse(res, paginatedData, 'Employee attendance retrieved successfully');
 
     } catch (error) {
       logger.error('Get employee attendance error', { error: error.message, stack: error.stack });
@@ -260,7 +100,6 @@ class AttendanceController {
 
   /**
    * Get all attendance (generic endpoint)
-   * With flexible filtering
    */
   static async getAttendance(req, res) {
     try {
@@ -274,36 +113,40 @@ class AttendanceController {
         limit = 50
       } = req.query;
 
-      // Build where clause
-      const where = { is_deleted: false };
+      let sql = 'SELECT * FROM attendance WHERE is_deleted = 0';
+      const params = [];
 
       if (start_date && end_date) {
-        where.tanggal = {
-          gte: new Date(start_date),
-          lte: new Date(end_date)
-        };
+        sql += ' AND tanggal >= ? AND tanggal <= ?';
+        params.push(start_date, end_date);
       }
 
-      if (nip) where.nip = nip;
-      if (jabatan) where.jabatan = jabatan;
-      if (status) where.status = status;
+      if (nip) {
+        sql += ' AND nip = ?';
+        params.push(nip);
+      }
 
-      // Pagination
+      if (jabatan) {
+        sql += ' AND jabatan = ?';
+        params.push(jabatan);
+      }
+
+      if (status) {
+        sql += ' AND status = ?';
+        params.push(status);
+      }
+
+      // Get total count
+      const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
+      const countResult = await query(countSql, params);
+      const total = countResult[0].total;
+
+      // Add pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      const take = parseInt(limit);
+      sql += ' ORDER BY tanggal DESC LIMIT ? OFFSET ?';
+      params.push(parseInt(limit), skip);
 
-      const total = await prisma.attendance.count({ where });
-
-      const attendance = await prisma.attendance.findMany({
-        where,
-        include: {
-          employee: true,
-          device: true
-        },
-        orderBy: { tanggal: 'desc' },
-        skip,
-        take
-      });
+      const attendance = await query(sql, params);
 
       return successResponse(res, {
         data: attendance,
@@ -323,7 +166,6 @@ class AttendanceController {
 
   /**
    * Get attendance summary/rekap
-   * Aggregated statistics
    */
   static async getAttendanceSummary(req, res) {
     try {
@@ -333,33 +175,20 @@ class AttendanceController {
         return errorResponse(res, 'start_date and end_date are required', 400);
       }
 
-      const where = {
-        tanggal: {
-          gte: new Date(start_date),
-          lte: new Date(end_date)
-        },
-        is_deleted: false
-      };
+      let sql = `
+        SELECT * FROM attendance 
+        WHERE tanggal >= ? AND tanggal <= ? AND is_deleted = 0
+      `;
+      const params = [start_date, end_date];
 
-      if (nip) where.nip = nip;
+      if (nip) {
+        sql += ' AND nip = ?';
+        params.push(nip);
+      }
 
-      // Get all attendance in range
-      const attendance = await prisma.attendance.findMany({
-        where,
-        include: {
-          employee: {
-            select: {
-              nip: true,
-              nama: true,
-              jabatan: true
-            }
-          }
-        },
-        orderBy: [
-          { tanggal: 'desc' },
-          { jam_masuk: 'desc' }
-        ]
-      });
+      sql += ' ORDER BY tanggal DESC, jam_masuk DESC';
+
+      const attendance = await query(sql, params);
 
       // Group by employee
       const employeeStats = {};
@@ -382,39 +211,33 @@ class AttendanceController {
         employeeStats[key].total_days++;
         if (record.jam_masuk) {
           employeeStats[key].total_hadir++;
-          // Update last check-in if this is more recent
           if (!employeeStats[key].last_check_in || new Date(record.jam_masuk) > new Date(employeeStats[key].last_check_in)) {
             employeeStats[key].last_check_in = record.jam_masuk;
           }
         }
 
-        // Update last check-out if this is more recent
         if (record.jam_keluar) {
           if (!employeeStats[key].last_check_out || new Date(record.jam_keluar) > new Date(employeeStats[key].last_check_out)) {
             employeeStats[key].last_check_out = record.jam_keluar;
           }
         }
 
-        // Track late attendance
         if (record.status === 'TERLAMBAT') {
           employeeStats[key].total_terlambat++;
         }
       });
 
-      // Convert to array, add percentage, and filter fields
       const summary = Object.values(employeeStats).map((emp, index) => ({
         no: index + 1,
         nama: emp.nama,
         nip: emp.nip,
         jabatan: emp.jabatan,
-        check_in_terakhir: emp.last_check_in ? emp.last_check_in.toISOString() : null,
-        check_out_terakhir: emp.last_check_out ? emp.last_check_out.toISOString() : null,
+        check_in_terakhir: emp.last_check_in,
+        check_out_terakhir: emp.last_check_out,
         total_hadir: emp.total_hadir,
         total_terlambat: emp.total_terlambat,
         total_days: emp.total_days,
-        persentase: emp.total_days > 0
-          ? Math.round((emp.total_hadir / emp.total_days) * 100)
-          : 0
+        persentase: emp.total_days > 0 ? Math.round((emp.total_hadir / emp.total_days) * 100) : 0
       }));
 
       return successResponse(res, {
@@ -430,96 +253,27 @@ class AttendanceController {
   }
 
   /**
-   * Get monthly report
-   * Grouped by month
-   */
-  static async getMonthlyReport(req, res) {
-    try {
-      const { year, month, jabatan } = req.query;
-
-      if (!year || !month) {
-        return errorResponse(res, 'year and month are required', 400);
-      }
-
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0, 23, 59, 59);
-
-      const where = {
-        tanggal: {
-          gte: startDate,
-          lte: endDate
-        },
-        is_deleted: false
-      };
-
-      if (jabatan) where.jabatan = jabatan;
-
-      const attendance = await prisma.attendance.findMany({
-        where,
-        include: {
-          employee: true
-        },
-        orderBy: { tanggal: 'asc' }
-      });
-
-      // Group by day
-      const dailyStats = {};
-
-      attendance.forEach(record => {
-        const day = record.tanggal.toISOString().split('T')[0];
-        if (!dailyStats[day]) {
-          dailyStats[day] = {
-            date: day,
-            total: 0,
-            hadir: 0,
-            terlambat: 0
-          };
-        }
-
-        dailyStats[day].total++;
-        if (record.jam_masuk) dailyStats[day].hadir++;
-        if (record.status === 'TERLAMBAT') dailyStats[day].terlambat++;
-      });
-
-      const report = Object.values(dailyStats);
-
-      return successResponse(res, {
-        report,
-        period: { year: parseInt(year), month: parseInt(month) },
-        summary: {
-          total_days: report.length,
-          total_attendance: attendance.length,
-          total_unique_employees: new Set(attendance.map(a => a.nip)).size
-        }
-      }, 'Monthly report generated successfully');
-
-    } catch (error) {
-      logger.error('Get monthly report error', { error: error.message });
-      return errorResponse(res, 'Failed to generate monthly report', 500);
-    }
-  }
-
-  /**
-   * Delete attendance record
-   * Soft delete (mark as deleted)
+   * Delete attendance record (soft delete)
    */
   static async deleteAttendance(req, res) {
     try {
       const { id } = req.params;
 
-      const attendance = await prisma.attendance.findUnique({
-        where: { id: parseInt(id) }
-      });
+      const result = await query(
+        'SELECT * FROM attendance WHERE id = ? LIMIT 1',
+        [parseInt(id)]
+      );
 
-      if (!attendance) {
+      if (result.length === 0) {
         return errorResponse(res, 'Attendance record not found', 404);
       }
 
-      // Soft delete
-      await prisma.attendance.update({
-        where: { id: parseInt(id) },
-        data: { is_deleted: true }
-      });
+      const attendance = result[0];
+
+      await query(
+        'UPDATE attendance SET is_deleted = 1 WHERE id = ?',
+        [parseInt(id)]
+      );
 
       logger.audit('ATTENDANCE_DELETED', req.user?.id, {
         attendance_id: id,
@@ -532,6 +286,31 @@ class AttendanceController {
     } catch (error) {
       logger.error('Delete attendance error', { error: error.message });
       return errorResponse(res, 'Failed to delete attendance record', 500);
+    }
+  }
+
+  /**
+   * Get attendance summary (stub for /summary route)
+   */
+  static async getSummary(req, res) {
+    try {
+      // This is a stub - redirecting to getAttendanceSummary
+      return AttendanceController.getAttendanceSummary(req, res);
+    } catch (error) {
+      logger.error('Get summary error', { error: error.message });
+      return errorResponse(res, 'Failed to get attendance summary', 500);
+    }
+  }
+
+  /**
+   * Get monthly report (stub - not implemented yet)
+   */
+  static async getMonthlyReport(req, res) {
+    try {
+      return errorResponse(res, 'Monthly report endpoint not implemented yet', 501);
+    } catch (error) {
+      logger.error('Get monthly report error', { error: error.message });
+      return errorResponse(res, 'Failed to get monthly report', 500);
     }
   }
 }

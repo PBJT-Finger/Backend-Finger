@@ -36,8 +36,7 @@ A comprehensive REST API for managing employee attendance with fingerprint integ
 - Multiple check-in/check-out per day
 - Shift-based lateness detection for employees
 - Flexible scheduling for faculty
-- Automatic working days calculation
-- Holiday calendar support (perpetual)
+- Automatic working days calculation (Sunday as weekend)
 
 ### Analytics & Reporting
 - Comprehensive attendance summary
@@ -257,16 +256,6 @@ For technical assistance or questions, contact the development team.
               description: 'Position type',
               example: 'KARYAWAN'
             },
-            department: {
-              type: 'string',
-              description: 'Department or unit',
-              example: 'Teknologi Informasi'
-            },
-            fakultas: {
-              type: 'string',
-              description: 'Faculty',
-              example: 'Fakultas Teknik'
-            },
             email: {
               type: 'string',
               format: 'email',
@@ -420,14 +409,6 @@ For technical assistance or questions, contact the development team.
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
               example: 'KARYAWAN'
-            },
-            department: {
-              type: 'string',
-              example: 'Teknologi Informasi'
-            },
-            fakultas: {
-              type: 'string',
-              example: 'Fakultas Teknik'
             },
             shift: {
               type: 'string',

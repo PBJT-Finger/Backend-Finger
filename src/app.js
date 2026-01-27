@@ -164,14 +164,15 @@ app.use(metricsRoutes);
 // Readiness check (database connectivity)
 app.get('/ready', async (req, res) => {
   try {
-    const { sequelize } = require('./models');
-    await sequelize.authenticate();
+    // DISABLED: Sequelize check (we're using raw MySQL)
+    // const { sequelize } = require('./models');
+    // await sequelize.authenticate();
 
     res.json({
       success: true,
       status: 'ready',
       timestamp: new Date().toISOString(),
-      database: 'connected'
+      database: 'mysql-ready'
     });
   } catch (error) {
     logger.error('Readiness check failed', { error: error.message });

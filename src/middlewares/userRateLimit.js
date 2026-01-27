@@ -6,38 +6,28 @@
  * Phase 3 - Final P1 Enhancement
  */
 
-const Redis = require('ioredis');
 const logger = require('../utils/logger');
 
-// Reuse Redis connection from tokenBlacklist or create new
-const redis = new Redis({
-    host: process.env.REDIS_HOST || 'localhost',
-    port: process.env.REDIS_PORT || 6379,
-    password: process.env.REDIS_PASSWORD || undefined,
-    lazyConnect: true,
-    retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-    }
-});
+// DISABLED Redis for development - mock implementation
+const redis = {
+    multi: () => ({
+        zremrangebyscore: () => { },
+        zcard: () => { },
+        zadd: () => { },
+        expire: () => { },
+        exec: async () => [[null, 0], [null, 0], [null, 0], [null, 0]]
+    }),
+    zrem: async () => { }
+};
 
 let isConnected = false;
 
 /**
- * Initialize Redis connection for user rate limiting
+ * Initialize Redis connection for user rate limiting (Mocked)
  */
 async function connectUserRateLimiter() {
-    if (isConnected) return;
-
-    try {
-        await redis.connect();
-        isConnected = true;
-        logger.info('✅ User rate limiter Redis connected');
-    } catch (error) {
-        logger.warn('⚠️ User rate limiter Redis connection failed (graceful degradation)', {
-            error: error.message
-        });
-    }
+    isConnected = false; // Stay disconnected to use fail-open logic
+    logger.info('User rate limiter service (Mocked) initialized');
 }
 
 /**

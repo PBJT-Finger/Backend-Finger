@@ -60,16 +60,7 @@ router.use(sanitizeInputs);
  *         schema:
  *           type: string
  *         description: Filter by specific NIP
- *       - in: query
- *         name: department
- *         schema:
- *           type: string
- *         description: Filter by department
- *       - in: query
- *         name: fakultas
- *         schema:
- *           type: string
- *         description: Filter by faculty
+
  *       - in: query
  *         name: page
  *         schema:

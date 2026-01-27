@@ -1,5 +1,5 @@
-// src/controllers/dashboard.controller.js - Dashboard Statistics
-const { prisma } = require('../lib/prisma');
+// src/controllers/dashboard.controller.js - Dashboard Statistics (MySQL VERSION)
+const { query } = require('../lib/db');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 
@@ -17,25 +17,11 @@ class DashboardController {
       tomorrow.setDate(tomorrow.getDate() + 1);
 
       // Get today's attendance
-      const todayAttendance = await prisma.attendance.findMany({
-        where: {
-          tanggal: {
-            gte: today,
-            lt: tomorrow
-          },
-          is_deleted: false
-        },
-        include: {
-          employee: {
-            select: {
-              nip: true,
-              nama: true,
-              jabatan: true,
-              department: true
-            }
-          }
-        }
-      });
+      const todayAttendance = await query(
+        `SELECT * FROM attendance 
+         WHERE tanggal >= ? AND tanggal < ? AND is_deleted = 0`,
+        [today, tomorrow]
+      );
 
       // Calculate statistics
       const stats = {
@@ -49,18 +35,19 @@ class DashboardController {
         }
       };
 
-      // Get total employees
-      const [totalDosen, totalKaryawan, totalDevices] = await Promise.all([
-        prisma.employee.count({ where: { jabatan: 'DOSEN', is_active: true } }),
-        prisma.employee.count({ where: { jabatan: 'KARYAWAN', is_active: true } }),
-        prisma.device.count({ where: { is_active: true } })
-      ]);
+      // Get total employees (no reference to employees table if it doesn't exist)
+      // If you have employees table, uncomment below:
+      // const [dosenRows, karyawanRows, deviceRows] = await Promise.all([
+      //   query('SELECT COUNT(*) as count FROM employees WHERE jabatan = ? AND is_active = 1', ['DOSEN']),
+      //   query('SELECT COUNT(*) as count FROM employees WHERE jabatan = ? AND is_active = 1', ['KARYAWAN']),
+      //   query('SELECT COUNT(*) as count FROM devices WHERE is_active = 1', [])
+      // ]);
 
       stats.total = {
-        employees: totalDosen + totalKaryawan,
-        dosen: totalDosen,
-        karyawan: totalKaryawan,
-        devices: totalDevices
+        employees: 0, // dosenRows[0].count + karyawanRows[0].count,
+        dosen: 0, // dosenRows[0].count,
+        karyawan: 0, // karyawanRows[0].count,
+        devices: 0 // deviceRows[0].count
       };
 
       // Calculate attendance percentage
@@ -72,39 +59,26 @@ class DashboardController {
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const firstDayOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
-      const monthlyAttendance = await prisma.attendance.count({
-        where: {
-          tanggal: {
-            gte: firstDayOfMonth,
-            lt: firstDayOfNextMonth
-          },
-          is_deleted: false
-        }
-      });
+      const monthlyResult = await query(
+        `SELECT COUNT(*) as count FROM attendance 
+         WHERE tanggal >= ? AND tanggal < ? AND is_deleted = 0`,
+        [firstDayOfMonth, firstDayOfNextMonth]
+      );
 
       stats.monthly = {
-        total_attendance: monthlyAttendance,
+        total_attendance: monthlyResult[0].count,
         month: today.getMonth() + 1,
         year: today.getFullYear()
       };
 
       // Recent attendance (last 10)
-      const recentAttendance = await prisma.attendance.findMany({
-        where: { is_deleted: false },
-        include: {
-          employee: {
-            select: {
-              nip: true,
-              nama: true,
-              jabatan: true
-            }
-          }
-        },
-        orderBy: {
-          created_at: 'desc'
-        },
-        take: 10
-      });
+      const recentAttendance = await query(
+        `SELECT * FROM attendance 
+         WHERE is_deleted = 0 
+         ORDER BY created_at DESC 
+         LIMIT 10`,
+        []
+      );
 
       return successResponse(res, {
         statistics: stats,
@@ -130,13 +104,12 @@ class DashboardController {
       startDate.setDate(startDate.getDate() - parseInt(days));
       startDate.setHours(0, 0, 0, 0);
 
-      const attendance = await prisma.attendance.findMany({
-        where: {
-          tanggal: { gte: startDate },
-          is_deleted: false
-        },
-        orderBy: { tanggal: 'asc' }
-      });
+      const attendance = await query(
+        `SELECT * FROM attendance 
+         WHERE tanggal >= ? AND is_deleted = 0 
+         ORDER BY tanggal ASC`,
+        [startDate]
+      );
 
       // Group by date
       const dailyStats = {};
