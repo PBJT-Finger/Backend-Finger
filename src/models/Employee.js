@@ -24,26 +24,6 @@ const Employee = sequelize.define('Employee', {
     allowNull: false,
     comment: 'Jabatan pegawai'
   },
-  department: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: 'Departemen/Unit kerja'
-  },
-  fakultas: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: 'Fakultas'
-  },
-  email: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    comment: 'Email pegawai'
-  },
-  phone: {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    comment: 'Nomor telepon'
-  },
   shift_id: {
     type: DataTypes.INTEGER,
     allowNull: true,

@@ -1,5 +1,6 @@
-// src/controllers/export.controller.js - Export Attendance Data (MySQL VERSION)
-const { query } = require('../lib/db');
+// src/controllers/export.controller.js - Export Attendance Data (Prisma)
+const { prisma } = require('../models');
+const { formatTime } = require('../utils/prismaHelpers');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 const XLSX = require('xlsx');
@@ -76,8 +77,7 @@ class ExportController {
             'Jam Masuk': formatTime(record.jam_masuk),
             'Jam Keluar': formatTime(record.jam_keluar),
             'Status': record.status,
-            'Device': record.device_id || '-',
-            'Keterangan': record.keterangan || '-'
+            'Device': record.device_id || '-'
           };
         } else {
           // For DOSEN, include all columns
@@ -89,8 +89,7 @@ class ExportController {
             'Jam Masuk': formatTime(record.jam_masuk),
             'Jam Keluar': formatTime(record.jam_keluar),
             'Status': record.status,
-            'Device': record.device_id || '-',
-            'Keterangan': record.keterangan || '-'
+            'Device': record.device_id || '-'
           };
         }
       });
@@ -108,8 +107,7 @@ class ExportController {
         { wch: 12 }, // Jam Masuk
         { wch: 12 }, // Jam Keluar
         { wch: 12 }, // Status
-        { wch: 15 }, // Device
-        { wch: 30 }  // Keterangan
+        { wch: 15 }  // Device
       ];
       ws['!cols'] = wscols;
 
@@ -411,8 +409,7 @@ class ExportController {
             jam_masuk: formatTime(record.jam_masuk),
             jam_keluar: formatTime(record.jam_keluar),
             status: record.status,
-            device: record.device_id || '-',
-            keterangan: record.keterangan || '-'
+            device: record.device_id || '-'
           };
         } else {
           // For DOSEN, include all columns
@@ -424,8 +421,7 @@ class ExportController {
             jam_masuk: formatTime(record.jam_masuk),
             jam_keluar: formatTime(record.jam_keluar),
             status: record.status,
-            device: record.device_id || '-',
-            keterangan: record.keterangan || '-'
+            device: record.device_id || '-'
           };
         }
       });

@@ -32,6 +32,11 @@ const { testSequelizeConnection } = require('./config/database');
 // Import logger
 const logger = require('./utils/logger');
 
+// 🚀 CLEAN ARCHITECTURE: Bootstrap DI Container
+// Initialize dependency injection container with repositories and use cases
+const bootstrap = require('./infrastructure/container/bootstrap');
+bootstrap(); // This registers all dependencies
+
 // Initialize Express app
 const app = express();
 

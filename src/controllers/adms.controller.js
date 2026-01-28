@@ -1,9 +1,9 @@
 // src/controllers/adms.controller.js
-// Controller for ADMS fingerprint device endpoints
+// Controller for ADMS fingerprint device endpoints (Prisma)
 
+const { prisma } = require('../models');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
-const db = require('../lib/db');
 
 class ADMSController {
     /**
@@ -31,49 +31,57 @@ class ADMSController {
             }
 
             // AUTO-LOOKUP: Get jabatan from employees table based on NIP
-            const [employees] = await db.query(
-                'SELECT jabatan, nama as employee_name FROM employees WHERE nip = ? AND is_active = 1',
-                [nip]
-            );
+            const employee = await prisma.employees.findFirst({
+                where: {
+                    nip: nip,
+                    is_active: true
+                },
+                select: {
+                    jabatan: true,
+                    nama: true
+                }
+            });
 
-            if (!employees || employees.length === 0) {
+            if (!employee) {
                 return errorResponse(res, `Employee with NIP ${nip} not found or inactive`, 404);
             }
 
-            const jabatan = employees[0].jabatan; // Auto-detected jabatan (DOSEN or KARYAWAN)
+            const jabatan = employee.jabatan; // Auto-detected jabatan (DOSEN or KARYAWAN)
+            const employeeName = employee.nama || nama; // Use employee name from database
 
-            // Use employee name from database if provided name doesn't match
-            const employeeName = employees[0].employee_name || nama;
+            // Parse date for querying
+            const attendanceDate = new Date(tanggal_absensi);
 
             // Check for existing record on this date for this user
-            const [existingRecords] = await db.query(
-                'SELECT * FROM attendance WHERE nip = ? AND tanggal = ? AND is_deleted = 0',
-                [nip, tanggal_absensi]
-            );
+            const existingRecord = await prisma.attendance.findFirst({
+                where: {
+                    nip: nip,
+                    tanggal: attendanceDate,
+                    is_deleted: false
+                }
+            });
 
             let recordId;
 
-            if (existingRecords.length > 0) {
-                const existing = existingRecords[0];
-
+            if (existingRecord) {
                 // Update based on tipe_absensi
-                if (tipe_absensi === 'MASUK' && !existing.jam_masuk) {
+                if (tipe_absensi === 'MASUK' && !existingRecord.jam_masuk) {
                     // Update jam_masuk if not set
-                    await db.query(
-                        'UPDATE attendance SET jam_masuk = ? WHERE id = ?',
-                        [waktu_absensi, existing.id]
-                    );
-                    recordId = existing.id;
-                } else if (tipe_absensi === 'PULANG' && !existing.jam_keluar) {
+                    const updated = await prisma.attendance.update({
+                        where: { id: existingRecord.id },
+                        data: { jam_masuk: waktu_absensi }
+                    });
+                    recordId = updated.id;
+                } else if (tipe_absensi === 'PULANG' && !existingRecord.jam_keluar) {
                     // Update jam_keluar if not set
-                    await db.query(
-                        'UPDATE attendance SET jam_keluar = ? WHERE id = ?',
-                        [waktu_absensi, existing.id]
-                    );
-                    recordId = existing.id;
+                    const updated = await prisma.attendance.update({
+                        where: { id: existingRecord.id },
+                        data: { jam_keluar: waktu_absensi }
+                    });
+                    recordId = updated.id;
                 } else {
                     // Record already exists, return success without update
-                    return successResponse(res, { id: existing.id }, 'Attendance record already exists', 200);
+                    return successResponse(res, { id: existingRecord.id }, 'Attendance record already exists', 200);
                 }
             } else {
                 // Create new attendance record
@@ -81,43 +89,29 @@ class ADMSController {
                     user_id: user_id,
                     nip: nip,
                     nama: employeeName,  // Use validated name from employees table
-                    jabatan: jabatan,     // Auto-detected jabatan
-                    tanggal: tanggal_absensi,
+                    jabatan: jabatan,    // Auto-detected jabatan
+                    tanggal: attendanceDate,
                     device_id: device_id,
-                    cloud_id: cloud_id || null,  // NEW: Cloud system identifier
-                    verification_method: verifikasi || 'SIDIK_JARI',  // NEW: Verification method
+                    cloud_id: cloud_id || null,  // Cloud system identifier
+                    verification_method: verifikasi || 'SIDIK_JARI',  // Verification method
                     status: 'HADIR',
-                    is_deleted: 0
+                    is_deleted: false
                 };
 
                 // Set jam_masuk or jam_keluar based on tipe
                 if (tipe_absensi === 'MASUK') {
                     insertData.jam_masuk = waktu_absensi;
+                    insertData.jam_keluar = null;
                 } else if (tipe_absensi === 'PULANG') {
+                    insertData.jam_masuk = null;
                     insertData.jam_keluar = waktu_absensi;
                 }
 
-                const [result] = await db.query(
-                    `INSERT INTO attendance 
-           (user_id, nip, nama, jabatan, tanggal, jam_masuk, jam_keluar, device_id, cloud_id, verification_method, status, is_deleted) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                        insertData.user_id,
-                        insertData.nip,
-                        insertData.nama,
-                        insertData.jabatan,
-                        insertData.tanggal,
-                        insertData.jam_masuk || null,
-                        insertData.jam_keluar || null,
-                        insertData.device_id,
-                        insertData.cloud_id,
-                        insertData.verification_method,
-                        insertData.status,
-                        insertData.is_deleted
-                    ]
-                );
+                const result = await prisma.attendance.create({
+                    data: insertData
+                });
 
-                recordId = result.insertId;
+                recordId = result.id;
             }
 
             logger.info('Attendance pushed from ADMS device', {

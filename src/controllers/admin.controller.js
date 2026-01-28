@@ -1,5 +1,5 @@
-// src/controllers/admin.controller.js - Admin Management (MySQL VERSION)
-const { query } = require('../lib/db');
+// src/controllers/admin.controller.js - Admin Management (Prisma)
+const { prisma } = require('../models');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 const bcrypt = require('bcrypt');
@@ -7,12 +7,20 @@ const bcrypt = require('bcrypt');
 class AdminController {
     static async getAdmins(req, res) {
         try {
-            const admins = await query(
-                `SELECT id, username, email, role, is_active, last_login, created_at 
-                 FROM admins 
-                 ORDER BY created_at DESC`,
-                []
-            );
+            const admins = await prisma.admins.findMany({
+                select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    role: true,
+                    is_active: true,
+                    last_login: true,
+                    created_at: true
+                },
+                orderBy: {
+                    created_at: 'desc'
+                }
+            });
 
             return successResponse(res, admins, 'Admins retrieved successfully');
         } catch (error) {
@@ -25,19 +33,25 @@ class AdminController {
         try {
             const { id } = req.params;
 
-            const result = await query(
-                `SELECT id, username, email, role, is_active, last_login, created_at, updated_at 
-                 FROM admins 
-                 WHERE id = ? 
-                 LIMIT 1`,
-                [parseInt(id)]
-            );
+            const admin = await prisma.admins.findUnique({
+                where: { id: parseInt(id) },
+                select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    role: true,
+                    is_active: true,
+                    last_login: true,
+                    created_at: true,
+                    updated_at: true
+                }
+            });
 
-            if (result.length === 0) {
+            if (!admin) {
                 return errorResponse(res, 'Admin not found', 404);
             }
 
-            return successResponse(res, result[0], 'Admin retrieved successfully');
+            return successResponse(res, admin, 'Admin retrieved successfully');
         } catch (error) {
             logger.error('Get admin by ID error', { error: error.message });
             return errorResponse(res, 'Failed to retrieve admin', 500);

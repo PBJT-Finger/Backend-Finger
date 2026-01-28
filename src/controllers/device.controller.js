@@ -1,15 +1,25 @@
-// src/controllers/device.controller.js - Device Management (MySQL VERSION)  
-const { query } = require('../lib/db');
+// src/controllers/device.controller.js - Device Management (Prisma)
+const { prisma } = require('../models');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 
 class DeviceController {
     static async getDevices(req, res) {
         try {
-            const devices = await query(
-                'SELECT id, device_name, device_id, location, is_active, created_at FROM devices WHERE is_active = 1 ORDER BY created_at DESC',
-                []
-            );
+            const devices = await prisma.devices.findMany({
+                where: { is_active: true },
+                select: {
+                    id: true,
+                    device_name: true,
+                    device_id: true,
+                    location: true,
+                    is_active: true,
+                    created_at: true
+                },
+                orderBy: {
+                    created_at: 'desc'
+                }
+            });
 
             return successResponse(res, devices, 'Devices retrieved successfully');
         } catch (error) {

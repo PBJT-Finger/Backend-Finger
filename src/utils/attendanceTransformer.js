@@ -92,6 +92,7 @@ function transformDosenAttendance(attendanceRecords) {
                 totalHadir,
                 tidakHadir,
                 totalHariKerja: totalMengajar,
+                persentase: totalMengajar > 0 ? (totalHadir / totalMengajar) * 100 : 0,
                 attendanceDates: formatAttendanceDates(group.attendanceDates),
                 lastCheckIn: group.lastCheckIn
                     ? formatTimeOnly(group.lastCheckIn)
@@ -210,6 +211,7 @@ function transformKaryawanAttendance(attendanceRecords) {
                 tidakHadir,
                 totalTerlambat,
                 totalHariKerja,
+                persentase: totalHariKerja > 0 ? (totalHadir / totalHariKerja) * 100 : 0,
                 attendanceDates: formatAttendanceDates(group.attendanceDates),
                 lastCheckIn: group.lastCheckIn
                     ? formatTimeOnly(group.lastCheckIn)

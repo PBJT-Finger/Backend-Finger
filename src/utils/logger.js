@@ -2,7 +2,6 @@
 const winston = require('winston');
 const path = require('path');
 const fs = require('fs');
-const { redactSensitiveData } = require('./logRedactor');
 
 // Definisikan level log
 const levels = {
@@ -29,24 +28,15 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// PII Redaction Format using redactSensitiveData from logRedactor.js
-const piiRedactionFormat = winston.format((info) => {
-  // Apply PII redaction to the entire log info object
-  // This will handle both top-level fields and nested metadata
-  return redactSensitiveData(info);
-})();
-
 // Definisikan format log
 const format = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
-  piiRedactionFormat, // PII redaction enabled!
   winston.format.json()
 );
 
 // Define transports
 const transports = [
-  // Error log file
   new winston.transports.File({
     filename: path.join(logsDir, 'error.log'),
     level: 'error',
@@ -56,62 +46,34 @@ const transports = [
       winston.format.json()
     )
   }),
-
-  // Combined log file
   new winston.transports.File({
     filename: path.join(logsDir, 'combined.log'),
     format
-  }),
-
-  // Audit log file (for security events)
-  new winston.transports.File({
-    filename: path.join(logsDir, 'audit.log'),
-    level: 'info',
-    format: winston.format.combine(
-      winston.format.timestamp(),
-      winston.format.printf(({ timestamp, level, message, ...meta }) => {
-        return JSON.stringify({
-          timestamp,
-          level,
-          message,
-          ...meta
-        });
-      })
-    )
   })
 ];
 
-// Add console transport for development
+// Console transport untuk melihat detail error saat development
 if (process.env.NODE_ENV !== 'production') {
   transports.push(
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize({ all: true }),
         winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        winston.format.printf(({ timestamp, level, message }) => {
-          return `${timestamp} [${level}]: ${message}`;
+        winston.format.printf(({ timestamp, level, message, ...meta }) => {
+          // Bagian ini yang saya tambahkan untuk mengeluarkan pesan error asli
+          const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+          return `${timestamp} [${level}]: ${message}${metaStr}`;
         })
       )
     })
   );
 }
 
-// Create logger instance
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   levels,
   format,
   transports,
 });
-
-// Security audit logging function
-logger.audit = (action, userId, details = {}) => {
-  logger.info('AUDIT_LOG', {
-    action,
-    userId,
-    timestamp: new Date().toISOString(),
-    ...details
-  });
-};
 
 module.exports = logger;

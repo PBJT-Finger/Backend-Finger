@@ -1,5 +1,5 @@
-// src/controllers/attendance.controller.js - Attendance Management with MySQL
-const { query } = require('../lib/db');
+// src/controllers/attendance.controller.js - Attendance Management (Prisma)
+const { prisma } = require('../models');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 
@@ -12,26 +12,29 @@ class AttendanceController {
     try {
       const { start_date, end_date, dosen_id, page = 1, limit = 50 } = req.query;
 
-      let sql = `
-        SELECT a.* 
-        FROM attendance a
-        WHERE a.jabatan = 'DOSEN' AND a.is_deleted = 0
-      `;
-      const params = [];
+      const whereClause = {
+        jabatan: 'DOSEN',
+        is_deleted: false
+      };
 
       if (start_date && end_date) {
-        sql += ' AND a.tanggal >= ? AND a.tanggal <= ?';
-        params.push(start_date, end_date);
+        whereClause.tanggal = {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
+        };
       }
 
       if (dosen_id) {
-        sql += ' AND a.nip = ?';
-        params.push(dosen_id);
+        whereClause.nip = dosen_id;
       }
 
-      sql += ' ORDER BY a.tanggal DESC, a.jam_masuk ASC';
-
-      const attendance = await query(sql, params);
+      const attendance = await prisma.attendance.findMany({
+        where: whereClause,
+        orderBy: [
+          { tanggal: 'desc' },
+          { jam_masuk: 'asc' }
+        ]
+      });
 
       // Transform to aggregated data
       const { transformDosenAttendance } = require('../utils/attendanceTransformer');
@@ -59,26 +62,29 @@ class AttendanceController {
     try {
       const { start_date, end_date, karyawan_id, page = 1, limit = 50 } = req.query;
 
-      let sql = `
-        SELECT a.* 
-        FROM attendance a
-        WHERE a.jabatan = 'KARYAWAN' AND a.is_deleted = 0
-      `;
-      const params = [];
+      const whereClause = {
+        jabatan: 'KARYAWAN',
+        is_deleted: false
+      };
 
       if (start_date && end_date) {
-        sql += ' AND a.tanggal >= ? AND a.tanggal <= ?';
-        params.push(start_date, end_date);
+        whereClause.tanggal = {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
+        };
       }
 
       if (karyawan_id) {
-        sql += ' AND a.nip = ?';
-        params.push(karyawan_id);
+        whereClause.nip = karyawan_id;
       }
 
-      sql += ' ORDER BY a.tanggal DESC, a.jam_masuk ASC';
-
-      const attendance = await query(sql, params);
+      const attendance = await prisma.attendance.findMany({
+        where: whereClause,
+        orderBy: [
+          { tanggal: 'desc' },
+          { jam_masuk: 'asc' }
+        ]
+      });
 
       // Transform to aggregated data
       const { transformKaryawanAttendance } = require('../utils/attendanceTransformer');
@@ -113,40 +119,40 @@ class AttendanceController {
         limit = 50
       } = req.query;
 
-      let sql = 'SELECT * FROM attendance WHERE is_deleted = 0';
-      const params = [];
+      const whereClause = {
+        is_deleted: false
+      };
 
       if (start_date && end_date) {
-        sql += ' AND tanggal >= ? AND tanggal <= ?';
-        params.push(start_date, end_date);
+        whereClause.tanggal = {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
+        };
       }
 
       if (nip) {
-        sql += ' AND nip = ?';
-        params.push(nip);
+        whereClause.nip = nip;
       }
 
       if (jabatan) {
-        sql += ' AND jabatan = ?';
-        params.push(jabatan);
+        whereClause.jabatan = jabatan;
       }
 
       if (status) {
-        sql += ' AND status = ?';
-        params.push(status);
+        whereClause.status = status;
       }
 
       // Get total count
-      const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
-      const countResult = await query(countSql, params);
-      const total = countResult[0].total;
+      const total = await prisma.attendance.count({ where: whereClause });
 
-      // Add pagination
+      // Get attendance with pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      sql += ' ORDER BY tanggal DESC LIMIT ? OFFSET ?';
-      params.push(parseInt(limit), skip);
-
-      const attendance = await query(sql, params);
+      const attendance = await prisma.attendance.findMany({
+        where: whereClause,
+        orderBy: { tanggal: 'desc' },
+        skip: skip,
+        take: parseInt(limit)
+      });
 
       return successResponse(res, {
         data: attendance,
@@ -175,20 +181,25 @@ class AttendanceController {
         return errorResponse(res, 'start_date and end_date are required', 400);
       }
 
-      let sql = `
-        SELECT * FROM attendance 
-        WHERE tanggal >= ? AND tanggal <= ? AND is_deleted = 0
-      `;
-      const params = [start_date, end_date];
+      const whereClause = {
+        tanggal: {
+          gte: new Date(start_date),
+          lte: new Date(end_date)
+        },
+        is_deleted: false
+      };
 
       if (nip) {
-        sql += ' AND nip = ?';
-        params.push(nip);
+        whereClause.nip = nip;
       }
 
-      sql += ' ORDER BY tanggal DESC, jam_masuk DESC';
-
-      const attendance = await query(sql, params);
+      const attendance = await prisma.attendance.findMany({
+        where: whereClause,
+        orderBy: [
+          { tanggal: 'desc' },
+          { jam_masuk: 'desc' }
+        ]
+      });
 
       // Group by employee
       const employeeStats = {};
@@ -259,21 +270,18 @@ class AttendanceController {
     try {
       const { id } = req.params;
 
-      const result = await query(
-        'SELECT * FROM attendance WHERE id = ? LIMIT 1',
-        [parseInt(id)]
-      );
+      const attendance = await prisma.attendance.findUnique({
+        where: { id: parseInt(id) }
+      });
 
-      if (result.length === 0) {
+      if (!attendance) {
         return errorResponse(res, 'Attendance record not found', 404);
       }
 
-      const attendance = result[0];
-
-      await query(
-        'UPDATE attendance SET is_deleted = 1 WHERE id = ?',
-        [parseInt(id)]
-      );
+      await prisma.attendance.update({
+        where: { id: parseInt(id) },
+        data: { is_deleted: true }
+      });
 
       logger.audit('ATTENDANCE_DELETED', req.user?.id, {
         attendance_id: id,

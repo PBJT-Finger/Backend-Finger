@@ -9,68 +9,65 @@ const Device = sequelize.define('Device', {
     primaryKey: true,
     autoIncrement: true
   },
-  device_id: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    unique: true
-  },
-  serial_number: {
+  device_name: {
     type: DataTypes.STRING(100),
     allowNull: false,
-    unique: true
+    comment: 'Nama device (human-readable)'
+  },
+  device_id: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    unique: true,
+    comment: 'Device ID unik (technical identifier)'
   },
   ip_address: {
     type: DataTypes.STRING(45), // IPv6 compatible
-    allowNull: false
-  },
-  api_key: {
-    type: DataTypes.STRING(255),
-    allowNull: false
+    allowNull: true,
+    comment: 'IP address device'
   },
   location: {
     type: DataTypes.STRING(255),
-    allowNull: true
+    allowNull: true,
+    comment: 'Lokasi fisik device'
   },
-  faculty: {
-    type: DataTypes.STRING(100),
-    allowNull: true
+  api_key_hash: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Hashed API key untuk autentikasi device'
   },
   is_active: {
     type: DataTypes.BOOLEAN,
-    defaultValue: true
-  },
-  last_seen: {
-    type: DataTypes.DATE,
-    allowNull: true
+    defaultValue: true,
+    comment: 'Status aktif device'
   }
 }, {
   tableName: 'devices',
+  timestamps: true,
+  underscored: true,
   indexes: [
     { fields: ['device_id'] },
-    { fields: ['serial_number'] },
-    { fields: ['ip_address'] },
     { fields: ['is_active'] }
   ]
 });
 
-// Phase 3: Hash API key before creating device
+// Hash API key before creating device
 Device.beforeCreate(async (device) => {
-  if (device.api_key && !device.api_key.startsWith('$2b$')) {
+  if (device.api_key_hash && !device.api_key_hash.startsWith('$2b$')) {
     // Hash API key with 10 rounds (slightly less than passwords for performance)
-    device.api_key = await bcrypt.hash(device.api_key, 10);
+    device.api_key_hash = await bcrypt.hash(device.api_key_hash, 10);
   }
 });
 
-// Phase 3: Hash API key before updating if changed
+// Hash API key before updating if changed
 Device.beforeUpdate(async (device) => {
-  if (device.changed('api_key') && !device.api_key.startsWith('$2b$')) {
-    device.api_key = await bcrypt.hash(device.api_key, 10);
+  if (device.changed('api_key_hash') && !device.api_key_hash.startsWith('$2b$')) {
+    device.api_key_hash = await bcrypt.hash(device.api_key_hash, 10);
   }
 });
 
-// Phase 3: Instance method to verify API key
+// Instance method to verify API key
 Device.prototype.verifyApiKey = async function (plainApiKey) {
-  return await bcrypt.compare(plainApiKey, this.api_key);
+  return await bcrypt.compare(plainApiKey, this.api_key_hash);
 };
 
 module.exports = Device;

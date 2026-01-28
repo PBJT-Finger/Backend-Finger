@@ -5,3 +5,4 @@ exports/
 .DS_Store
 .vscode/
 .idea/
+/src/generated/prisma

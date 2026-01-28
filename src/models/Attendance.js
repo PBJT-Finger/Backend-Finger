@@ -1,4 +1,4 @@
-// src/models/Attendance.js - Model utama untuk data absensi
+// src/models/Attendance.js - Model untuk data absensi (UPDATED FOR PRODUCTION)
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
@@ -8,17 +8,13 @@ const Attendance = sequelize.define('Attendance', {
     primaryKey: true,
     autoIncrement: true
   },
-  cloud_id: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-    comment: 'ID dari cloud system'
-  },
-  device_id: {
+  // Employee identification (denormalized for performance)
+  user_id: {
     type: DataTypes.STRING(50),
     allowNull: false,
-    comment: 'ID perangkat fingerprint'
+    comment: 'User ID (sama dengan NIP)'
   },
-  user_id: {
+  nip: {
     type: DataTypes.STRING(50),
     allowNull: false,
     comment: 'Nomor Induk Pegawai'
@@ -26,40 +22,54 @@ const Attendance = sequelize.define('Attendance', {
   nama: {
     type: DataTypes.STRING(255),
     allowNull: false,
-    comment: 'Nama lengkap pengguna'
+    comment: 'Nama pegawai (denormalized)'
   },
-  kategori_user: {
+  jabatan: {
     type: DataTypes.ENUM('DOSEN', 'KARYAWAN'),
     allowNull: false,
-    comment: 'Jabatan pengguna'
+    comment: 'Jabatan pegawai (denormalized)'
   },
-  tanggal_absensi: {
+  // Attendance data
+  tanggal: {
     type: DataTypes.DATEONLY,
     allowNull: false,
-    comment: 'Tanggal absensi (YYYY-MM-DD)'
+    comment: 'Tanggal absensi'
   },
-  waktu_absensi: {
+  jam_masuk: {
     type: DataTypes.TIME,
-    allowNull: false,
-    comment: 'Waktu absensi (HH:mm:ss)'
+    allowNull: true,
+    comment: 'Waktu check-in pertama'
   },
-  tipe_absensi: {
-    type: DataTypes.ENUM('MASUK', 'PULANG'),
-    allowNull: false,
-    comment: 'Tipe absensi'
+  jam_keluar: {
+    type: DataTypes.TIME,
+    allowNull: true,
+    comment: 'Waktu check-out terakhir'
   },
-  verifikasi: {
+  // Device info
+  device_id: {
     type: DataTypes.STRING(100),
-    allowNull: false,
+    allowNull: true,
+    comment: 'ID device fingerprint'
+  },
+  cloud_id: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Cloud system identifier dari fingerprint device'
+  },
+  verification_method: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
     defaultValue: 'SIDIK_JARI',
-    comment: 'Metode verifikasi'
+    comment: 'Metode verifikasi (SIDIK_JARI, KARTU, WAJAH)'
   },
-  tanggal_upload: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    comment: 'Timestamp upload data'
+  // Status tracking (HADIR / TERLAMBAT only)
+  status: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    defaultValue: 'HADIR',
+    comment: 'Status kehadiran (HADIR, TERLAMBAT)'
   },
+  // Soft delete
   is_deleted: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
@@ -67,20 +77,21 @@ const Attendance = sequelize.define('Attendance', {
   }
 }, {
   tableName: 'attendance',
-  indexes: [
-    { fields: ['user_id', 'tanggal_absensi'] },
-    { fields: ['device_id'] },
-    { fields: ['tipe_absensi'] },
-    { fields: ['kategori_user'] }, // Gunakan nama kolom sebenarnya
-    { fields: ['tanggal_upload'] },
-    { fields: ['is_deleted'] },
-    { fields: ['cloud_id'], unique: true }
-  ],
-  paranoid: true, // Aktifkan soft deletes
   timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
-  deletedAt: 'deleted_at'
+  underscored: true,
+  indexes: [
+    { fields: ['user_id'] },
+    { fields: ['nip'] },
+    { fields: ['tanggal'] },
+    { fields: ['jabatan'] },
+    { fields: ['device_id'] },
+    { fields: ['cloud_id'] },
+    { fields: ['verification_method'] },
+    { fields: ['status'] },
+    { fields: ['is_deleted'] },
+    { fields: ['nip', 'tanggal'] },
+    { fields: ['tanggal', 'jabatan'] }
+  ]
 });
 
 module.exports = Attendance;

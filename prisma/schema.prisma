@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model admins {
+  id              Int               @id @default(autoincrement())
+  username        String            @unique(map: "username") @db.VarChar(50)
+  password_hash   String            @db.VarChar(255)
+  email           String            @unique(map: "email") @db.VarChar(100)
+  full_name       String?           @db.VarChar(255)
+  role            String?           @default("ADMIN") @db.VarChar(50)
+  is_active       Boolean?          @default(true)
+  last_login      DateTime?         @db.Timestamp(0)
+  created_at      DateTime?         @default(now()) @db.Timestamp(0)
+  updated_at      DateTime?         @default(now()) @db.Timestamp(0)
+  password_resets password_resets[]
+
+  @@index([email], map: "idx_email")
+  @@index([is_active], map: "idx_is_active")
+  @@index([username], map: "idx_username")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model attendance {
+  id                  Int                @id @default(autoincrement())
+  user_id             String             @db.VarChar(50)
+  nip                 String             @db.VarChar(50)
+  nama                String             @db.VarChar(255)
+  jabatan             attendance_jabatan
+  tanggal             DateTime           @db.Date
+  jam_masuk           DateTime?          @db.Time(0)
+  jam_keluar          DateTime?          @db.Time(0)
+  device_id           String?            @db.VarChar(100)
+  cloud_id            String?            @db.VarChar(100)
+  verification_method String?            @default("SIDIK_JARI") @db.VarChar(50)
+  status              String?            @default("HADIR") @db.VarChar(50)
+  is_deleted          Boolean?           @default(false)
+  created_at          DateTime?          @default(now()) @db.Timestamp(0)
+  updated_at          DateTime?          @default(now()) @db.Timestamp(0)
+
+  @@index([cloud_id], map: "idx_cloud_id")
+  @@index([device_id], map: "idx_device_id")
+  @@index([is_deleted], map: "idx_is_deleted")
+  @@index([jabatan], map: "idx_jabatan")
+  @@index([nip], map: "idx_nip")
+  @@index([nip, tanggal], map: "idx_nip_tanggal")
+  @@index([status], map: "idx_status")
+  @@index([tanggal], map: "idx_tanggal")
+  @@index([tanggal, jabatan], map: "idx_tanggal_jabatan")
+  @@index([user_id], map: "idx_user_id")
+  @@index([verification_method], map: "idx_verification_method")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model devices {
+  id           Int       @id @default(autoincrement())
+  device_name  String    @db.VarChar(100)
+  device_id    String    @unique(map: "device_id") @db.VarChar(100)
+  ip_address   String?   @db.VarChar(45)
+  location     String?   @db.VarChar(255)
+  api_key_hash String?   @db.VarChar(255)
+  is_active    Boolean?  @default(true)
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  updated_at   DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([device_id], map: "idx_device_id")
+  @@index([is_active], map: "idx_is_active")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model employees {
+  id            Int               @id @default(autoincrement())
+  nip           String            @unique(map: "nip") @db.VarChar(50)
+  nama          String            @db.VarChar(255)
+  jabatan       employees_jabatan
+  shift_id      Int?
+  status        employees_status? @default(AKTIF)
+  tanggal_masuk DateTime?         @db.Date
+  is_active     Boolean?          @default(true)
+  created_at    DateTime?         @default(now()) @db.Timestamp(0)
+  updated_at    DateTime?         @default(now()) @db.Timestamp(0)
+  shifts        shifts?           @relation(fields: [shift_id], references: [id], onUpdate: NoAction, map: "fk_employee_shift")
+
+  @@index([is_active], map: "idx_is_active")
+  @@index([jabatan], map: "idx_jabatan")
+  @@index([nip], map: "idx_nip")
+  @@index([shift_id], map: "idx_shift")
+  @@index([status], map: "idx_status")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model password_resets {
+  id          Int       @id @default(autoincrement())
+  admin_id    Int
+  email       String    @db.VarChar(255)
+  code        String    @db.VarChar(6)
+  reset_token String?   @db.VarChar(255)
+  expires_at  DateTime  @db.DateTime(0)
+  used_at     DateTime? @db.DateTime(0)
+  created_at  DateTime? @default(now()) @db.DateTime(0)
+  admins      admins    @relation(fields: [admin_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_password_resets_admin")
+
+  @@index([admin_id], map: "idx_admin_id")
+  @@index([code], map: "idx_code")
+  @@index([email], map: "idx_email")
+  @@index([expires_at], map: "idx_expires_at")
+  @@index([reset_token], map: "idx_reset_token")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model shifts {
+  id         Int         @id @default(autoincrement())
+  nama_shift String      @db.VarChar(50)
+  jam_masuk  DateTime    @db.Time(0)
+  jam_keluar DateTime    @db.Time(0)
+  deskripsi  String?     @db.Text
+  is_active  Boolean?    @default(true)
+  created_at DateTime?   @default(now()) @db.Timestamp(0)
+  updated_at DateTime?   @default(now()) @db.Timestamp(0)
+  employees  employees[]
+
+  @@index([is_active], map: "idx_is_active")
+}
+
+enum employees_jabatan {
+  DOSEN
+  KARYAWAN
+}
+
+enum attendance_jabatan {
+  DOSEN
+  KARYAWAN
+}
+
+enum employees_status {
+  AKTIF
+  CUTI
+  RESIGN
+  NON_AKTIF
+}

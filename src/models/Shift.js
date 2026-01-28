@@ -11,17 +11,17 @@ const Shift = sequelize.define('Shift', {
     nama_shift: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: 'Nama shift (e.g., Shift Pagi, Shift Malam)'
+        comment: 'Nama shift (e.g., Shift Pagi, Shift Sore)'
     },
     jam_masuk: {
         type: DataTypes.TIME,
         allowNull: false,
-        comment: 'Jam masuk yang diharapkan'
+        comment: 'Jam mulai shift'
     },
-    toleransi_menit: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-        comment: 'Grace period dalam menit'
+    jam_keluar: {
+        type: DataTypes.TIME,
+        allowNull: false,
+        comment: 'Jam selesai shift'
     },
     deskripsi: {
         type: DataTypes.TEXT,
