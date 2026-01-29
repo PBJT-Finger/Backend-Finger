@@ -32,11 +32,6 @@ const { testSequelizeConnection } = require('./config/database');
 // Import logger
 const logger = require('./utils/logger');
 
-// 🚀 CLEAN ARCHITECTURE: Bootstrap DI Container
-// Initialize dependency injection container with repositories and use cases
-const bootstrap = require('./infrastructure/container/bootstrap');
-bootstrap(); // This registers all dependencies
-
 // Initialize Express app
 const app = express();
 
@@ -112,7 +107,7 @@ app.use(helmet({
 // Konfigurasi CORS dengan multi-origin support
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000', 'http://localhost:5173'];
+  : ['http://localhost:5000', 'http://localhost:5173'];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -302,12 +297,6 @@ app.get('/finger-api/docs-json', (req, res) => {
 });
 
 
-
-// Legacy Swagger UI (if needed) - backup
-app.get('/finger-api/docs/old', (req, res) => {
-  const path = require('path');
-  res.sendFile(path.join(__dirname, '..', 'public', 'swagger-ui.html'));
-});
 
 // Routes API
 app.use('/api/auth', authRoutes);

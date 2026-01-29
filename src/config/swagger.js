@@ -141,9 +141,9 @@ For technical assistance or questions, contact the development team.
 
 ## 🔗 Quick Links
 
-- **API Base URL:** [http://localhost:3000/api](http://localhost:3000/api)
-- **Health Check:** [http://localhost:3000/health](http://localhost:3000/health)
-- **Metrics:** [http://localhost:3000/metrics](http://localhost:3000/metrics)
+- **API Base URL:** [http://localhost:5000/api](http://localhost:5000/api)
+- **Health Check:** [http://localhost:5000/health](http://localhost:5000/health)
+- **Metrics:** [http://localhost:5000/metrics](http://localhost:5000/metrics)
       `,
       contact: {
         name: 'Backend Development Team',
@@ -156,16 +156,12 @@ For technical assistance or questions, contact the development team.
     },
     servers: [
       {
-        url: 'http://localhost:3000',
-        description: 'Development Server'
+        url: `http://localhost:${process.env.PORT || 5000}`,
+        description: 'Development Server (dynamic port)'
       },
       {
-        url: 'http://localhost:3000/api',
+        url: `http://localhost:${process.env.PORT || 5000}/api`,
         description: 'API Base URL'
-      },
-      {
-        url: `http://localhost:${process.env.PORT || 3000}`,
-        description: 'Development server (dynamic port)',
       },
       {
         url: 'https://api.kampus.edu',
@@ -506,12 +502,13 @@ For technical assistance or questions, contact the development team.
         // ==================== AUTH ====================
         LoginRequest: {
           type: 'object',
-          required: ['username', 'password'],
+          required: ['email', 'password'],
           properties: {
-            username: {
+            email: {
               type: 'string',
-              description: 'Admin username',
-              example: 'admin'
+              format: 'email',
+              description: 'Admin email (used for login)',
+              example: 'admin@kampus.edu'
             },
             password: {
               type: 'string',

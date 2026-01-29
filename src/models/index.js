@@ -1,11 +1,10 @@
-// src/models/index.js - Centralized Model Exports (Prisma Version)
-// CLEAN ARCHITECTURE: Exports only the Prisma instance.
-// Legacy Sequelize models have been archived to /src/models/legacy/
+// src/models/index.js - Prisma Client Export
+// This file exports Prisma client for controllers that still use require('../models')
 
-const { prisma } = require('../utils/prismaHelpers');
+const { PrismaClient } = require('@prisma/client');
 
-// Export Prisma Client instance
-// Usages: const { prisma } = require('../models');
+const prisma = new PrismaClient();
+
 module.exports = {
-  prisma
+    prisma
 };

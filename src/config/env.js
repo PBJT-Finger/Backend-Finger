@@ -64,7 +64,7 @@ const validateEnv = () => {
         }),
         CORS_ORIGINS: str({
             desc: 'Comma-separated list of allowed CORS origins',
-            default: 'http://localhost:3000,http://localhost:5173'
+            default: 'http://localhost:5000,http://localhost:5173'
         }),
 
         // Logging

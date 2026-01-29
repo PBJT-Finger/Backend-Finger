@@ -4,7 +4,7 @@
  */
 
 const express = require('express');
-const { sequelize } = require('../models');
+const { prisma } = require('../models');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -33,14 +33,14 @@ router.get('/health', async (req, res) => {
         checks: {}
     };
 
-    // Check Database Connection
+    // Check Database Connection (Prisma)
     try {
         const dbStart = Date.now();
-        await sequelize.authenticate();
+        await prisma.$queryRaw`SELECT 1`;
         health.checks.database = {
             status: 'up',
             responseTime: Date.now() - dbStart,
-            type: sequelize.getDialect()
+            type: 'MySQL (Prisma)'
         };
     } catch (error) {
         health.checks.database = {
@@ -144,8 +144,8 @@ router.get('/health/live', (req, res) => {
  */
 router.get('/health/ready', async (req, res) => {
     try {
-        // Check critical dependencies
-        await sequelize.authenticate();
+        // Check critical dependencies (Prisma)
+        await prisma.$queryRaw`SELECT 1`;
 
         res.status(200).json({
             status: 'ready',

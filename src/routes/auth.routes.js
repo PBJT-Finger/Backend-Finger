@@ -12,12 +12,13 @@ const router = express.Router();
  *     LoginRequest:
  *       type: object
  *       required:
- *         - username
+ *         - email
  *         - password
  *       properties:
- *         username:
+ *         email:
  *           type: string
- *           description: Username admin
+ *           format: email
+ *           description: Admin email address
  *         password:
  *           type: string
  *           description: Password admin
@@ -140,7 +141,9 @@ router.post('/logout', authenticateToken, AuthController.logout);
  *             properties:
  *               username:
  *                 type: string
- *                 description: Unique username
+ *                 description: Unique username (for display after login)
+ *                 minLength: 3
+ *                 maxLength: 50
  *               email:
  *                 type: string
  *                 format: email

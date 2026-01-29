@@ -76,4 +76,14 @@ const logger = winston.createLogger({
   transports,
 });
 
+// Add audit method for audit trail logging
+logger.audit = function (event, userId, metadata = {}) {
+  logger.info(`AUDIT: ${event}`, {
+    event,
+    userId,
+    ...metadata,
+    timestamp: new Date().toISOString()
+  });
+};
+
 module.exports = logger;

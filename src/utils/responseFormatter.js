@@ -48,19 +48,22 @@ const loginResponse = (res, user, token, refreshToken = null, message = 'Login b
     const response = {
         success: true,
         message,
-        token,
-        user: {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            role: user.role,
-            name: user.username // Using username as name for now
+        data: {
+            user: {
+                id: user.id,
+                email: user.email,
+                username: user.username,
+                role: user.role,
+                name: user.username // Using username as name for now
+            },
+            tokens: {
+                access_token: token,
+                refresh_token: refreshToken,
+                token_type: 'Bearer',
+                expires_in: 15 * 60 // 15 minutes in seconds
+            }
         }
     };
-
-    if (refreshToken) {
-        response.refreshToken = refreshToken;
-    }
 
     return res.status(200).json(response);
 };

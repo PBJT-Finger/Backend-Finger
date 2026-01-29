@@ -90,6 +90,12 @@ class AuthController {
   ];
 
   static register = [
+    body('username')
+      .trim()
+      .isLength({ min: 3, max: 50 })
+      .withMessage('Username harus 3-50 karakter')
+      .matches(/^[a-zA-Z0-9_]+$/)
+      .withMessage('Username hanya boleh huruf, angka, dan underscore'),
     body('email')
       .trim()
       .isEmail()
@@ -108,16 +114,19 @@ class AuthController {
           return errorResponse(res, errors.array()[0].msg, 400);
         }
 
-        const { email, password } = req.body;
+        const { username, email, password } = req.body;
+
+        // Check if username exists
+        const existingUsername = await query('SELECT id FROM admins WHERE username = ? LIMIT 1', [username]);
+        if (existingUsername.length > 0) {
+          return errorResponse(res, 'Username sudah digunakan', 400);
+        }
 
         // Check if email exists
         const existing = await query('SELECT id FROM admins WHERE email = ? LIMIT 1', [email]);
         if (existing.length > 0) {
           return errorResponse(res, 'Email sudah terdaftar', 400);
         }
-
-        // Auto-generate username from email (part before @)
-        const username = email.split('@')[0];
 
         const hashedPassword = await bcrypt.hash(password, 12);
 

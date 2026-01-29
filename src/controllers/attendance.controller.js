@@ -38,7 +38,7 @@ class AttendanceController {
 
       // Transform to aggregated data
       const { transformDosenAttendance } = require('../utils/attendanceTransformer');
-      const transformedData = transformDosenAttendance(attendance);
+      const transformedData = transformDosenAttendance(attendance, start_date, end_date);
 
       // Apply pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);

@@ -1,4 +1,5 @@
 // src/controllers/export.controller.js - Export Attendance Data (Prisma)
+const { query } = require('../lib/db');
 const { prisma } = require('../models');
 const { formatTime } = require('../utils/prismaHelpers');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
@@ -16,6 +17,16 @@ class ExportController {
   static async exportToExcel(req, res) {
     try {
       const { start_date, end_date, jabatan, nip } = req.query;
+
+      // Helper function to format date to DD/MM/YYYY
+      const formatDate = (dateValue) => {
+        if (!dateValue) return '-';
+        const date = new Date(dateValue);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
 
       // Helper function to format time (handles both string and Date object)
       const formatTime = (timeValue) => {
@@ -47,7 +58,7 @@ class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      const params = [new Date(start_date), new Date(end_date)];
+      const params = [start_date, end_date]; // Use string dates for MySQL
 
       if (jabatan) {
         sql += ' AND a.jabatan = ?';
@@ -72,7 +83,7 @@ class ExportController {
         // For KARYAWAN, exclude NIP and Jabatan columns
         if (jabatan === 'KARYAWAN') {
           return {
-            'Tanggal': record.tanggal.toISOString().split('T')[0],
+            'Tanggal': formatDate(record.tanggal),
             'Nama': record.nama,
             'Jam Masuk': formatTime(record.jam_masuk),
             'Jam Keluar': formatTime(record.jam_keluar),
@@ -80,12 +91,11 @@ class ExportController {
             'Device': record.device_id || '-'
           };
         } else {
-          // For DOSEN, include all columns
+          // For DOSEN, exclude Jabatan (redundant - already filtered)
           return {
-            'Tanggal': record.tanggal.toISOString().split('T')[0],
+            'Tanggal': formatDate(record.tanggal),
             'NIP': record.nip,
             'Nama': record.nama,
-            'Jabatan': record.jabatan,
             'Jam Masuk': formatTime(record.jam_masuk),
             'Jam Keluar': formatTime(record.jam_keluar),
             'Status': record.status,
@@ -177,7 +187,7 @@ class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      const params = [new Date(start_date), new Date(end_date)];
+      const params = [start_date, end_date]; // Use string dates for MySQL
 
       if (jabatan) {
         sql += ' AND a.jabatan = ?';
@@ -361,6 +371,16 @@ class ExportController {
     try {
       const { start_date, end_date, jabatan, nip } = req.query;
 
+      // Helper function to format date to DD/MM/YYYY
+      const formatDate = (dateValue) => {
+        if (!dateValue) return '-';
+        const date = new Date(dateValue);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+
       // Helper function to format time (handles both string and Date object)
       const formatTime = (timeValue) => {
         if (!timeValue) return '-';
@@ -379,7 +399,7 @@ class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      const params = [new Date(start_date), new Date(end_date)];
+      const params = [start_date, end_date]; // Use string dates for MySQL
 
       if (jabatan) {
         sql += ' AND a.jabatan = ?';
@@ -404,7 +424,7 @@ class ExportController {
         // For KARYAWAN, exclude NIP and Jabatan columns
         if (jabatan === 'KARYAWAN') {
           return {
-            tanggal: record.tanggal.toISOString().split('T')[0],
+            tanggal: formatDate(record.tanggal),
             nama: record.nama,
             jam_masuk: formatTime(record.jam_masuk),
             jam_keluar: formatTime(record.jam_keluar),
@@ -412,12 +432,11 @@ class ExportController {
             device: record.device_id || '-'
           };
         } else {
-          // For DOSEN, include all columns
+          // For DOSEN, exclude Jabatan (redundant - already filtered)
           return {
-            tanggal: record.tanggal.toISOString().split('T')[0],
+            tanggal: formatDate(record.tanggal),
             nip: record.nip,
             nama: record.nama,
-            jabatan: record.jabatan,
             jam_masuk: formatTime(record.jam_masuk),
             jam_keluar: formatTime(record.jam_keluar),
             status: record.status,

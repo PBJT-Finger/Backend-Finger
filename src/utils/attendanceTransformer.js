@@ -130,10 +130,9 @@ function transformKaryawanAttendance(attendanceRecords) {
                 grouped[nip] = {
                     nip: nip,
                     nama: record.nama || record.employee?.nama || 'Unknown',
-                    jabatan: record.employee?.department || record.department || 'N/A',
                     records: [],
-                    uniqueDates: new Set(),
                     attendanceDates: new Set(),
+                    uniqueDates: new Set(),
                     lastCheckIn: null,
                     lastCheckOut: null
                 };
@@ -141,23 +140,24 @@ function transformKaryawanAttendance(attendanceRecords) {
 
             grouped[nip].records.push(record);
 
-            // Track unique dates for totalHariKerja
+            // Track ALL dates for this employee (for total hari kerja)
             if (record.tanggal) {
                 const dateStr = record.tanggal instanceof Date
                     ? record.tanggal.toISOString().split('T')[0]
                     : String(record.tanggal).split('T')[0];
-
                 grouped[nip].uniqueDates.add(dateStr);
-
-                // Track attendance dates (only dates with actual attendance)
-                if (record.jam_masuk) {
-                    grouped[nip].attendanceDates.add(dateStr);
-                }
             }
 
-            // Track last check-in (MySQL returns TIME as string "HH:MM:SS")
+            // Track attendance dates (only when there's check-in)
             if (record.jam_masuk && record.tanggal) {
-                // Combine date + time to create valid Date object
+                const dateStr = record.tanggal instanceof Date
+                    ? record.tanggal.toISOString().split('T')[0]
+                    : String(record.tanggal).split('T')[0];
+                grouped[nip].attendanceDates.add(dateStr);
+            }
+
+            // Track last check-in
+            if (record.jam_masuk && record.tanggal) {
                 const dateStr = record.tanggal instanceof Date
                     ? record.tanggal.toISOString().split('T')[0]
                     : String(record.tanggal).split('T')[0];
@@ -229,58 +229,88 @@ function transformKaryawanAttendance(attendanceRecords) {
     }
 }
 
-/**
- * Format date to readable string (e.g., "22 Jan 2026")
- */
-function formatDate(date) {
-    if (!date) return 'Belum ada data';
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return 'Belum ada data';
+// Helper function to format attendance dates
+function formatAttendanceDates(datesSet) {
+    if (!datesSet || datesSet.size === 0) return 'Belum ada data';
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    const dates = Array.from(datesSet).sort();
+
+    // If only 1 day, show single date
+    if (dates.length === 1) {
+        const date = new Date(dates[0]);
+        const day = date.getDate();
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        const month = monthNames[date.getMonth()];
+        const year = date.getFullYear();
+        return `${day} ${month} ${year}`;
+    }
+
+    // If multiple days, show range
+    const firstDate = new Date(dates[0]);
+    const lastDate = new Date(dates[dates.length - 1]);
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+    const firstDay = firstDate.getDate();
+    const firstMonth = monthNames[firstDate.getMonth()];
+
+    const lastDay = lastDate.getDate();
+    const lastMonth = monthNames[lastDate.getMonth()];
+    const lastYear = lastDate.getFullYear();
+
+    // If same month, show: "22 - 28 Jan 2026"
+    if (firstDate.getMonth() === lastDate.getMonth() && firstDate.getFullYear() === lastDate.getFullYear()) {
+        return `${firstDay} - ${lastDay} ${lastMonth} ${lastYear}`;
+    }
+
+    // If different months, show: "22 Jan - 28 Feb 2026"
+    return `${firstDay} ${firstMonth} - ${lastDay} ${lastMonth} ${lastYear}`;
 }
 
-/**
- * Format time to readable string (e.g., "08:30")
- */
-function formatTimeOnly(date) {
-    if (!date) return 'Belum ada data';
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return 'Belum ada data';
+// Helper function to format time
+function formatTime(time) {
+    if (!time) return 'Belum ada data';
+    if (typeof time === 'string') return time;
 
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const date = new Date(time);
+    if (isNaN(date.getTime())) return 'Belum ada data';
+
+    return date.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+// Helper function to format time only (HH:MM from Date object)
+function formatTimeOnly(dateTime) {
+    if (!dateTime) return 'Belum ada data';
+
+    const date = dateTime instanceof Date ? dateTime : new Date(dateTime);
+    if (isNaN(date.getTime())) return 'Belum ada data';
+
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
     return `${hours}:${minutes}`;
 }
 
-/**
- * Format attendance dates to comma-separated string
- */
-function formatAttendanceDates(datesSet) {
-    if (!datesSet || datesSet.size === 0) {
-        return 'Belum ada data';
-    }
+// Helper function to format date in Indonesian format (DD/MM/YYYY)
+function formatDateID(dateString) {
+    if (!dateString) return '-';
 
-    // Convert Set to sorted array
-    const sortedDates = Array.from(datesSet).filter(d => d).sort();
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
 
-    // Format each date
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    const formattedDates = sortedDates.map(dateStr => {
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return null;
-        return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
-    }).filter(d => d);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
 
-    // Join with comma
-    return formattedDates.length > 0 ? formattedDates.join(', ') : 'Belum ada data';
+    return `${day}/${month}/${year}`;
 }
 
 module.exports = {
     transformDosenAttendance,
     transformKaryawanAttendance,
-    formatDate,
-    formatTimeOnly,
-    formatAttendanceDates
+    formatDateID
 };
