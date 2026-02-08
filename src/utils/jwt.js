@@ -8,7 +8,7 @@ const JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 // Generate Access Token
-const generateAccessToken = (payload) => {
+const generateAccessToken = payload => {
   return jwt.sign(payload, JWT_ACCESS_SECRET, {
     expiresIn: JWT_ACCESS_EXPIRES_IN,
     issuer: 'kampus-attendance-system',
@@ -17,7 +17,7 @@ const generateAccessToken = (payload) => {
 };
 
 // Generate Refresh Token
-const generateRefreshToken = (payload) => {
+const generateRefreshToken = payload => {
   return jwt.sign(payload, JWT_REFRESH_SECRET, {
     expiresIn: JWT_REFRESH_EXPIRES_IN,
     issuer: 'kampus-attendance-system',
@@ -26,7 +26,7 @@ const generateRefreshToken = (payload) => {
 };
 
 // Verifikasi Access Token
-const verifyAccessToken = (token) => {
+const verifyAccessToken = token => {
   try {
     return jwt.verify(token, JWT_ACCESS_SECRET, {
       issuer: 'kampus-attendance-system',
@@ -38,7 +38,7 @@ const verifyAccessToken = (token) => {
 };
 
 // Verify Refresh Token
-const verifyRefreshToken = (token) => {
+const verifyRefreshToken = token => {
   try {
     return jwt.verify(token, JWT_REFRESH_SECRET, {
       issuer: 'kampus-attendance-system',
@@ -50,7 +50,7 @@ const verifyRefreshToken = (token) => {
 };
 
 // Generate token pair
-const generateTokens = (user) => {
+const generateTokens = user => {
   const payload = {
     id: user.id,
     username: user.username,

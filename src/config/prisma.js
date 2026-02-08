@@ -1,9 +1,9 @@
 /**
  * Prisma Client Configuration
- * 
+ *
  * Singleton pattern for Prisma Client to prevent multiple instances
  * in development and ensure optimal connection pooling.
- * 
+ *
  * @see https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
  */
 
@@ -15,12 +15,12 @@ const logger = require('../utils/logger');
  * Configure logging and error handling
  */
 const prismaOptions = {
-    log: [
-        { level: 'query', emit: 'event' },
-        { level: 'error', emit: 'stdout' },
-        { level: 'warn', emit: 'stdout' }
-    ],
-    errorFormat: 'minimal'
+  log: [
+    { level: 'query', emit: 'event' },
+    { level: 'error', emit: 'stdout' },
+    { level: 'warn', emit: 'stdout' }
+  ],
+  errorFormat: 'minimal'
 };
 
 /**
@@ -30,14 +30,14 @@ const prismaOptions = {
 let prisma;
 
 if (process.env.NODE_ENV === 'production') {
-    // Production: Create single instance
-    prisma = new PrismaClient(prismaOptions);
+  // Production: Create single instance
+  prisma = new PrismaClient(prismaOptions);
 } else {
-    // Development: Use global to preserve instance across hot reloads
-    if (!global.prisma) {
-        global.prisma = new PrismaClient(prismaOptions);
-    }
-    prisma = global.prisma;
+  // Development: Use global to preserve instance across hot reloads
+  if (!global.prisma) {
+    global.prisma = new PrismaClient(prismaOptions);
+  }
+  prisma = global.prisma;
 }
 
 /**
@@ -45,11 +45,12 @@ if (process.env.NODE_ENV === 'production') {
  * Log slow queries for performance monitoring
  */
 if (process.env.NODE_ENV !== 'production') {
-    prisma.$on('query', (e) => {
-        if (e.duration > 100) { // Log queries slower than 100ms
-            logger.warn(`Slow Query (${e.duration}ms): ${e.query}`);
-        }
-    });
+  prisma.$on('query', e => {
+    if (e.duration > 100) {
+      // Log queries slower than 100ms
+      logger.warn(`Slow Query (${e.duration}ms): ${e.query}`);
+    }
+  });
 }
 
 /**
@@ -57,20 +58,20 @@ if (process.env.NODE_ENV !== 'production') {
  * Disconnect Prisma Client on application shutdown
  */
 process.on('beforeExit', async () => {
-    await prisma.$disconnect();
-    logger.info('Prisma Client disconnected');
+  await prisma.$disconnect();
+  logger.info('Prisma Client disconnected');
 });
 
 process.on('SIGINT', async () => {
-    await prisma.$disconnect();
-    logger.info('Prisma Client disconnected (SIGINT)');
-    process.exit(0);
+  await prisma.$disconnect();
+  logger.info('Prisma Client disconnected (SIGINT)');
+  process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    await prisma.$disconnect();
-    logger.info('Prisma Client disconnected (SIGTERM)');
-    process.exit(0);
+  await prisma.$disconnect();
+  logger.info('Prisma Client disconnected (SIGTERM)');
+  process.exit(0);
 });
 
 module.exports = prisma;

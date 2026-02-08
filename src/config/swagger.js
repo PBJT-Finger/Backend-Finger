@@ -6,161 +6,33 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Finger API',
+      title: 'API Finger - Sistem Absensi Sidik Jari',
       version: '2.0.0',
-      description: `
-# Enterprise Attendance Management System
+      description: `**API Finger** adalah sistem manajemen absensi berbasis sidik jari yang terintegrasi dengan perangkat fingerprint, dirancang khusus untuk kebutuhan kampus dan institusi.
 
-**Finger API** is a fingerprint-based attendance management system integrated with ADMS devices, designed for campus and institutional use with enterprise-grade features.
+API REST yang komprehensif untuk mengelola absensi karyawan dengan integrasi sidik jari, sinkronisasi real-time, dan kemampuan analitik tingkat lanjut.
 
----
+**Base URL:** http://localhost:${process.env.PORT || 3333}/api
 
-## Overview
+**Authentication:** Bearer Token (JWT)
 
-A comprehensive REST API for managing employee attendance with fingerprint integration, real-time synchronization, and advanced analytics capabilities.
-
----
-
-## Core Features
-
-### Security & Authentication
-- JWT-based authentication with refresh token rotation
-- Token blacklist with Redis-based revocation
-- Multi-tier rate limiting (IP + per-user)
-- Input validation and sanitization
-- CORS and security headers
-- PII log redaction for compliance
-
-### Attendance Management
-- Real-time fingerprint device integration (ADMS)
-- Multiple check-in/check-out per day
-- Shift-based lateness detection for employees
-- Flexible scheduling for faculty
-- Automatic working days calculation (Sunday as weekend)
-
-### Analytics & Reporting
-- Comprehensive attendance summary
-- Attendance percentage calculation
-- Lateness tracking
-- Export to Excel, CSV, PDF formats
-- Dashboard with real-time statistics
-
-### Device Integration
-- Real-time sync with ADMS fingerprint devices
-- API key authentication for devices
-- HMAC signature validation
-- Automatic data validation
-
----
-
-## Technical Specifications
-
-| Specification | Value |
-|--------------|-------|
-| **Protocol** | REST API over HTTP/HTTPS |
-| **Format** | JSON (UTF-8) |
-| **Authentication** | JWT (HS256) with Bearer token |
-| **Timezone** | Asia/Jakarta (UTC+7) |
-| **Database** | MySQL 8.0+ |
-| **Cache** | Redis 7.0+ |
-| **Security Score** | 9.5/10 (Enterprise-grade) |
-
----
-
-## Rate Limits
-
-| Endpoint Category | Limit | Window |
-|------------------|-------|--------|
-| **Auth (Login)** | 5 requests | 15 minutes |
-| **Summary API** | 30 requests | 5 minutes |
-| **Export API** | 10 requests | 1 hour |
-| **Dashboard API** | 20 requests | 1 minute |
-| **ADMS Push** | 100 requests | 1 minute |
-| **General API** | 100 requests | 15 minutes |
-| **Per-User Limit (Moderate)** | 200 requests | 15 minutes |
-| **Per-User Limit (Strict)** | 50 requests | 15 minutes |
-
----
-
-## Response Format
-
-All API responses follow this standard structure:
-
-**Success Response:**
-\`\`\`json
-{
-  "success": true,
-  "message": "Operation successful",
-  "data": { ... }
-}
-\`\`\`
-
-**Error Response:**
-\`\`\`json
-{
-  "success": false,
-  "message": "Error description",
-  "errors": [ ... ]
-}
-\`\`\`
-
----
-
-## Getting Started
-
-### 1. Authenticate
-Obtain access tokens by logging in with admin credentials:
-
-\`\`\`bash
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "username": "admin",
-  "password": "your_password"
-}
-\`\`\`
-
-### 2. Use Bearer Token
-Include the access token in the Authorization header for all protected endpoints:
-
-\`\`\`bash
-Authorization: Bearer {your_access_token}
-\`\`\`
-
-### 3. Explore Endpoints
-Use the sections below to explore available endpoints. Click "Authorize" button to save your token for easy testing.
-
----
-
-## Support
-
-For technical assistance or questions, contact the development team.
-
----
-
-## 🔗 Quick Links
-
-- **API Base URL:** [http://localhost:5000/api](http://localhost:5000/api)
-- **Health Check:** [http://localhost:5000/health](http://localhost:5000/health)
-- **Metrics:** [http://localhost:5000/metrics](http://localhost:5000/metrics)
-      `,
+**Untuk memulai:** Login menggunakan endpoint /auth/login untuk mendapatkan access token, lalu gunakan token tersebut di header Authorization untuk mengakses endpoint lainnya.`,
       contact: {
-        name: 'Backend Development Team',
+        name: 'Tim Pengembangan Backend',
         email: 'admin@kampus.edu'
       },
       license: {
-        name: 'MIT License',
+        name: 'Lisensi MIT',
         url: 'https://opensource.org/licenses/MIT'
       }
     },
     servers: [
       {
-        url: `http://localhost:${process.env.PORT || 5000}`,
-        description: 'Development Server (dynamic port)'
+        url: `http://localhost:${process.env.PORT || 3333}`,
+        description: 'Development Server (dynamic port from env)'
       },
       {
-        url: `http://localhost:${process.env.PORT || 5000}/api`,
+        url: `http://localhost:${process.env.PORT || 3333}/api`,
         description: 'API Base URL'
       },
       {
@@ -186,35 +58,38 @@ For technical assistance or questions, contact the development team.
     tags: [
       {
         name: 'Authentication',
-        description: 'User login, token refresh, and logout operations. JWT-based authentication with Bearer tokens.'
+        description:
+          'Operasi login pengguna, refresh token, dan logout. Autentikasi berbasis JWT dengan Bearer token.'
       },
       {
         name: 'Attendance',
-        description: 'Fingerprint attendance operations - check in/out, view records, and attendance management'
+        description:
+          'Operasi absensi sidik jari - check in/out, lihat rekaman, dan manajemen absensi'
       },
       {
         name: 'Attendance Summary',
-        description: 'Attendance analytics, statistics, and summary reports with percentage calculations'
+        description:
+          'Analitik absensi, statistik, dan laporan ringkasan dengan perhitungan persentase'
       },
       {
         name: 'Dashboard',
-        description: 'Real-time dashboard statistics, trends, and key performance metrics'
+        description: 'Statistik dashboard real-time, tren, dan metrik kinerja utama'
       },
       {
         name: 'Export',
-        description: 'Export attendance data in multiple formats (Excel, CSV, PDF)'
+        description: 'Ekspor data absensi dalam berbagai format (Excel, CSV, PDF)'
       },
       {
         name: 'Admin',
-        description: 'Admin user management - view, create, update admin accounts'
+        description: 'Manajemen akun admin - CRUD operasi untuk user management sistem'
       },
       {
         name: 'Device',
-        description: 'ADMS fingerprint device management and synchronization'
+        description: 'Manajemen dan sinkronisasi perangkat sidik jari ADMS'
       },
       {
         name: 'System',
-        description: 'Health checks, monitoring, and system metrics'
+        description: 'Health check, monitoring, dan metrik sistem'
       }
     ],
     components: {
@@ -223,8 +98,8 @@ For technical assistance or questions, contact the development team.
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Enter your JWT token obtained from login endpoint'
-        },
+          description: 'Masukkan token JWT Anda yang diperoleh dari endpoint login'
+        }
       },
       schemas: {
         // ==================== EMPLOYEE ====================
@@ -233,7 +108,7 @@ For technical assistance or questions, contact the development team.
           properties: {
             id: {
               type: 'integer',
-              description: 'Unique employee ID',
+              description: 'ID karyawan unik',
               example: 1
             },
             nip: {
@@ -243,13 +118,13 @@ For technical assistance or questions, contact the development team.
             },
             nama: {
               type: 'string',
-              description: 'Full name',
+              description: 'Nama lengkap',
               example: 'Dr. Budi Santoso, M.Kom'
             },
             jabatan: {
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
-              description: 'Position type',
+              description: 'Tipe jabatan',
               example: 'KARYAWAN'
             },
             email: {
@@ -264,24 +139,24 @@ For technical assistance or questions, contact the development team.
             shift_id: {
               type: 'integer',
               nullable: true,
-              description: 'Shift assignment (NULL for DOSEN - flexible schedule)',
+              description: 'Penugasan shift (NULL untuk DOSEN - jadwal fleksibel)',
               example: 1
             },
             status: {
               type: 'string',
               enum: ['AKTIF', 'CUTI', 'RESIGN', 'NON_AKTIF'],
-              description: 'Employment status',
+              description: 'Status kepegawaian',
               example: 'AKTIF'
             },
             tanggal_masuk: {
               type: 'string',
               format: 'date',
-              description: 'Join date',
+              description: 'Tanggal bergabung',
               example: '2020-01-01'
             },
             is_active: {
               type: 'boolean',
-              description: 'Active status',
+              description: 'Status aktif',
               example: true
             }
           }
@@ -297,18 +172,18 @@ For technical assistance or questions, contact the development team.
             },
             nama_shift: {
               type: 'string',
-              description: 'Shift name',
+              description: 'Nama shift',
               example: 'Shift Pagi'
             },
             jam_masuk: {
               type: 'string',
               format: 'time',
-              description: 'Expected check-in time',
+              description: 'Waktu check-in yang diharapkan',
               example: '08:00:00'
             },
             toleransi_menit: {
               type: 'integer',
-              description: 'Grace period in minutes',
+              description: 'Masa tenggang dalam menit',
               example: 0
             },
             deskripsi: {
@@ -322,68 +197,67 @@ For technical assistance or questions, contact the development team.
           }
         },
 
-
         // ==================== ATTENDANCE ====================
         Attendance: {
           type: 'object',
           properties: {
             id: {
               type: 'integer',
-              description: 'Attendance record ID',
+              description: 'ID rekaman absensi',
               example: 1234
             },
             cloud_id: {
               type: 'string',
-              description: 'Cloud system identifier',
+              description: 'Identifikasi sistem cloud',
               example: 'CLOUD-001'
             },
             device_id: {
               type: 'string',
-              description: 'Fingerprint device ID',
+              description: 'ID perangkat sidik jari',
               example: 'FP-DEVICE-01'
             },
             user_id: {
               type: 'string',
-              description: 'User identifier from device',
+              description: 'Identifikasi pengguna dari perangkat',
               example: 'USER-001'
             },
             nama: {
               type: 'string',
-              description: 'Employee name',
+              description: 'Nama karyawan',
               example: 'Budi Santoso'
             },
             nip: {
               type: 'string',
-              description: 'NIP (Employee number)',
+              description: 'NIP (Nomor Induk Pegawai)',
               example: '199001012020011001'
             },
             jabatan: {
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
-              description: 'Position',
+              description: 'Jabatan',
               example: 'KARYAWAN'
             },
             tanggal_absensi: {
               type: 'string',
               format: 'date',
-              description: 'Attendance date (YYYY-MM-DD)',
+              description: 'Tanggal absensi (YYYY-MM-DD)',
               example: '2026-01-14'
             },
             waktu_absensi: {
               type: 'string',
               format: 'time',
-              description: 'Attendance time (HH:mm:ss)',
+              description: 'Waktu absensi (HH:mm:ss)',
               example: '08:15:30'
             },
             tipe_absensi: {
               type: 'string',
               enum: ['MASUK', 'PULANG'],
-              description: 'Check-in or check-out',
+              description: 'Check-in atau check-out',
               example: 'MASUK'
             },
             verifikasi: {
               type: 'string',
-              description: 'Verification method',
+              description: 'Metode verifikasi',
               example: 'SIDIK_JARI'
             }
           }
@@ -739,11 +613,13 @@ For technical assistance or questions, contact the development team.
         }
       }
     },
-    security: [{
-      bearerAuth: []
-    }],
+    security: [
+      {
+        bearerAuth: []
+      }
+    ]
   },
-  apis: ['./src/routes/*.js'], // Path to the API docs
+  apis: ['./src/routes/*.js'] // Path to the API docs
 };
 
 const specs = swaggerJsdoc(options);

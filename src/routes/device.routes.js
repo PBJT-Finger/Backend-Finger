@@ -12,18 +12,14 @@ router.use(authenticateToken);
 const deviceLimiter = createUserRateLimiter('moderate');
 router.use(deviceLimiter);
 
-/**
- * @swagger
- * tags:
- *   name: Device Management
- *   description: ADMS device management endpoints (CRUD operations)
- */
+// Device Management endpoints - using Device tag for documentation
+
 
 /**
  * @swagger
  * /api/device:
  *   get:
- *     summary: Get all devices (paginated)
+ *     summary: Dapatkan semua perangkat (paginasi)
  *     tags: [Device]
  *     security:
  *       - bearerAuth: []
@@ -53,7 +49,7 @@ router.use(deviceLimiter);
  *           type: string
  *     responses:
  *       200:
- *         description: List of devices
+ *         description: Daftar perangkat
  */
 router.get('/', DeviceController.getDevices);
 
@@ -61,7 +57,7 @@ router.get('/', DeviceController.getDevices);
  * @swagger
  * /api/device/{id}:
  *   get:
- *     summary: Get device by ID
+ *     summary: Dapatkan perangkat berdasarkan ID
  *     tags: [Device]
  *     security:
  *       - bearerAuth: []
@@ -73,9 +69,9 @@ router.get('/', DeviceController.getDevices);
  *           type: integer
  *     responses:
  *       200:
- *         description: Device details
+ *         description: Detail perangkat
  *       404:
- *         description: Device not found
+ *         description: Perangkat tidak ditemukan
  */
 router.get('/:id', DeviceController.getDeviceById);
 
@@ -83,7 +79,7 @@ router.get('/:id', DeviceController.getDeviceById);
  * @swagger
  * /api/device:
  *   post:
- *     summary: Create new device
+ *     summary: Buat perangkat baru
  *     tags: [Device]
  *     security:
  *       - bearerAuth: []
@@ -113,9 +109,9 @@ router.get('/:id', DeviceController.getDeviceById);
  *                 type: string
  *     responses:
  *       201:
- *         description: Device created successfully
+ *         description: Perangkat berhasil dibuat
  *       409:
- *         description: Serial number already exists
+ *         description: Nomor seri sudah ada
  */
 router.post('/', DeviceController.createDevice);
 
@@ -123,7 +119,7 @@ router.post('/', DeviceController.createDevice);
  * @swagger
  * /api/device/{id}:
  *   put:
- *     summary: Update device
+ *     summary: Perbarui perangkat
  *     tags: [Device]
  *     security:
  *       - bearerAuth: []
@@ -154,9 +150,9 @@ router.post('/', DeviceController.createDevice);
  *                 type: string
  *     responses:
  *       200:
- *         description: Device updated successfully
+ *         description: Perangkat berhasil diperbarui
  *       404:
- *         description: Device not found
+ *         description: Perangkat tidak ditemukan
  */
 router.put('/:id', DeviceController.updateDevice);
 
@@ -164,7 +160,7 @@ router.put('/:id', DeviceController.updateDevice);
  * @swagger
  * /api/device/{id}:
  *   delete:
- *     summary: Delete device
+ *     summary: Hapus perangkat
  *     tags: [Device]
  *     security:
  *       - bearerAuth: []
@@ -176,9 +172,9 @@ router.put('/:id', DeviceController.updateDevice);
  *           type: integer
  *     responses:
  *       200:
- *         description: Device deleted successfully
+ *         description: Perangkat berhasil dihapus
  *       404:
- *         description: Device not found
+ *         description: Perangkat tidak ditemukan
  */
 router.delete('/:id', DeviceController.deleteDevice);
 
@@ -186,7 +182,7 @@ router.delete('/:id', DeviceController.deleteDevice);
  * @swagger
  * /api/device/{id}/sync:
  *   post:
- *     summary: Update device last sync time
+ *     summary: Perbarui waktu sinkronisasi perangkat terakhir
  *     tags: [Device]
  *     security:
  *       - bearerAuth: []
@@ -198,9 +194,9 @@ router.delete('/:id', DeviceController.deleteDevice);
  *           type: integer
  *     responses:
  *       200:
- *         description: Device synced successfully
+ *         description: Perangkat berhasil disinkronkan
  *       404:
- *         description: Device not found
+ *         description: Perangkat tidak ditemukan
  */
 router.post('/:id/sync', DeviceController.syncDevice);
 

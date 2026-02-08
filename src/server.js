@@ -28,7 +28,6 @@ const initializeApp = async () => {
     // await connectUserRateLimiter();
 
     logger.info('✅ Application initialized successfully');
-
   } catch (error) {
     logger.error('Failed to initialize application', {
       error: error.message,
@@ -48,15 +47,17 @@ const startServer = async () => {
     server = app.listen(PORT, () => {
       logger.info(`🚀 Server berjalan di port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`🔒 Keamanan: ${process.env.NODE_ENV === 'production' ? 'Mode Production (Rate Limiting Aktif)' : 'Mode Development'}`);
+      logger.info(
+        `🔒 Keamanan: ${process.env.NODE_ENV === 'production' ? 'Mode Production (Rate Limiting Aktif)' : 'Mode Development'}`
+      );
       logger.info(`🧪 Try It (Swagger UI): http://localhost:${PORT}/finger-api/docs`);
       logger.info(`📖 Dokumentasi Lengkap tersedia di: http://localhost:${PORT}/finger-api/docs/`);
     });
 
-    server.on('error', (error) => {
+    server.on('error', error => {
       if (error.code === 'EADDRINUSE') {
         logger.error(`❌ Port ${PORT} sudah digunakan!`);
-        logger.error('💡 Solusi: Matikan aplikasi lain di port 3000 atau gunakan port berbeda');
+        logger.error('💡 Solusi: Matikan aplikasi lain di port 3333 atau gunakan port berbeda');
         logger.error(`   Coba: PORT=3001 npm run dev`);
         process.exit(1);
       } else {
@@ -67,7 +68,6 @@ const startServer = async () => {
         process.exit(1);
       }
     });
-
   } catch (error) {
     logger.error('Failed to start server', {
       error: error.message,
@@ -78,7 +78,7 @@ const startServer = async () => {
 };
 
 // Graceful shutdown handler
-const gracefulShutdown = async (signal) => {
+const gracefulShutdown = async signal => {
   logger.info(`${signal} received. Starting graceful shutdown...`);
 
   if (server) {
@@ -119,7 +119,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
   logger.error('Uncaught Exception', {
     error: error.message,
     stack: error.stack

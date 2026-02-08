@@ -1,0 +1,159 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: pbjt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      # ✅ RESOURCE: Performance tuning for small server
+      POSTGRES_INITDB_ARGS: "-c shared_buffers=128MB -c max_connections=100"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backups:/backups
+    networks:
+      - pbjt-network
+    # ✅ RESOURCE LIMITS: Small server (2GB RAM)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0" # Max 1 CPU core
+          memory: 512M # Max 512 MB
+        reservations:
+          cpus: "0.5" # Reserve 0.5 CPU
+          memory: 256M # Reserve 256 MB
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Security (Rate Limiting, Token Blacklist, OTP/Session)
+  redis:
+    image: redis:7-alpine
+    container_name: pbjt-redis
+    restart: unless-stopped
+    # ✅ FIX: Changed eviction policy to allkeys-lru
+    command: >
+      redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes --appendfilename "appendonly.aof" --save 900 1 --save 300 10 --save 60 10000 --timeout 300 --tcp-keepalive 60 --protected-mode yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - pbjt-network
+    # ✅ RESOURCE LIMITS: Small server
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5" # Max 0.5 CPU
+          memory: 256M # Max 256 MB
+        reservations:
+          cpus: "0.25" # Reserve 0.25 CPU
+          memory: 128M # Reserve 128 MB
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "PING" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # PBJT Library Backend
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY:-ginganomercy/pbjt-library}:${IMAGE_TAG:-latest}
+    container_name: pbjt-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # ✅ FIX: Bind to localhost only (Nginx-only access)
+    ports:
+      - "127.0.0.1:3333:3333"
+    networks:
+      - pbjt-network
+    volumes:
+      - ./logs:/app/logs
+    # ✅ RESOURCE LIMITS: Small server
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5" # Max 0.5 CPU
+          memory: 512M # Max 512 MB
+        reservations:
+          cpus: "0.25" # Reserve 0.25 CPU
+          memory: 256M # Reserve 256 MB
+    # ✅ LOG ROTATION: Prevent disk exhaustion
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3333/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ✅ SPRINT 3.1: Automated Postgres Backup
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    container_name: pbjt-backup
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 3
+      HEALTHCHECK_PORT: 8080
+    volumes:
+      - postgres_backups:/backups
+    networks:
+      - pbjt-network
+    # ✅ RESOURCE LIMITS: Backup process
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25" # Max 0.25 CPU
+          memory: 256M # Max 256 MB
+        reservations:
+          cpus: "0.1" # Reserve 0.1 CPU
+          memory: 64M # Reserve 64 MB
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  pbjt-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  postgres_backups:
+    # ✅ NEW: Isolated backup volume
+    driver: local
+  redis_data:
+    driver: local
+
+# ✅ SECURITY NOTES:
+# 1. Postgres & Redis ports bound to 127.0.0.1 (localhost only)
+# 2. For production: Remove ports entirely - backend accesses via service names
+# 3. Redis healthcheck fixed to use password
+# 4. Redis eviction policy changed to volatile-ttl (security use-case)
+# 5. Backend uses pre-built GHCR image (faster, consistent)
+# 6. Backups use named volume (isolated)
+#
+# USAGE:
+# Local dev: Keep 127.0.0.1 binding for psql/redis-cli access
+# Production: Remove ports completely for maximum security

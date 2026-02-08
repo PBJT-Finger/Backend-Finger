@@ -6,12 +6,54 @@ Production-ready backend API for fingerprint-based campus attendance tracking sy
 
 ## 📋 Table of Contents
 
+- [Recent Updates](#-recent-updates)
 - [Quick Start](#-quick-start)
 - [Development](#-development)
 - [Database Management](#️-database-management)
 - [Production Deployment](#-production-deployment)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
+
+---
+
+## 🆕 Recent Updates
+
+### February 2, 2026
+
+#### 🐛 Critical Bug Fix: Attendance Percentage Calculation
+**Issue**: Attendance percentage was always showing 100% regardless of actual attendance.
+
+**Root Cause**: Transformer functions calculated percentage as `(records_present / records_present)` instead of `(records_present / total_working_days)`.
+
+**Fix Applied**:
+- Added `calculateWorkingDays()` helper function in `attendanceTransformer.js`
+- Updated `transformDosenAttendance()` and `transformKaryawanAttendance()` to accept `startDate` and `endDate` parameters
+- Now correctly calculates: `percentage = (days_present / total_working_days_in_range) * 100`
+
+**Impact**: ✅ Dashboard now shows realistic attendance percentages (e.g., 75%, 80%, etc.)
+
+**Files Modified**:
+- `src/utils/attendanceTransformer.js`
+- `src/controllers/attendance.controller.js`
+
+#### 📁 Backend Structure Cleanup
+**Changes**:
+- Created `seeds/` directory for SQL sample data files
+- Moved all SQL files from root to `seeds/`:
+  - `dummy.sql` → `seeds/dummy.sql`
+  - `insert_today_data.sql` → `seeds/insert_today_data.sql`
+  - `5_insert_data.sql` → `seeds/5_insert_data.sql`
+  - `1_month_attendance.sql` → `seeds/1_month_attendance.sql`
+- Updated `package.json` scripts to reference new paths
+
+**Impact**: ✅ Cleaner root directory, better project organization
+
+#### 🔧 Code Quality Improvements
+**Applied**:
+- ESLint: Fixed auto-fixable issues (20 warnings remaining - unused variables)
+- Prettier: Formatted all JavaScript files for consistency
+
+**Impact**: ✅ Consistent code style, better maintainability
 
 ---
 
@@ -43,7 +85,7 @@ npm run db:setup
 npm run dev
 ```
 
-Server akan berjalan di `http://localhost:5000`
+Server akan berjalan di `http://localhost:3333`
 
 ---
 
@@ -63,11 +105,11 @@ npm run db:setup          # Initial database setup
 npm run db:reset         # Reset to dummy data
 npm run db:import-today  # Import today's sample data
 
-# PM2 (Production daemon)
-npm run pm2:start        # Start with PM2
-npm run pm2:stop         # Stop PM2
-npm run pm2:restart      # Restart PM2
-npm run pm2:delete       # Remove PM2 process
+# Code Quality
+npm run lint            # Check code with ESLint
+npm run lint:fix        # Fix ESLint issues automatically
+npm run format          # Format code with Prettier
+npm run format:check    # Check code formatting
 ```
 
 ### Environment Variables
@@ -89,14 +131,14 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
 # Server
-PORT=5000
+PORT=3333
 NODE_ENV=development
 ```
 
 ### API Documentation
 
-- **Swagger UI**: `http://localhost:5000/api/docs`
-- **Scalar UI**: `http://localhost:5000/api/scalar`
+- **Swagger UI**: `http://localhost:3333/api/docs`
+- **Scalar UI**: `http://localhost:3333/api/scalar`
 
 ---
 
@@ -166,8 +208,8 @@ sudo apt-get install -y nodejs
 sudo apt install mysql-server
 sudo mysql_secure_installation
 
-# PM2 (Process Manager)
-sudo npm install -g pm2
+# For production monitoring (optional)
+sudo apt install htop
 ```
 
 #### 2. Clone & Install
@@ -236,26 +278,44 @@ EXIT;
 mysql -u fingeruser -p finger_attendance < dummy.sql
 ```
 
-#### 5. Start with PM2
+#### 5. Setup Systemd Service
+
+Create systemd service file:
 
 ```bash
-# Start application
-pm2 start src/server.js --name "attendance-api"
-
-# Save PM2 list
-pm2 save
-
-# Setup auto-restart on reboot
-pm2 startup
+sudo nano /etc/systemd/system/attendance-api.service
 ```
 
-**PM2 Commands:**
+**Service configuration:**
+```ini
+[Unit]
+Description=Attendance API Backend
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/backend-finger
+Environment="NODE_ENV=production"
+ExecStart=/usr/bin/node /var/www/backend-finger/src/server.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=attendance-api
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Start service:**
 ```bash
-pm2 status              # Check status
-pm2 logs attendance-api # View logs
-pm2 restart attendance-api
-pm2 stop attendance-api
-pm2 monit               # Monitor resources
+sudo systemctl daemon-reload
+sudo systemctl enable attendance-api
+sudo systemctl start attendance-api
+
+# Check status
+sudo systemctl status attendance-api
 ```
 
 #### 6. Setup Nginx Reverse Proxy
@@ -315,16 +375,22 @@ sudo ufw enable
 ### Monitoring
 
 ```bash
-# View logs
-pm2 logs attendance-api
+# View application logs
+sudo journalctl -u attendance-api -f
 
-# Monitor resources
-pm2 monit
+# View last 100 lines
+sudo journalctl -u attendance-api -n 100
 
-# Setup log rotation
-pm2 install pm2-logrotate
-pm2 set pm2-logrotate:max_size 10M
-pm2 set pm2-logrotate:retain 7
+# Monitor system resources
+htop
+```
+
+**Log rotation** (automatic with systemd journal):
+```bash
+# Configure journal size limits
+sudo nano /etc/systemd/journald.conf
+# Set: SystemMaxUse=1G
+sudo systemctl restart systemd-journald
 ```
 
 ### Backups
@@ -354,7 +420,7 @@ Add:
 cd /var/www/backend-finger
 git pull origin main
 npm install --production
-pm2 restart attendance-api
+sudo systemctl restart attendance-api
 ```
 
 ---
@@ -366,7 +432,7 @@ pm2 restart attendance-api
 - **ORM:** Prisma 6.x
 - **Database:** MySQL 8.0+
 - **Authentication:** JWT
-- **Process Manager:** PM2
+- **Process Manager:** Systemd
 - **Documentation:** Swagger + Scalar
 - **Logging:** Winston
 
@@ -427,11 +493,14 @@ mysql -u root -p finger_db
 
 **Backend won't start:**
 ```bash
-# Check logs
-pm2 logs attendance-api
+# Check service status
+sudo systemctl status attendance-api
 
-# Check process status
-pm2 status
+# View logs
+sudo journalctl -u attendance-api -n 50
+
+# Restart service
+sudo systemctl restart attendance-api
 ```
 
 ### Health Checks

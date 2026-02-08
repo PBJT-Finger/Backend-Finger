@@ -60,7 +60,7 @@ const router = express.Router();
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Admin login
+ *     summary: Login admin
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -70,13 +70,13 @@ const router = express.Router();
  *             $ref: '#/components/schemas/LoginRequest'
  *     responses:
  *       200:
- *         description: Login successful
+ *         description: Login berhasil
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/LoginResponse'
  *       401:
- *         description: Invalid credentials
+ *         description: Kredensial tidak valid
  */
 router.post('/login', AuthController.login);
 
@@ -102,9 +102,9 @@ router.post('/login', AuthController.login);
  *                 description: Refresh token
  *     responses:
  *       200:
- *         description: Token refreshed successfully
+ *         description: Token berhasil di-refresh
  *       401:
- *         description: Invalid refresh token
+ *         description: Refresh token tidak valid
  */
 router.post('/refresh', AuthController.refreshToken);
 
@@ -112,13 +112,13 @@ router.post('/refresh', AuthController.refreshToken);
  * @swagger
  * /api/auth/logout:
  *   post:
- *     summary: Admin logout
+ *     summary: Logout admin
  *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Logout successful
+ *         description: Logout berhasil
  */
 router.post('/logout', authenticateToken, AuthController.logout);
 
@@ -126,7 +126,7 @@ router.post('/logout', authenticateToken, AuthController.logout);
  * @swagger
  * /api/auth/register:
  *   post:
- *     summary: Register new admin account
+ *     summary: Daftar akun admin baru
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -154,9 +154,9 @@ router.post('/logout', authenticateToken, AuthController.logout);
  *                 description: Strong password (min 8 chars, uppercase, lowercase, number)
  *     responses:
  *       201:
- *         description: Registration successful
+ *         description: Pendaftaran berhasil
  *       400:
- *         description: Validation error or username/email already exists
+ *         description: Error validasi atau username/email sudah ada
  */
 router.post('/register', AuthController.register);
 
@@ -164,7 +164,7 @@ router.post('/register', AuthController.register);
  * @swagger
  * /api/auth/forgot-password:
  *   post:
- *     summary: Request password reset code
+ *     summary: Minta kode reset password
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -178,12 +178,12 @@ router.post('/register', AuthController.register);
  *               email:
  *                 type: string
  *                 format: email
- *                 description: Admin email address
+ *                 description: Alamat email admin
  *     responses:
  *       200:
- *         description: Reset code sent to email
+ *         description: Kode reset dikirim ke email
  *       400:
- *         description: Invalid email format
+ *         description: Format email tidak valid
  */
 router.post('/forgot-password', AuthController.forgotPassword);
 
@@ -191,7 +191,7 @@ router.post('/forgot-password', AuthController.forgotPassword);
  * @swagger
  * /api/auth/verify-code:
  *   post:
- *     summary: Verify password reset code
+ *     summary: Verifikasi kode reset password
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -212,9 +212,9 @@ router.post('/forgot-password', AuthController.forgotPassword);
  *                 description: 6-digit verification code
  *     responses:
  *       200:
- *         description: Code verified, reset token returned
+ *         description: Kode terverifikasi, token reset dikembalikan
  *       400:
- *         description: Invalid or expired code
+ *         description: Kode tidak valid atau kadaluarsa
  */
 router.post('/verify-code', AuthController.verifyCode);
 
@@ -222,7 +222,7 @@ router.post('/verify-code', AuthController.verifyCode);
  * @swagger
  * /api/auth/reset-password:
  *   post:
- *     summary: Reset password with verification token
+ *     summary: Reset password dengan token verifikasi
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -243,9 +243,9 @@ router.post('/verify-code', AuthController.verifyCode);
  *                 description: New password (min 8 chars, uppercase, lowercase, number)
  *     responses:
  *       200:
- *         description: Password reset successful
+ *         description: Reset password berhasil
  *       400:
- *         description: Invalid or expired token
+ *         description: Token tidak valid atau kadaluarsa
  */
 router.post('/reset-password', AuthController.resetPassword);
 

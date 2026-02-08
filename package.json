@@ -6,13 +6,20 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "pm2:start": "pm2 start src/server.js --name attendance-api",
-    "pm2:stop": "pm2 stop attendance-api",
-    "pm2:restart": "pm2 restart attendance-api",
-    "pm2:delete": "pm2 delete attendance-api",
-    "db:setup": "mysql -u root -padmin finger_db < dummy.sql",
-    "db:reset": "mysql -u root -padmin finger_db < dummy.sql",
-    "db:import-today": "mysql -u root -padmin finger_db < insert_today_data.sql"
+    "db:setup": "mysql -u root -padmin finger_db < seeds/dummy.sql",
+    "db:reset": "mysql -u root -padmin finger_db < seeds/dummy.sql",
+    "db:import-today": "mysql -u root -padmin finger_db < seeds/insert_today_data.sql",
+    "migrate:legacy": "node scripts/migrate-legacy-employees.js",
+    "seed:device-mapping": "node scripts/seed-device-mapping.js",
+    "verify:migration": "node scripts/verify-migration.js",
+    "cleanup:dummy": "node scripts/cleanup-dummy-employees.js",
+    "employee:add": "node scripts/add-new-employee.js",
+    "device:test": "node scripts/test-device-connection.js",
+    "sync:attendance": "node scripts/sync-attendance.js",
+    "lint": "eslint \"src/**/*.js\" \"*.js\"",
+    "lint:fix": "eslint \"src/**/*.js\" \"*.js\" --fix",
+    "format": "prettier --write \"src/**/*.js\" \"*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"*.js\""
   },
   "dependencies": {
     "@prisma/client": "6",
@@ -36,14 +43,21 @@
     "nodemailer": "^7.0.12",
     "pdfkit": "^0.14.0",
     "prom-client": "^15.1.3",
+    "sequelize": "^6.37.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zklib-js": "^1.3.5"
   },
   "devDependencies": {
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-node": "^11.1.0",
+    "globals": "^17.3.0",
     "nodemon": "^2.0.7",
+    "prettier": "^3.8.1",
     "prisma": "6"
   },
   "author": "Your Name",

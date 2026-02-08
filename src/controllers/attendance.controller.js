@@ -30,10 +30,7 @@ class AttendanceController {
 
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: [
-          { tanggal: 'desc' },
-          { jam_masuk: 'asc' }
-        ]
+        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }]
       });
 
       // Transform to aggregated data
@@ -47,7 +44,6 @@ class AttendanceController {
 
       // Return array directly in data field for frontend compatibility
       return successResponse(res, paginatedData, 'Lecturer attendance retrieved successfully');
-
     } catch (error) {
       logger.error('Get lecturer attendance error', { error: error.message, stack: error.stack });
       return errorResponse(res, 'Failed to retrieve lecturer attendance', 500);
@@ -80,15 +76,12 @@ class AttendanceController {
 
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: [
-          { tanggal: 'desc' },
-          { jam_masuk: 'asc' }
-        ]
+        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }]
       });
 
       // Transform to aggregated data
       const { transformKaryawanAttendance } = require('../utils/attendanceTransformer');
-      const transformedData = transformKaryawanAttendance(attendance);
+      const transformedData = transformKaryawanAttendance(attendance, start_date, end_date);
 
       // Apply pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -97,7 +90,6 @@ class AttendanceController {
 
       // Return array directly in data field for frontend compatibility
       return successResponse(res, paginatedData, 'Employee attendance retrieved successfully');
-
     } catch (error) {
       logger.error('Get employee attendance error', { error: error.message, stack: error.stack });
       return errorResponse(res, 'Failed to retrieve employee attendance', 500);
@@ -109,15 +101,7 @@ class AttendanceController {
    */
   static async getAttendance(req, res) {
     try {
-      const {
-        start_date,
-        end_date,
-        nip,
-        jabatan,
-        status,
-        page = 1,
-        limit = 50
-      } = req.query;
+      const { start_date, end_date, nip, jabatan, status, page = 1, limit = 50 } = req.query;
 
       const whereClause = {
         is_deleted: false
@@ -154,16 +138,19 @@ class AttendanceController {
         take: parseInt(limit)
       });
 
-      return successResponse(res, {
-        data: attendance,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          total_pages: Math.ceil(total / parseInt(limit))
-        }
-      }, 'Attendance retrieved successfully');
-
+      return successResponse(
+        res,
+        {
+          data: attendance,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            total_pages: Math.ceil(total / parseInt(limit))
+          }
+        },
+        'Attendance retrieved successfully'
+      );
     } catch (error) {
       logger.error('Get attendance error', { error: error.message });
       return errorResponse(res, 'Failed to retrieve attendance', 500);
@@ -195,10 +182,7 @@ class AttendanceController {
 
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: [
-          { tanggal: 'desc' },
-          { jam_masuk: 'desc' }
-        ]
+        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'desc' }]
       });
 
       // Group by employee
@@ -222,13 +206,19 @@ class AttendanceController {
         employeeStats[key].total_days++;
         if (record.jam_masuk) {
           employeeStats[key].total_hadir++;
-          if (!employeeStats[key].last_check_in || new Date(record.jam_masuk) > new Date(employeeStats[key].last_check_in)) {
+          if (
+            !employeeStats[key].last_check_in ||
+            new Date(record.jam_masuk) > new Date(employeeStats[key].last_check_in)
+          ) {
             employeeStats[key].last_check_in = record.jam_masuk;
           }
         }
 
         if (record.jam_keluar) {
-          if (!employeeStats[key].last_check_out || new Date(record.jam_keluar) > new Date(employeeStats[key].last_check_out)) {
+          if (
+            !employeeStats[key].last_check_out ||
+            new Date(record.jam_keluar) > new Date(employeeStats[key].last_check_out)
+          ) {
             employeeStats[key].last_check_out = record.jam_keluar;
           }
         }
@@ -251,12 +241,15 @@ class AttendanceController {
         persentase: emp.total_days > 0 ? Math.round((emp.total_hadir / emp.total_days) * 100) : 0
       }));
 
-      return successResponse(res, {
-        summary,
-        period: { start_date, end_date },
-        total_employees: summary.length
-      }, 'Attendance summary calculated successfully');
-
+      return successResponse(
+        res,
+        {
+          summary,
+          period: { start_date, end_date },
+          total_employees: summary.length
+        },
+        'Attendance summary calculated successfully'
+      );
     } catch (error) {
       logger.error('Get attendance summary error', { error: error.message });
       return errorResponse(res, 'Failed to calculate attendance summary', 500);
@@ -290,7 +283,6 @@ class AttendanceController {
       });
 
       return successResponse(res, null, 'Attendance record deleted successfully');
-
     } catch (error) {
       logger.error('Delete attendance error', { error: error.message });
       return errorResponse(res, 'Failed to delete attendance record', 500);
@@ -319,6 +311,150 @@ class AttendanceController {
     } catch (error) {
       logger.error('Get monthly report error', { error: error.message });
       return errorResponse(res, 'Failed to get monthly report', 500);
+    }
+  }
+
+  /**
+   * Sync attendance data from fingerprint device
+   * POST /api/attendance/sync-fingerprint
+   */
+  static async syncFromFingerprint(req, res) {
+    try {
+      const fingerprintService = require('../services/fingerprint.service');
+
+      logger.info('Starting fingerprint sync...');
+
+      // Get attendance logs from device
+      const logs = await fingerprintService.getAttendanceLogs();
+
+      if (!logs || logs.length === 0) {
+        return successResponse(res, { synced: 0 }, 'No new attendance records found');
+      }
+
+      let syncedCount = 0;
+      let skippedCount = 0;
+      const errors = [];
+
+      // Process each log
+      for (const log of logs) {
+        try {
+          // Map device user ID to NIP
+          const nip = log.deviceUserId || log.userSn;
+
+          if (!nip) {
+            skippedCount++;
+            continue;
+          }
+
+          // Get employee info
+          const employee = await prisma.employees.findUnique({
+            where: { nip: String(nip) }
+          });
+
+          if (!employee) {
+            logger.warn(`Employee not found for NIP: ${nip}`);
+            skippedCount++;
+            continue;
+          }
+
+          // Parse attendance date and time
+          const recordTime = new Date(log.recordTime);
+          const tanggal = new Date(recordTime.toDateString()); // Date only
+          const jamMasuk = recordTime.toTimeString().split(' ')[0]; // Time only
+
+          // Check if record already exists
+          const existing = await prisma.attendance.findFirst({
+            where: {
+              nip: employee.nip,
+              tanggal: tanggal,
+              jam_masuk: jamMasuk,
+              is_deleted: false
+            }
+          });
+
+          if (existing) {
+            skippedCount++;
+            continue;
+          }
+
+          // Create new attendance record
+          await prisma.attendance.create({
+            data: {
+              user_id: employee.nip,
+              nip: employee.nip,
+              nama: employee.nama,
+              jabatan: employee.jabatan,
+              tanggal: tanggal,
+              jam_masuk: jamMasuk,
+              jam_keluar: null, // Will be updated on check-out
+              device_id: process.env.FINGERPRINT_DEVICE_ID || 'FP-MAIN-001',
+              verification_method: 'SIDIK_JARI',
+              status: 'HADIR',
+              is_deleted: false
+            }
+          });
+
+          syncedCount++;
+          logger.info(`Synced attendance for ${employee.nama} (${employee.nip})`);
+        } catch (err) {
+          logger.error(`Error processing log for user ${log.deviceUserId}:`, err);
+          errors.push({ userId: log.deviceUserId, error: err.message });
+        }
+      }
+
+      logger.info(`Sync completed: ${syncedCount} synced, ${skippedCount} skipped`);
+
+      return successResponse(
+        res,
+        {
+          synced: syncedCount,
+          skipped: skippedCount,
+          total: logs.length,
+          errors: errors.length > 0 ? errors : undefined
+        },
+        `Successfully synced ${syncedCount} attendance records`
+      );
+    } catch (error) {
+      logger.error('Fingerprint sync error:', { error: error.message, stack: error.stack });
+      return errorResponse(res, `Failed to sync fingerprint data: ${error.message}`, 500);
+    }
+  }
+
+  /**
+   * Get fingerprint device status
+   * GET /api/attendance/device-status
+   */
+  static async getDeviceStatus(req, res) {
+    try {
+      const fingerprintService = require('../services/fingerprint.service');
+
+      // Try to connect to device
+      await fingerprintService.connect();
+      await fingerprintService.disconnect();
+
+      return successResponse(
+        res,
+        {
+          status: 'connected',
+          ip: process.env.FINGERPRINT_IP || '192.168.1.201',
+          port: process.env.FINGERPRINT_PORT || 4370,
+          message: 'Device is online and ready'
+        },
+        'Device status retrieved successfully'
+      );
+    } catch (error) {
+      logger.error('Device status check error:', { error: error.message });
+      return successResponse(
+        res,
+        {
+          status: 'disconnected',
+          ip: process.env.FINGERPRINT_IP || '192.168.1.201',
+          port: process.env.FINGERPRINT_PORT || 4370,
+          message: error.message,
+          error: 'Device is offline or unreachable'
+        },
+        'Device is offline'
+      );
     }
   }
 }

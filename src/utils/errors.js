@@ -6,23 +6,23 @@ const { HTTP_STATUS } = require('../constants/app');
  * Extends native Error with additional properties
  */
 class AppError extends Error {
-    constructor(message, statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR, isOperational = true) {
-        super(message);
-        this.statusCode = statusCode;
-        this.isOperational = isOperational;
-        this.timestamp = new Date().toISOString();
+  constructor(message, statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR, isOperational = true) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = isOperational;
+    this.timestamp = new Date().toISOString();
 
-        Error.captureStackTrace(this, this.constructor);
-    }
+    Error.captureStackTrace(this, this.constructor);
+  }
 
-    toJSON() {
-        return {
-            success: false,
-            message: this.message,
-            statusCode: this.statusCode,
-            timestamp: this.timestamp
-        };
-    }
+  toJSON() {
+    return {
+      success: false,
+      message: this.message,
+      statusCode: this.statusCode,
+      timestamp: this.timestamp
+    };
+  }
 }
 
 /**
@@ -30,20 +30,20 @@ class AppError extends Error {
  * Used for input validation failures
  */
 class ValidationError extends AppError {
-    constructor(message, errors = []) {
-        super(message, HTTP_STATUS.BAD_REQUEST);
-        this.name = 'ValidationError';
-        this.errors = errors;
-    }
+  constructor(message, errors = []) {
+    super(message, HTTP_STATUS.BAD_REQUEST);
+    this.name = 'ValidationError';
+    this.errors = errors;
+  }
 
-    toJSON() {
-        return {
-            success: false,
-            message: this.message,
-            errors: this.errors,
-            statusCode: this.statusCode
-        };
-    }
+  toJSON() {
+    return {
+      success: false,
+      message: this.message,
+      errors: this.errors,
+      statusCode: this.statusCode
+    };
+  }
 }
 
 /**
@@ -51,10 +51,10 @@ class ValidationError extends AppError {
  * Used for authentication failures
  */
 class AuthenticationError extends AppError {
-    constructor(message = 'Authentication failed') {
-        super(message, HTTP_STATUS.UNAUTHORIZED);
-        this.name = 'AuthenticationError';
-    }
+  constructor(message = 'Authentication failed') {
+    super(message, HTTP_STATUS.UNAUTHORIZED);
+    this.name = 'AuthenticationError';
+  }
 }
 
 /**
@@ -62,10 +62,10 @@ class AuthenticationError extends AppError {
  * Used when user doesn't have permission
  */
 class AuthorizationError extends AppError {
-    constructor(message = 'Access forbidden') {
-        super(message, HTTP_STATUS.FORBIDDEN);
-        this.name = 'AuthorizationError';
-    }
+  constructor(message = 'Access forbidden') {
+    super(message, HTTP_STATUS.FORBIDDEN);
+    this.name = 'AuthorizationError';
+  }
 }
 
 /**
@@ -73,10 +73,10 @@ class AuthorizationError extends AppError {
  * Used when resource is not found
  */
 class NotFoundError extends AppError {
-    constructor(resource = 'Resource') {
-        super(`${resource} not found`, HTTP_STATUS.NOT_FOUND);
-        this.name = 'NotFoundError';
-    }
+  constructor(resource = 'Resource') {
+    super(`${resource} not found`, HTTP_STATUS.NOT_FOUND);
+    this.name = 'NotFoundError';
+  }
 }
 
 /**
@@ -84,10 +84,10 @@ class NotFoundError extends AppError {
  * Used for duplicate resources or conflicts
  */
 class ConflictError extends AppError {
-    constructor(message = 'Resource already exists') {
-        super(message, HTTP_STATUS.CONFLICT);
-        this.name = 'ConflictError';
-    }
+  constructor(message = 'Resource already exists') {
+    super(message, HTTP_STATUS.CONFLICT);
+    this.name = 'ConflictError';
+  }
 }
 
 /**
@@ -95,10 +95,10 @@ class ConflictError extends AppError {
  * Used when rate limit is exceeded
  */
 class RateLimitError extends AppError {
-    constructor(message = 'Too many requests') {
-        super(message, HTTP_STATUS.TOO_MANY_REQUESTS);
-        this.name = 'RateLimitError';
-    }
+  constructor(message = 'Too many requests') {
+    super(message, HTTP_STATUS.TOO_MANY_REQUESTS);
+    this.name = 'RateLimitError';
+  }
 }
 
 /**
@@ -106,20 +106,20 @@ class RateLimitError extends AppError {
  * Used for database operation failures
  */
 class DatabaseError extends AppError {
-    constructor(message = 'Database operation failed', originalError = null) {
-        super(message, HTTP_STATUS.INTERNAL_SERVER_ERROR, false);
-        this.name = 'DatabaseError';
-        this.originalError = originalError;
-    }
+  constructor(message = 'Database operation failed', originalError = null) {
+    super(message, HTTP_STATUS.INTERNAL_SERVER_ERROR, false);
+    this.name = 'DatabaseError';
+    this.originalError = originalError;
+  }
 }
 
 module.exports = {
-    AppError,
-    ValidationError,
-    AuthenticationError,
-    AuthorizationError,
-    NotFoundError,
-    ConflictError,
-    RateLimitError,
-    DatabaseError
+  AppError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+  DatabaseError
 };

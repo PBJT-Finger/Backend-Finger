@@ -54,9 +54,10 @@ class DashboardController {
       };
 
       // Calculate attendance percentage
-      stats.today.attendance_percentage = stats.total.employees > 0
-        ? Math.round((stats.today.unique_employees / stats.total.employees) * 100)
-        : 0;
+      stats.today.attendance_percentage =
+        stats.total.employees > 0
+          ? Math.round((stats.today.unique_employees / stats.total.employees) * 100)
+          : 0;
 
       // Get this month's statistics
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -85,12 +86,15 @@ class DashboardController {
         take: 10
       });
 
-      return successResponse(res, {
-        statistics: stats,
-        recent_attendance: recentAttendance,
-        timestamp: new Date().toISOString()
-      }, 'Dashboard statistics retrieved successfully');
-
+      return successResponse(
+        res,
+        {
+          statistics: stats,
+          recent_attendance: recentAttendance,
+          timestamp: new Date().toISOString()
+        },
+        'Dashboard statistics retrieved successfully'
+      );
     } catch (error) {
       logger.error('Get dashboard summary error', { error: error.message, stack: error.stack });
       return errorResponse(res, 'Failed to retrieve dashboard statistics', 500);
@@ -142,15 +146,18 @@ class DashboardController {
 
       const trends = Object.values(dailyStats);
 
-      return successResponse(res, {
-        trends,
-        period: {
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: new Date().toISOString().split('T')[0],
-          days: parseInt(days)
-        }
-      }, 'Attendance trends retrieved successfully');
-
+      return successResponse(
+        res,
+        {
+          trends,
+          period: {
+            start_date: startDate.toISOString().split('T')[0],
+            end_date: new Date().toISOString().split('T')[0],
+            days: parseInt(days)
+          }
+        },
+        'Attendance trends retrieved successfully'
+      );
     } catch (error) {
       logger.error('Get attendance trends error', { error: error.message });
       return errorResponse(res, 'Failed to retrieve attendance trends', 500);

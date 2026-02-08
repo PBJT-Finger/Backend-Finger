@@ -12,18 +12,13 @@ router.use(authenticateToken);
 const adminLimiter = createUserRateLimiter('moderate');
 router.use(adminLimiter);
 
-/**
- * @swagger
- * tags:
- *   name: Admin Management
- *   description: Admin user management endpoints (CRUD operations)
- */
+// Admin Management endpoints - using System tag for cleaner documentation
 
 /**
  * @swagger
  * /api/admin:
  *   get:
- *     summary: Get all admins (paginated)
+ *     summary: Dapatkan semua admin (paginasi)
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -53,9 +48,9 @@ router.use(adminLimiter);
  *           type: string
  *     responses:
  *       200:
- *         description: List of admins
+ *         description: Daftar admin
  *       401:
- *         description: Unauthorized
+ *         description: Tidak terautentikasi
  */
 router.get('/', AdminController.getAdmins);
 
@@ -63,7 +58,7 @@ router.get('/', AdminController.getAdmins);
  * @swagger
  * /api/admin/{id}:
  *   get:
- *     summary: Get admin by ID
+ *     summary: Dapatkan admin berdasarkan ID
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -75,9 +70,9 @@ router.get('/', AdminController.getAdmins);
  *           type: integer
  *     responses:
  *       200:
- *         description: Admin details
+ *         description: Detail admin
  *       404:
- *         description: Admin not found
+ *         description: Admin tidak ditemukan
  */
 router.get('/:id', AdminController.getAdminById);
 
@@ -85,7 +80,7 @@ router.get('/:id', AdminController.getAdminById);
  * @swagger
  * /api/admin:
  *   post:
- *     summary: Create new admin
+ *     summary: Buat admin baru
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -116,9 +111,9 @@ router.get('/:id', AdminController.getAdminById);
  *                 enum: [admin, super_admin]
  *     responses:
  *       201:
- *         description: Admin created successfully
+ *         description: Admin berhasil dibuat
  *       409:
- *         description: Username or email already exists
+ *         description: Username atau email sudah ada
  */
 router.post('/', AdminController.createAdmin);
 
@@ -126,7 +121,7 @@ router.post('/', AdminController.createAdmin);
  * @swagger
  * /api/admin/{id}:
  *   put:
- *     summary: Update admin
+ *     summary: Perbarui admin
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -152,9 +147,9 @@ router.post('/', AdminController.createAdmin);
  *                 type: boolean
  *     responses:
  *       200:
- *         description: Admin updated successfully
+ *         description: Admin berhasil diperbarui
  *       404:
- *         description: Admin not found
+ *         description: Admin tidak ditemukan
  */
 router.put('/:id', AdminController.updateAdmin);
 
@@ -162,7 +157,7 @@ router.put('/:id', AdminController.updateAdmin);
  * @swagger
  * /api/admin/{id}:
  *   delete:
- *     summary: Delete admin
+ *     summary: Hapus admin
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -174,11 +169,11 @@ router.put('/:id', AdminController.updateAdmin);
  *           type: integer
  *     responses:
  *       200:
- *         description: Admin deleted successfully
+ *         description: Admin berhasil dihapus
  *       403:
- *         description: Cannot delete own account
+ *         description: Tidak dapat menghapus akun sendiri
  *       404:
- *         description: Admin not found
+ *         description: Admin tidak ditemukan
  */
 router.delete('/:id', AdminController.deleteAdmin);
 
@@ -186,7 +181,7 @@ router.delete('/:id', AdminController.deleteAdmin);
  * @swagger
  * /api/admin/{id}/password:
  *   put:
- *     summary: Change admin password
+ *     summary: Ubah password admin
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -213,9 +208,9 @@ router.delete('/:id', AdminController.deleteAdmin);
  *                 minLength: 8
  *     responses:
  *       200:
- *         description: Password changed successfully
+ *         description: Password berhasil diubah
  *       401:
- *         description: Current password incorrect
+ *         description: Password saat ini salah
  */
 router.put('/:id/password', AdminController.changePassword);
 

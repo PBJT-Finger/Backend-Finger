@@ -1,13 +1,8 @@
 // src/controllers/export.controller.js - Export Attendance Data (Prisma)
 const { query } = require('../lib/db');
-const { prisma } = require('../models');
-const { formatTime } = require('../utils/prismaHelpers');
-const { successResponse, errorResponse } = require('../utils/responseFormatter');
+const { errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 const XLSX = require('xlsx');
-const { createObjectCsvWriter } = require('csv-writer');
-const path = require('path');
-const fs = require('fs');
 
 class ExportController {
   /**
@@ -19,7 +14,7 @@ class ExportController {
       const { start_date, end_date, jabatan, nip } = req.query;
 
       // Helper function to format date to DD/MM/YYYY
-      const formatDate = (dateValue) => {
+      const formatDate = dateValue => {
         if (!dateValue) return '-';
         const date = new Date(dateValue);
         const day = String(date.getDate()).padStart(2, '0');
@@ -29,7 +24,7 @@ class ExportController {
       };
 
       // Helper function to format time (handles both string and Date object)
-      const formatTime = (timeValue) => {
+      const formatTime = timeValue => {
         if (!timeValue) return '-';
         if (typeof timeValue === 'string') return timeValue;
         if (timeValue instanceof Date) return timeValue.toISOString().split('T')[1].substring(0, 8);
@@ -83,23 +78,23 @@ class ExportController {
         // For KARYAWAN, exclude NIP and Jabatan columns
         if (jabatan === 'KARYAWAN') {
           return {
-            'Tanggal': formatDate(record.tanggal),
-            'Nama': record.nama,
+            Tanggal: formatDate(record.tanggal),
+            Nama: record.nama,
             'Jam Masuk': formatTime(record.jam_masuk),
             'Jam Keluar': formatTime(record.jam_keluar),
-            'Status': record.status,
-            'Device': record.device_id || '-'
+            Status: record.status,
+            Device: record.device_id || '-'
           };
         } else {
           // For DOSEN, exclude Jabatan (redundant - already filtered)
           return {
-            'Tanggal': formatDate(record.tanggal),
-            'NIP': record.nip,
-            'Nama': record.nama,
+            Tanggal: formatDate(record.tanggal),
+            NIP: record.nip,
+            Nama: record.nama,
             'Jam Masuk': formatTime(record.jam_masuk),
             'Jam Keluar': formatTime(record.jam_keluar),
-            'Status': record.status,
-            'Device': record.device_id || '-'
+            Status: record.status,
+            Device: record.device_id || '-'
           };
         }
       });
@@ -117,21 +112,23 @@ class ExportController {
         { wch: 12 }, // Jam Masuk
         { wch: 12 }, // Jam Keluar
         { wch: 12 }, // Status
-        { wch: 15 }  // Device
+        { wch: 15 } // Device
       ];
       ws['!cols'] = wscols;
 
       XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absensi');
 
       // Add summary sheet
-      const summaryData = [{
-        'Total Records': attendance.length,
-        'Period': `${start_date} to ${end_date}`,
-        'Jabatan Filter': jabatan || 'All',
-        'Unique Employees': new Set(attendance.map(a => a.nip)).size,
-        'Total Hadir': attendance.filter(a => a.jam_masuk !== null).length,
-        'Total Terlambat': attendance.filter(a => a.status === 'TERLAMBAT').length
-      }];
+      const summaryData = [
+        {
+          'Total Records': attendance.length,
+          Period: `${start_date} to ${end_date}`,
+          'Jabatan Filter': jabatan || 'All',
+          'Unique Employees': new Set(attendance.map(a => a.nip)).size,
+          'Total Hadir': attendance.filter(a => a.jam_masuk !== null).length,
+          'Total Terlambat': attendance.filter(a => a.status === 'TERLAMBAT').length
+        }
+      ];
       const summaryWs = XLSX.utils.json_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
 
@@ -141,7 +138,10 @@ class ExportController {
       // Set headers for file download
       const filename = `rekap-absensi-${jabatan || 'all'}-${start_date}-to-${end_date}.xlsx`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
 
       logger.info('Excel export generated', {
         filename,
@@ -150,7 +150,6 @@ class ExportController {
       });
 
       return res.send(buf);
-
     } catch (error) {
       logger.error('Export to Excel error', { error: error.message, stack: error.stack });
       return errorResponse(res, 'Failed to export to Excel', 500);
@@ -170,7 +169,7 @@ class ExportController {
       }
 
       // Helper function to format date to DD/MM/YYYY
-      const formatDateID = (dateStr) => {
+      const formatDateID = dateStr => {
         const date = new Date(dateStr);
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -179,7 +178,10 @@ class ExportController {
       };
 
       const PDFDocument = require('pdfkit');
-      const { transformDosenAttendance, transformKaryawanAttendance } = require('../utils/attendanceTransformer');
+      const {
+        transformDosenAttendance,
+        transformKaryawanAttendance
+      } = require('../utils/attendanceTransformer');
 
       // Get attendance data
       let sql = `
@@ -232,7 +234,12 @@ class ExportController {
       // Add header with better spacing
       doc.fontSize(20).font('Helvetica-Bold').text('REKAP ABSENSI KAMPUS', { align: 'center' });
       doc.moveDown(0.5);
-      doc.fontSize(12).font('Helvetica').text(`Periode: ${formatDateID(start_date)} s/d ${formatDateID(end_date)}`, { align: 'center' });
+      doc
+        .fontSize(12)
+        .font('Helvetica')
+        .text(`Periode: ${formatDateID(start_date)} s/d ${formatDateID(end_date)}`, {
+          align: 'center'
+        });
       doc.text(`Jabatan: ${jabatan}`, { align: 'center' });
       doc.moveDown(1.5);
 
@@ -245,19 +252,37 @@ class ExportController {
         // KARYAWAN: No, Nama, Hadir, Terlambat, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
         // Adjusted widths: removed 'Tidak Hadir' column
         colWidths = [35, 150, 50, 60, 70, 145, 90, 90];
-        headers = ['No', 'Nama', 'Hadir', 'Terlambat', 'Total Hari\nKerja', 'Waktu Kehadiran', 'Check In\nTerakhir', 'Check Out\nTerakhir'];
+        headers = [
+          'No',
+          'Nama',
+          'Hadir',
+          'Terlambat',
+          'Total Hari\nKerja',
+          'Waktu Kehadiran',
+          'Check In\nTerakhir',
+          'Check Out\nTerakhir'
+        ];
       } else {
         // DOSEN: No, Nama, NIP, Hadir, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
         // Removed 'Tidak Hadir' column, redistributed width
         colWidths = [35, 120, 100, 50, 70, 145, 90, 90];
-        headers = ['No', 'Nama', 'NIP', 'Hadir', 'Total Hari\nKerja', 'Waktu Kehadiran', 'Check In\nTerakhir', 'Check Out\nTerakhir'];
+        headers = [
+          'No',
+          'Nama',
+          'NIP',
+          'Hadir',
+          'Total Hari\nKerja',
+          'Waktu Kehadiran',
+          'Check In\nTerakhir',
+          'Check Out\nTerakhir'
+        ];
       }
 
       const rowHeight = 25;
       const headerHeight = 30;
 
       // Helper function to draw table header with individual cell borders
-      const drawTableHeader = (startY) => {
+      const drawTableHeader = startY => {
         let xPos = startX;
 
         doc.fontSize(9).fillColor('black').font('Helvetica-Bold');
@@ -334,19 +359,21 @@ class ExportController {
           const textY = yPos + (rowHeight - 8) / 2;
           const padding = 4;
 
-          doc.fillColor('black').fontSize(8).text(data, xPos + padding, textY, {
-            width: colWidths[i] - (padding * 2),
-            align: align,
-            lineBreak: false,
-            ellipsis: true
-          });
+          doc
+            .fillColor('black')
+            .fontSize(8)
+            .text(data, xPos + padding, textY, {
+              width: colWidths[i] - padding * 2,
+              align: align,
+              lineBreak: false,
+              ellipsis: true
+            });
 
           xPos += colWidths[i];
         });
 
         yPos += rowHeight;
       });
-
 
       // Finalize PDF
       doc.end();
@@ -356,7 +383,6 @@ class ExportController {
         records: transformedData.length,
         user_id: req.user?.id
       });
-
     } catch (error) {
       logger.error('Export to PDF error', { error: error.message, stack: error.stack });
       return errorResponse(res, 'Failed to export to PDF', 500);
@@ -372,7 +398,7 @@ class ExportController {
       const { start_date, end_date, jabatan, nip } = req.query;
 
       // Helper function to format date to DD/MM/YYYY
-      const formatDate = (dateValue) => {
+      const formatDate = dateValue => {
         if (!dateValue) return '-';
         const date = new Date(dateValue);
         const day = String(date.getDate()).padStart(2, '0');
@@ -382,7 +408,7 @@ class ExportController {
       };
 
       // Helper function to format time (handles both string and Date object)
-      const formatTime = (timeValue) => {
+      const formatTime = timeValue => {
         if (!timeValue) return '-';
         if (typeof timeValue === 'string') return timeValue;
         if (timeValue instanceof Date) return timeValue.toISOString().split('T')[1].substring(0, 8);
@@ -449,11 +475,15 @@ class ExportController {
       const headers = Object.keys(csvData[0]);
       const csvRows = [
         headers.join(','), // Header row
-        ...csvData.map(row => headers.map(header => {
-          const value = row[header];
-          // Escape commas and quotes
-          return `"${String(value).replace(/"/g, '""')}"`;
-        }).join(','))
+        ...csvData.map(row =>
+          headers
+            .map(header => {
+              const value = row[header];
+              // Escape commas and quotes
+              return `"${String(value).replace(/"/g, '""')}"`;
+            })
+            .join(',')
+        )
       ];
       const csvContent = csvRows.join('\n');
 
@@ -472,7 +502,6 @@ class ExportController {
       });
 
       return res.send(BOM + csvContent);
-
     } catch (error) {
       logger.error('Export to CSV error', { error: error.message, stack: error.stack });
       return errorResponse(res, 'Failed to export to CSV', 500);

@@ -12,7 +12,7 @@ router.use(authenticateToken);
  * @swagger
  * /api/export/excel:
  *   get:
- *     summary: Export attendance data to Excel
+ *     summary: Ekspor data absensi ke Excel
  *     tags: [Export]
  *     security:
  *       - bearerAuth: []
@@ -22,22 +22,22 @@ router.use(authenticateToken);
  *         required: true
  *         schema:
  *           type: string
- *         description: Month (01-12)
+ *         description: Bulan (01-12)
  *       - in: query
  *         name: tahun
  *         required: true
  *         schema:
  *           type: string
- *         description: Year (YYYY)
+ *         description: Tahun (YYYY)
  *       - in: query
  *         name: jabatan
  *         schema:
  *           type: string
  *           enum: [DOSEN, KARYAWAN]
- *         description: Filter by position (optional)
+ *         description: Filter berdasarkan jabatan (opsional)
  *     responses:
  *       200:
- *         description: Excel file downloaded successfully
+ *         description: File Excel berhasil diunduh
  *         content:
  *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
  *             schema:
@@ -50,7 +50,7 @@ router.get('/excel', ExportController.exportToExcel);
  * @swagger
  * /api/export/pdf:
  *   get:
- *     summary: Export attendance data to PDF
+ *     summary: Ekspor data absensi ke PDF
  *     tags: [Export]
  *     security:
  *       - bearerAuth: []
@@ -60,22 +60,22 @@ router.get('/excel', ExportController.exportToExcel);
  *         required: true
  *         schema:
  *           type: string
- *         description: Month (01-12)
+ *         description: Bulan (01-12)
  *       - in: query
  *         name: tahun
  *         required: true
  *         schema:
  *           type: string
- *         description: Year (YYYY)
+ *         description: Tahun (YYYY)
  *       - in: query
  *         name: jabatan
  *         schema:
  *           type: string
  *           enum: [DOSEN, KARYAWAN]
- *         description: Filter by position (optional)
+ *         description: Filter berdasarkan jabatan (opsional)
  *     responses:
  *       200:
- *         description: PDF file downloaded successfully
+ *         description: File PDF berhasil diunduh
  *         content:
  *           application/pdf:
  *             schema:
@@ -88,7 +88,7 @@ router.get('/pdf', ExportController.exportToPDF);
  * @swagger
  * /api/export/csv:
  *   get:
- *     summary: Export attendance data to CSV
+ *     summary: Ekspor data absensi ke CSV
  *     tags: [Export]
  *     security:
  *       - bearerAuth: []
@@ -98,22 +98,22 @@ router.get('/pdf', ExportController.exportToPDF);
  *         required: true
  *         schema:
  *           type: string
- *         description: Month (01-12)
+ *         description: Bulan (01-12)
  *       - in: query
  *         name: tahun
  *         required: true
  *         schema:
  *           type: string
- *         description: Year (YYYY)
+ *         description: Tahun (YYYY)
  *       - in: query
  *         name: jabatan
  *         schema:
  *           type: string
  *           enum: [DOSEN, KARYAWAN]
- *         description: Filter by position (optional)
+ *         description: Filter berdasarkan jabatan (opsional)
  *     responses:
  *       200:
- *         description: CSV file downloaded successfully
+ *         description: File CSV berhasil diunduh
  *         content:
  *           text/csv:
  *             schema:

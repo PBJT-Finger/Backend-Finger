@@ -8,11 +8,11 @@ const router = express.Router();
  * @swagger
  * /adms/push:
  *   post:
- *     summary: Push attendance data from fingerprint machines
+ *     summary: Push data absensi dari mesin fingerprint
  *     description: |
- *       Internal endpoint for fingerprint machines to push attendance data.
- *       Requires valid API key and device validation.
- *       Not intended for direct API calls.
+ *       Endpoint internal untuk mesin fingerprint mengirim data absensi.
+ *       Membutuhkan API key yang valid dan validasi perangkat.
+ *       Tidak ditujukan untuk panggilan API langsung.
  *     tags: [Device]
  *     requestBody:
  *       required: true
@@ -34,58 +34,58 @@ const router = express.Router();
  *             properties:
  *               cloud_id:
  *                 type: string
- *                 description: Cloud system identifier
+ *                 description: Identifikasi sistem cloud
  *               device_id:
  *                 type: string
- *                 description: Fingerprint device identifier
+ *                 description: Identifikasi perangkat fingerprint
  *               user_id:
  *                 type: string
- *                 description: User identifier
+ *                 description: Identifikasi pengguna
  *               nama:
  *                 type: string
- *                 description: Full name
+ *                 description: Nama lengkap
  *               nip:
  *                 type: string
- *                 description: Employee ID number
+ *                 description: Nomor induk pegawai
  *               jabatan:
  *                 type: string
  *                 enum: [DOSEN, KARYAWAN]
- *                 description: Position
+ *                 description: Jabatan
  *               tanggal_absensi:
  *                 type: string
  *                 format: date
- *                 description: Attendance date (YYYY-MM-DD)
+ *                 description: Tanggal absensi (YYYY-MM-DD)
  *               waktu_absensi:
  *                 type: string
  *                 format: time
- *                 description: Attendance time (HH:mm:ss)
+ *                 description: Waktu absensi (HH:mm:ss)
  *               tipe_absensi:
  *                 type: string
  *                 enum: [MASUK, PULANG]
- *                 description: Attendance type
+ *                 description: Tipe absensi
  *               verifikasi:
  *                 type: string
  *                 default: SIDIK_JARI
- *                 description: Verification method
+ *                 description: Metode verifikasi
  *               api_key:
  *                 type: string
- *                 description: Device API key for authentication
+ *                 description: API key perangkat untuk autentikasi
  *               timestamp:
  *                 type: string
  *                 format: date-time
- *                 description: Request timestamp for validation
+ *                 description: Timestamp request untuk validasi
  *               signature:
  *                 type: string
- *                 description: HMAC signature for request validation
+ *                 description: Signature HMAC untuk validasi request
  *     responses:
  *       200:
- *         description: Attendance data processed successfully
+ *         description: Data absensi berhasil diproses
  *       400:
- *         description: Invalid request data
+ *         description: Data request tidak valid
  *       403:
- *         description: Authentication failed
+ *         description: Autentikasi gagal
  *       409:
- *         description: Duplicate attendance record
+ *         description: Rekaman absensi duplikat
  */
 router.post('/push', ADMSController.pushAttendance);
 
@@ -93,12 +93,12 @@ router.post('/push', ADMSController.pushAttendance);
  * @swagger
  * /adms/health:
  *   get:
- *     summary: ADMS service health check
- *     description: Health check endpoint for fingerprint machines
+ *     summary: Pemeriksaan kesehatan layanan ADMS
+ *     description: Endpoint pemeriksaan kesehatan untuk mesin fingerprint
  *     tags: [Device]
  *     responses:
  *       200:
- *         description: Service is healthy
+ *         description: Layanan sehat
  *         content:
  *           application/json:
  *             schema:

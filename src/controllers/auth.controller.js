@@ -25,14 +25,8 @@ class AuthController {
    */
   static login = [
     // Validation - email only
-    body('email')
-      .trim()
-      .isEmail()
-      .withMessage('Email tidak valid')
-      .normalizeEmail(),
-    body('password')
-      .isLength({ min: 6 })
-      .withMessage('Password minimal 6 karakter'),
+    body('email').trim().isEmail().withMessage('Email tidak valid').normalizeEmail(),
+    body('password').isLength({ min: 6 }).withMessage('Password minimal 6 karakter'),
 
     async (req, res) => {
       try {
@@ -69,10 +63,7 @@ class AuthController {
         const { accessToken, refreshToken } = generateTokens(admin);
 
         // Update last login
-        await query(
-          'UPDATE admins SET last_login = NOW() WHERE id = ?',
-          [admin.id]
-        );
+        await query('UPDATE admins SET last_login = NOW() WHERE id = ?', [admin.id]);
 
         logger.audit('LOGIN_SUCCESS', admin.id, {
           username: admin.username,
@@ -81,7 +72,6 @@ class AuthController {
         });
 
         return loginResponse(res, admin, accessToken, refreshToken);
-
       } catch (error) {
         logger.error('Login error', { error: error.message, stack: error.stack, ip: req.ip });
         return errorResponse(res, 'Internal server error', 500);
@@ -96,11 +86,7 @@ class AuthController {
       .withMessage('Username harus 3-50 karakter')
       .matches(/^[a-zA-Z0-9_]+$/)
       .withMessage('Username hanya boleh huruf, angka, dan underscore'),
-    body('email')
-      .trim()
-      .isEmail()
-      .withMessage('Email tidak valid')
-      .normalizeEmail(),
+    body('email').trim().isEmail().withMessage('Email tidak valid').normalizeEmail(),
     body('password')
       .isLength({ min: 8 })
       .withMessage('Password minimal 8 karakter')
@@ -117,7 +103,9 @@ class AuthController {
         const { username, email, password } = req.body;
 
         // Check if username exists
-        const existingUsername = await query('SELECT id FROM admins WHERE username = ? LIMIT 1', [username]);
+        const existingUsername = await query('SELECT id FROM admins WHERE username = ? LIMIT 1', [
+          username
+        ]);
         if (existingUsername.length > 0) {
           return errorResponse(res, 'Username sudah digunakan', 400);
         }
@@ -154,7 +142,6 @@ class AuthController {
         logger.audit('ADMIN_REGISTERED', admin.id, { username, email, ip: req.ip });
 
         return registerResponse(res, admin);
-
       } catch (error) {
         logger.error('Register error', { error: error.message, stack: error.stack, ip: req.ip });
         return errorResponse(res, 'Gagal mendaftar. Silakan coba lagi.', 500);
@@ -166,11 +153,7 @@ class AuthController {
    * Forgot Password
    */
   static forgotPassword = [
-    body('email')
-      .trim()
-      .isEmail()
-      .withMessage('Email tidak valid')
-      .normalizeEmail(),
+    body('email').trim().isEmail().withMessage('Email tidak valid').normalizeEmail(),
 
     async (req, res) => {
       try {
@@ -196,10 +179,9 @@ class AuthController {
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
         // Delete old unused reset requests
-        await query(
-          'DELETE FROM password_resets WHERE admin_id = ? AND used_at IS NULL',
-          [admin.id]
-        );
+        await query('DELETE FROM password_resets WHERE admin_id = ? AND used_at IS NULL', [
+          admin.id
+        ]);
 
         // Create new reset request
         await query(
@@ -218,9 +200,12 @@ class AuthController {
         logger.audit('PASSWORD_RESET_REQUESTED', admin.id, { email, ip: req.ip });
 
         return passwordResetResponse(res);
-
       } catch (error) {
-        logger.error('Forgot password error', { error: error.message, stack: error.stack, ip: req.ip });
+        logger.error('Forgot password error', {
+          error: error.message,
+          stack: error.stack,
+          ip: req.ip
+        });
         return errorResponse(res, 'Terjadi kesalahan. Silakan coba lagi.', 500);
       }
     }
@@ -230,11 +215,7 @@ class AuthController {
    * Verify Code
    */
   static verifyCode = [
-    body('email')
-      .trim()
-      .isEmail()
-      .withMessage('Email tidak valid')
-      .normalizeEmail(),
+    body('email').trim().isEmail().withMessage('Email tidak valid').normalizeEmail(),
     body('code')
       .trim()
       .isLength({ min: 6, max: 6 })
@@ -274,15 +255,14 @@ class AuthController {
 
         const resetToken = crypto.randomBytes(32).toString('hex');
 
-        await query(
-          'UPDATE password_resets SET reset_token = ? WHERE id = ?',
-          [resetToken, resetEntry.id]
-        );
+        await query('UPDATE password_resets SET reset_token = ? WHERE id = ?', [
+          resetToken,
+          resetEntry.id
+        ]);
 
         logger.audit('RESET_CODE_VERIFIED', resetEntry.admin_id, { email, ip: req.ip });
 
         return passwordResetResponse(res, { resetToken }, 'Kode valid');
-
       } catch (error) {
         logger.error('Verify code error', { error: error.message, stack: error.stack, ip: req.ip });
         return errorResponse(res, 'Terjadi kesalahan. Silakan coba lagi.', 500);
@@ -294,9 +274,7 @@ class AuthController {
    * Reset Password
    */
   static resetPassword = [
-    body('resetToken')
-      .notEmpty()
-      .withMessage('Reset token diperlukan'),
+    body('resetToken').notEmpty().withMessage('Reset token diperlukan'),
     body('newPassword')
       .isLength({ min: 8 })
       .withMessage('Password minimal 8 karakter')
@@ -336,16 +314,13 @@ class AuthController {
         const hashedPassword = await bcrypt.hash(newPassword, 12);
 
         // Update password
-        await query(
-          'UPDATE admins SET password_hash = ?, updated_at = NOW() WHERE id = ?',
-          [hashedPassword, resetEntry.admin_id]
-        );
+        await query('UPDATE admins SET password_hash = ?, updated_at = NOW() WHERE id = ?', [
+          hashedPassword,
+          resetEntry.admin_id
+        ]);
 
         // Mark reset as used
-        await query(
-          'UPDATE password_resets SET used_at = NOW() WHERE id = ?',
-          [resetEntry.id]
-        );
+        await query('UPDATE password_resets SET used_at = NOW() WHERE id = ?', [resetEntry.id]);
 
         try {
           await sendPasswordResetConfirmation(resetEntry.email, resetEntry.username);
@@ -362,9 +337,12 @@ class AuthController {
         });
 
         return passwordResetResponse(res, null, 'Password berhasil direset');
-
       } catch (error) {
-        logger.error('Reset password error', { error: error.message, stack: error.stack, ip: req.ip });
+        logger.error('Reset password error', {
+          error: error.message,
+          stack: error.stack,
+          ip: req.ip
+        });
         return errorResponse(res, 'Gagal mereset password. Silakan coba lagi.', 500);
       }
     }
@@ -389,10 +367,7 @@ class AuthController {
 
       const decoded = verifyRefreshToken(refresh_token);
 
-      const admins = await query(
-        'SELECT * FROM admins WHERE id = ? LIMIT 1',
-        [decoded.id]
-      );
+      const admins = await query('SELECT * FROM admins WHERE id = ? LIMIT 1', [decoded.id]);
 
       if (admins.length === 0 || !admins[0].is_active) {
         logger.warn('Refresh token failed: User not found or inactive', { userId: decoded.id });
@@ -408,15 +383,18 @@ class AuthController {
 
       logger.audit('TOKEN_REFRESH_ROTATED', admin.id, { ip: req.ip });
 
-      return successResponse(res, {
-        tokens: {
-          access_token: accessToken,
-          refresh_token: newRefreshToken,
-          token_type: 'Bearer',
-          expires_in: 15 * 60
-        }
-      }, 'Tokens refreshed successfully');
-
+      return successResponse(
+        res,
+        {
+          tokens: {
+            access_token: accessToken,
+            refresh_token: newRefreshToken,
+            token_type: 'Bearer',
+            expires_in: 15 * 60
+          }
+        },
+        'Tokens refreshed successfully'
+      );
     } catch (error) {
       logger.error('Refresh token error', { error: error.message, ip: req.ip });
       return errorResponse(res, 'Invalid refresh token', 401);
@@ -454,7 +432,6 @@ class AuthController {
         null,
         `Logout berhasil. ${tokensBlacklisted} token(s) invalidated.`
       );
-
     } catch (error) {
       logger.error('Logout error', { error: error.message, userId: req.user?.id });
       return errorResponse(res, 'Internal server error', 500);

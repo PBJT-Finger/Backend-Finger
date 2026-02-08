@@ -48,10 +48,10 @@ const exportToExcel = async (data, filePath) => {
     'Cloud ID': record.cloud_id,
     'Device ID': record.device_id,
     'User ID': record.user_id,
-    'Nama': record.nama,
+    Nama: record.nama,
     'Tanggal Absensi': record.tanggal_absensi,
     'Waktu Absensi': record.waktu_absensi,
-    'Verifikasi': record.verifikasi,
+    Verifikasi: record.verifikasi,
     'Tipe Absensi': record.tipe_absensi,
     'Tanggal Upload': record.tanggal_upload,
     'Kategori User': record.kategori_user
@@ -78,14 +78,15 @@ const exportToPDF = async (data, filePath) => {
   let yPosition = doc.y + 20;
 
   headers.forEach((header, index) => {
-    doc.fontSize(10).text(header, 50 + (index * 80), yPosition, { width: 70, align: 'center' });
+    doc.fontSize(10).text(header, 50 + index * 80, yPosition, { width: 70, align: 'center' });
   });
 
   doc.moveDown();
 
   // Table data
   data.forEach((record, index) => {
-    if (yPosition > 700) { // New page if needed
+    if (yPosition > 700) {
+      // New page if needed
       doc.addPage();
       yPosition = 50;
     }
@@ -100,14 +101,14 @@ const exportToPDF = async (data, filePath) => {
     ];
 
     rowData.forEach((cell, cellIndex) => {
-      doc.fontSize(8).text(cell, 50 + (cellIndex * 80), yPosition, { width: 70, align: 'center' });
+      doc.fontSize(8).text(cell, 50 + cellIndex * 80, yPosition, { width: 70, align: 'center' });
     });
 
     yPosition += 15;
   });
 
   doc.end();
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     doc.on('end', () => resolve(filePath));
   });
 };
@@ -125,7 +126,7 @@ const exportToCSV = async (data, filePath) => {
       { id: 'verifikasi', title: 'Verifikasi' },
       { id: 'tipe_absensi', title: 'Tipe Absensi' },
       { id: 'tanggal_upload', title: 'Tanggal Upload' },
-      { id: 'kategori_user', title: 'Kategori User' },
+      { id: 'kategori_user', title: 'Kategori User' }
     ]
   });
   await csvWriter.writeRecords(data);
@@ -134,14 +135,14 @@ const exportToCSV = async (data, filePath) => {
 
 const exportSummaryToExcel = async (data, filePath) => {
   const excelData = data.map(record => ({
-    'No': record.no,
-    'Nama': record.nama,
-    'NIP': record.nip,
-    'Jabatan': record.jabatan,
-    'Hadir': record.hadir,
+    No: record.no,
+    Nama: record.nama,
+    NIP: record.nip,
+    Jabatan: record.jabatan,
+    Hadir: record.hadir,
     'Total Hari Kerja': record.total_hari_kerja,
-    'Terlambat': record.terlambat,
-    'Persentase': record.persentase,
+    Terlambat: record.terlambat,
+    Persentase: record.persentase,
     'Check In Terakhir': record.check_in_terakhir,
     'Check Out Terakhir': record.check_out_terakhir
   }));

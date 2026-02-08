@@ -5,10 +5,10 @@ const { authenticateToken } = require('../middlewares/auth.middleware');
 const { handleValidationErrors, sanitizeInputs } = require('../middlewares/validate.middleware');
 const { userRateLimits } = require('../middlewares/userRateLimit'); // Phase 3
 const {
-    validateSummary,
-    validateAttendanceFilters,
-    validateAttendanceId,
-    validateRekapParams
+  validateSummary,
+  validateAttendanceFilters,
+  validateAttendanceId,
+  validateRekapParams
 } = require('../validators/attendance.validators');
 
 const router = express.Router();
@@ -21,14 +21,14 @@ router.use(sanitizeInputs);
  * @swagger
  * /api/attendance/summary:
  *   get:
- *     summary: Get comprehensive attendance summary for frontend rekap
+ *     summary: Dapatkan ringkasan absensi komprehensif untuk rekap frontend
  *     description: |
- *       Returns attendance summary with:
- *       - Hadir (days present based on check-in)
- *       - Total Hari Kerja (working days excluding weekends & holidays)
- *       - Terlambat (late days based on shift for KARYAWAN)
- *       - Presentase (attendance percentage)
- *       - Check In/Out Terakhir (last check-in/out times)
+ *       Mengembalikan ringkasan absensi dengan:
+ *       - Hadir (hari kehadiran berdasarkan check-in)
+ *       - Total Hari Kerja (hari kerja tidak termasuk akhir pekan & hari libur)
+ *       - Terlambat (hari terlambat berdasarkan shift untuk KARYAWAN)
+ *       - Presentase (persentase kehadiran)
+ *       - Check In/Out Terakhir (waktu check-in/out terakhir)
  *     tags: [Attendance Summary]
  *     security:
  *       - bearerAuth: []
@@ -40,7 +40,7 @@ router.use(sanitizeInputs);
  *           type: string
  *           format: date
  *           example: "2026-01-01"
- *         description: Start date (YYYY-MM-DD)
+ *         description: Tanggal mulai (YYYY-MM-DD)
  *       - in: query
  *         name: endDate
  *         required: true
@@ -48,35 +48,35 @@ router.use(sanitizeInputs);
  *           type: string
  *           format: date
  *           example: "2026-01-31"
- *         description: End date (YYYY-MM-DD)
+ *         description: Tanggal akhir (YYYY-MM-DD)
  *       - in: query
  *         name: jabatan
  *         schema:
  *           type: string
  *           enum: [DOSEN, KARYAWAN]
- *         description: Filter by position (DOSEN or KARYAWAN)
+ *         description: Filter berdasarkan jabatan (DOSEN atau KARYAWAN)
  *       - in: query
  *         name: nip
  *         schema:
  *           type: string
- *         description: Filter by specific NIP
+ *         description: Filter berdasarkan NIP tertentu
 
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number
+ *         description: Nomor halaman
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 50
  *           maximum: 100
- *         description: Records per page
+ *         description: Rekaman per halaman
  *     responses:
  *       200:
- *         description: Attendance summary retrieved successfully
+ *         description: Ringkasan absensi berhasil diambil
  *         content:
  *           application/json:
  *             schema:
@@ -114,25 +114,26 @@ router.use(sanitizeInputs);
  *                 pagination:
  *                   type: object
  *       400:
- *         description: Missing required parameters
+ *         description: Parameter yang diperlukan hilang
  */
 /**
  * Routes - Public API endpoints
  */
 
 // Phase 3: Apply moderate user rate limit (200 req/15min) for summary
-router.get('/summary',
-    userRateLimits.moderate,
-    validateSummary,
-    handleValidationErrors,
-    AttendanceController.getSummary
+router.get(
+  '/summary',
+  userRateLimits.moderate,
+  validateSummary,
+  handleValidationErrors,
+  AttendanceController.getSummary
 );
 
 /**
  * @swagger
  * /api/attendance:
  *   get:
- *     summary: Get all attendance records with filtering
+ *     summary: Dapatkan semua rekaman absensi dengan filter
  *     tags: [Attendance]
  *     security:
  *       - bearerAuth: []
@@ -142,47 +143,52 @@ router.get('/summary',
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number
+ *         description: Nomor halaman
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 50
- *         description: Records per page
+ *         description: Rekaman per halaman
  *       - in: query
  *         name: user_id
  *         schema:
  *           type: string
- *         description: Filter by user ID
+ *         description: Filter berdasarkan ID pengguna
  *       - in: query
  *         name: jabatan
  *         schema:
  *           type: string
  *           enum: [DOSEN, KARYAWAN]
- *         description: Filter by position
+ *         description: Filter berdasarkan jabatan
  *       - in: query
  *         name: tanggal_mulai
  *         schema:
  *           type: string
  *           format: date
- *         description: Start date (YYYY-MM-DD)
+ *         description: Tanggal mulai (YYYY-MM-DD)
  *       - in: query
  *         name: tanggal_akhir
  *         schema:
  *           type: string
  *           format: date
- *         description: End date (YYYY-MM-DD)
+ *         description: Tanggal akhir (YYYY-MM-DD)
  *     responses:
  *       200:
- *         description: Attendance records retrieved successfully
+ *         description: Rekaman absensi berhasil diambil
  */
-router.get('/', validateAttendanceFilters, handleValidationErrors, AttendanceController.getAttendance);
+router.get(
+  '/',
+  validateAttendanceFilters,
+  handleValidationErrors,
+  AttendanceController.getAttendance
+);
 
 /**
  * @swagger
  * /api/attendance/dosen:
  *   get:
- *     summary: Get attendance records for lecturers only
+ *     summary: Dapatkan rekaman absensi khusus dosen
  *     tags: [Attendance]
  *     security:
  *       - bearerAuth: []
@@ -209,7 +215,7 @@ router.get('/', validateAttendanceFilters, handleValidationErrors, AttendanceCon
  *           format: date
  *     responses:
  *       200:
- *         description: Lecturer attendance records retrieved successfully
+ *         description: Rekaman absensi dosen berhasil diambil
  */
 router.get('/dosen', AttendanceController.getLecturerAttendance);
 
@@ -217,7 +223,7 @@ router.get('/dosen', AttendanceController.getLecturerAttendance);
  * @swagger
  * /api/attendance/karyawan:
  *   get:
- *     summary: Get attendance records for employees only
+ *     summary: Dapatkan rekaman absensi khusus karyawan
  *     tags: [Attendance]
  *     security:
  *       - bearerAuth: []
@@ -244,7 +250,7 @@ router.get('/dosen', AttendanceController.getLecturerAttendance);
  *           format: date
  *     responses:
  *       200:
- *         description: Employee attendance records retrieved successfully
+ *         description: Rekaman absensi karyawan berhasil diambil
  */
 router.get('/karyawan', AttendanceController.getEmployeeAttendance);
 
@@ -252,8 +258,8 @@ router.get('/karyawan', AttendanceController.getEmployeeAttendance);
  * @swagger
  * /api/attendance/rekap:
  *   get:
- *     summary: Get employee attendance summary report
- *     description: Returns summarized attendance data for each employee with sequential numbering, last check-in/out times, and attendance statistics
+ *     summary: Dapatkan laporan ringkasan absensi karyawan
+ *     description: Mengembalikan data ringkasan absensi untuk setiap karyawan dengan penomoran berurutan, waktu check-in/out terakhir, dan statistik kehadiran
  *     tags: [Attendance]
  *     security:
  *       - bearerAuth: []
@@ -265,7 +271,7 @@ router.get('/karyawan', AttendanceController.getEmployeeAttendance);
  *           type: string
  *           format: date
  *           example: "2026-01-01"
- *         description: Start date (YYYY-MM-DD)
+ *         description: Tanggal mulai (YYYY-MM-DD)
  *       - in: query
  *         name: end_date
  *         required: true
@@ -273,15 +279,15 @@ router.get('/karyawan', AttendanceController.getEmployeeAttendance);
  *           type: string
  *           format: date
  *           example: "2026-01-31"
- *         description: End date (YYYY-MM-DD)
+ *         description: Tanggal akhir (YYYY-MM-DD)
  *       - in: query
  *         name: nip
  *         schema:
  *           type: string
- *         description: Filter by specific employee NIP
+ *         description: Filter berdasarkan NIP karyawan tertentu
  *     responses:
  *       200:
- *         description: Attendance summary retrieved successfully
+ *         description: Ringkasan absensi berhasil diambil
  *         content:
  *           application/json:
  *             schema:
@@ -292,7 +298,7 @@ router.get('/karyawan', AttendanceController.getEmployeeAttendance);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Attendance summary calculated successfully"
+ *                   example: "Ringkasan absensi berhasil dihitung"
  *                 data:
  *                   type: object
  *                   properties:
@@ -303,48 +309,48 @@ router.get('/karyawan', AttendanceController.getEmployeeAttendance);
  *                         properties:
  *                           no:
  *                             type: integer
- *                             description: Sequential number
+ *                             description: Nomor urut
  *                             example: 1
  *                           nama:
  *                             type: string
- *                             description: Full name
+ *                             description: Nama lengkap
  *                             example: "John Doe"
  *                           nip:
  *                             type: string
- *                             description: Employee ID number
+ *                             description: Nomor Induk Pegawai
  *                             example: "123456"
  *                           jabatan:
  *                             type: string
- *                             description: Position type
+ *                             description: Tipe jabatan
  *                             enum: [DOSEN, KARYAWAN]
  *                             example: "DOSEN"
  *                           check_in_terakhir:
  *                             type: string
  *                             format: date-time
  *                             nullable: true
- *                             description: Last check-in timestamp
+ *                             description: Timestamp check-in terakhir
  *                             example: "2026-01-20T08:30:00.000Z"
  *                           check_out_terakhir:
  *                             type: string
  *                             format: date-time
  *                             nullable: true
- *                             description: Last check-out timestamp
+ *                             description: Timestamp check-out terakhir
  *                             example: "2026-01-20T17:00:00.000Z"
  *                           total_hadir:
  *                             type: integer
- *                             description: Total days present
+ *                             description: Total hari hadir
  *                             example: 18
  *                           total_terlambat:
  *                             type: integer
- *                             description: Total days late
+ *                             description: Total hari terlambat
  *                             example: 2
  *                           total_days:
  *                             type: integer
- *                             description: Total days in period
+ *                             description: Total hari dalam periode
  *                             example: 20
  *                           persentase:
  *                             type: integer
- *                             description: Attendance percentage (0-100)
+ *                             description: Persentase kehadiran (0-100)
  *                             example: 90
  *                     period:
  *                       type: object
@@ -357,18 +363,23 @@ router.get('/karyawan', AttendanceController.getEmployeeAttendance);
  *                           format: date
  *                     total_employees:
  *                       type: integer
- *                       description: Total number of employees in result
+ *                       description: Total jumlah karyawan dalam hasil
  *                       example: 50
  *       400:
- *         description: Missing required parameters (start_date or end_date)
+ *         description: Parameter yang diperlukan hilang (start_date atau end_date)
  */
-router.get('/rekap', validateRekapParams, handleValidationErrors, AttendanceController.getAttendanceSummary);
+router.get(
+  '/rekap',
+  validateRekapParams,
+  handleValidationErrors,
+  AttendanceController.getAttendanceSummary
+);
 
 /**
  * @swagger
  * /api/attendance/rekap/bulanan:
  *   get:
- *     summary: Get detailed monthly attendance report
+ *     summary: Dapatkan laporan absensi bulanan detail
  *     tags: [Attendance]
  *     security:
  *       - bearerAuth: []
@@ -378,24 +389,29 @@ router.get('/rekap', validateRekapParams, handleValidationErrors, AttendanceCont
  *         required: true
  *         schema:
  *           type: string
- *         description: Month (01-12)
+ *         description: Bulan (01-12)
  *       - in: query
  *         name: tahun
  *         required: true
  *         schema:
  *           type: string
- *         description: Year (YYYY)
+ *         description: Tahun (YYYY)
  *     responses:
  *       200:
- *         description: Monthly report retrieved successfully
+ *         description: Laporan bulanan berhasil diambil
  */
-router.get('/rekap/bulanan', validateRekapParams, handleValidationErrors, AttendanceController.getMonthlyReport);
+router.get(
+  '/rekap/bulanan',
+  validateRekapParams,
+  handleValidationErrors,
+  AttendanceController.getMonthlyReport
+);
 
 /**
  * @swagger
  * /api/attendance/{id}:
  *   delete:
- *     summary: Soft delete attendance record
+ *     summary: Hapus rekaman absensi (soft delete)
  *     tags: [Attendance]
  *     security:
  *       - bearerAuth: []
@@ -405,13 +421,52 @@ router.get('/rekap/bulanan', validateRekapParams, handleValidationErrors, Attend
  *         required: true
  *         schema:
  *           type: integer
- *         description: Attendance record ID
+ *         description: ID rekaman absensi
  *     responses:
  *       200:
- *         description: Attendance record deleted successfully
+ *         description: Rekaman absensi berhasil dihapus
  *       404:
- *         description: Attendance record not found
+ *         description: Rekaman absensi tidak ditemukan
  */
-router.delete('/:id', validateAttendanceId, handleValidationErrors, AttendanceController.deleteAttendance);
+router.delete(
+  '/:id',
+  validateAttendanceId,
+  handleValidationErrors,
+  AttendanceController.deleteAttendance
+);
+
+/**
+ * @swagger
+ * /api/attendance/sync-fingerprint:
+ *   post:
+ *     summary: Sinkronisasi data absensi dari perangkat sidik jari
+ *     description: Mengambil log absensi dari mesin sidik jari dan menyimpannya ke database
+ *     tags: [Attendance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Data absensi berhasil disinkronkan
+ *       500:
+ *         description: Gagal menyinkronkan data absensi
+ */
+router.post('/sync-fingerprint', AttendanceController.syncFromFingerprint);
+
+/**
+ * @swagger
+ * /api/attendance/device-status:
+ *   get:
+ *     summary: Dapatkan status perangkat sidik jari
+ *     description: Periksa status koneksi perangkat sidik jari
+ *     tags: [Attendance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Status perangkat berhasil diambil
+ *       500:
+ *         description: Gagal mendapatkan status perangkat
+ */
+router.get('/device-status', AttendanceController.getDeviceStatus);
 
 module.exports = router;

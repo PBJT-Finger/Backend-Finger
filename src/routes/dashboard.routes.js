@@ -12,7 +12,7 @@ router.use(authenticateToken);
  * @swagger
  * /api/dashboard/summary:
  *   get:
- *     summary: Get dashboard summary statistics
+ *     summary: Dapatkan statistik ringkasan dashboard
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -21,15 +21,15 @@ router.use(authenticateToken);
  *         name: bulan
  *         schema:
  *           type: string
- *         description: Month (01-12), defaults to current month
+ *         description: Bulan (01-12), default bulan saat ini
  *       - in: query
  *         name: tahun
  *         schema:
  *           type: string
- *         description: Year (YYYY), defaults to current year
+ *         description: Tahun (YYYY), default tahun saat ini
  *     responses:
  *       200:
- *         description: Dashboard summary retrieved successfully
+ *         description: Ringkasan dashboard berhasil diambil
  *         content:
  *           application/json:
  *             schema:

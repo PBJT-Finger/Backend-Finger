@@ -12,25 +12,25 @@ const router = express.Router();
  * @swagger
  * /metrics:
  *   get:
- *     summary: Prometheus metrics
- *     description: Exposes application metrics in Prometheus format
+ *     summary: Metrik Prometheus
+ *     description: Menampilkan metrik aplikasi dalam format Prometheus
  *     tags: [System]
  *     responses:
  *       200:
- *         description: Metrics data in Prometheus exposition format
+ *         description: Data metrik dalam format eksposisi Prometheus
  *         content:
  *           text/plain:
  *             schema:
  *               type: string
  */
 router.get('/metrics', async (req, res) => {
-    try {
-        res.set('Content-Type', register.contentType);
-        const metrics = await register.metrics();
-        res.send(metrics);
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
+  try {
+    res.set('Content-Type', register.contentType);
+    const metrics = await register.metrics();
+    res.send(metrics);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
 });
 
 module.exports = router;

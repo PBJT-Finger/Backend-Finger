@@ -24,10 +24,10 @@ const { requestCorrelation } = require('./middlewares/correlation'); // Phase 3:
 const { metricsMiddleware } = require('./middlewares/metrics.middleware'); // Prometheus metrics
 
 // Import Swagger
-const { swaggerUi, specs } = require('./config/swagger');
+const { specs } = require('./config/swagger');
 
 // Import database
-const { testSequelizeConnection } = require('./config/database');
+// Removed testSequelizeConnection - not used
 
 // Import logger
 const logger = require('./utils/logger');
@@ -57,75 +57,88 @@ const dashboardLimiter = rateLimit(rateLimits.DASHBOARD_API);
 const admsLimiter = rateLimit(rateLimits.ADMS_PUSH);
 
 // Middleware keamanan dengan Helmet
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        'cdn.jsdelivr.net',
-        'cdnjs.cloudflare.com',
-        'fonts.googleapis.com'
-      ],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        'cdn.jsdelivr.net',
-        'cdnjs.cloudflare.com',
-        'unpkg.com'
-      ],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com'],
-      fontSrc: [
-        "'self'",
-        'fonts.googleapis.com',
-        'fonts.gstatic.com',
-        'cdnjs.cloudflare.com',
-        'data:'
-      ],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'self'"]  // Allow iframes for API reference embedding
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          'cdn.jsdelivr.net',
+          'cdnjs.cloudflare.com',
+          'fonts.googleapis.com'
+        ],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          'cdn.jsdelivr.net',
+          'cdnjs.cloudflare.com',
+          'unpkg.com'
+        ],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com'],
+        fontSrc: [
+          "'self'",
+          'fonts.googleapis.com',
+          'fonts.gstatic.com',
+          'cdnjs.cloudflare.com',
+          'data:'
+        ],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'self'"] // Allow iframes for API reference embedding
+      }
     },
-  },
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  hsts: {
-    maxAge: 31536000, // 1 year
-    includeSubDomains: true,
-    preload: true
-  },
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-  permissionsPolicy: {
-    camera: [],
-    microphone: [],
-    geolocation: []
-  }
-}));
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true
+    },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    permissionsPolicy: {
+      camera: [],
+      microphone: [],
+      geolocation: []
+    }
+  })
+);
 
 // Konfigurasi CORS dengan multi-origin support
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:5000', 'http://localhost:5173'];
+  : ['http://localhost:3000', 'http://localhost:3333'];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
-  maxAge: 600 // 10 minutes preflight cache
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      // In development, allow all localhost origins
+      if (isDevelopment && origin.startsWith('http://localhost')) {
+        return callback(null, true);
+      }
+
+      // In production or for non-localhost, check whitelist
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        logger.warn('CORS blocked request', { origin, allowedOrigins });
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
+    maxAge: 600 // 10 minutes preflight cache
+  })
+);
 
 // Phase 3: Request Correlation - Apply EARLY for distributed tracing
 app.use(requestCorrelation);
@@ -160,7 +173,6 @@ app.use(healthRoutes);
 // Metrics endpoint (no auth required, for Prometheus scraper)
 app.use(metricsRoutes);
 
-
 // Readiness check (database connectivity)
 app.get('/ready', async (req, res) => {
   try {
@@ -194,49 +206,6 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/../public/api-docs.html');
 });
 
-// Dokumentasi Swagger dengan custom styling
-const swaggerCustomCss = `
-  .swagger-ui .topbar { display: none; }
-  .swagger-ui { background: #0a0a0b; }
-  .swagger-ui .info { margin: 40px 0; }
-  .swagger-ui .info .title { font-size: 2.5em; background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-  .swagger-ui .scheme-container { background: #111113; padding: 20px; border-radius: 12px; border: 1px solid #27272a; }
-  .swagger-ui .opblock-tag { font-size: 1.3em; font-weight: 600; color: #e4e4e7; }
-  .swagger-ui .opblock { border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 1px solid #27272a; background: #111113; }
-  .swagger-ui .opblock .opblock-summary { border-radius: 12px; }
-  .swagger-ui .opblock.opblock-post { border-color: #8b5cf6; }
-  .swagger-ui .opblock.opblock-post .opblock-summary { background: rgba(139, 92, 246, 0.1); }
-  .swagger-ui .opblock.opblock-get { border-color: #10b981; }
-  .swagger-ui .opblock.opblock-get .opblock-summary { background: rgba(16, 185, 129, 0.1); }
-  .swagger-ui .opblock.opblock-put { border-color: #f59e0b; }
-  .swagger-ui .opblock.opblock-put .opblock-summary { background: rgba(245, 158, 11, 0.1); }
-  .swagger-ui .opblock.opblock-delete { border-color: #ef4444; }
-  .swagger-ui .opblock.opblock-delete .opblock-summary { background: rgba(239, 68, 68, 0.1); }
-  .swagger-ui .btn.authorize { background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); border: none; }
-  .swagger-ui table thead tr th { background: #8b5cf6; color: white; }
-`;
-
-const swaggerOptions = {
-  customCss: swaggerCustomCss,
-  customSiteTitle: "🔐 Finger API • Technical Reference",
-  customfavIcon: "https://cdn-icons-png.flaticon.com/512/3064/3064155.png",
-  swaggerOptions: {
-    persistAuthorization: true,
-    displayRequestDuration: true,
-    filter: true,
-    syntaxHighlight: {
-      activate: true,
-      theme: "monokai"
-    },
-    tryItOutEnabled: true,
-    defaultModelsExpandDepth: 2,
-    defaultModelExpandDepth: 2,
-    docExpansion: 'list',
-    tagsSorter: 'alpha',
-    operationsSorter: 'alpha'
-  }
-};
-
 // Helper function to render documentation pages with EJS
 const renderDocsPage = (page, title, options = {}) => {
   return (req, res) => {
@@ -269,16 +238,18 @@ app.get('/api-docs', (req, res) => {
   res.send(html);
 });
 
-
-
 // OpenAPI JSON spec endpoint - with language support
-const { translateTags, translateDescription, getTranslation } = require('./config/i18n.translations');
+const {
+  translateTags,
+  translateDescription,
+  getTranslation
+} = require('./config/i18n.translations');
 
 app.get('/finger-api/docs-json', (req, res) => {
   const lang = req.query.lang || 'en';
 
   // Clone specs for modification
-  let localizedSpecs = JSON.parse(JSON.stringify(specs));
+  const localizedSpecs = JSON.parse(JSON.stringify(specs));
 
   // Apply translations if language is Indonesian
   if (lang === 'id') {
@@ -295,8 +266,6 @@ app.get('/finger-api/docs-json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(localizedSpecs);
 });
-
-
 
 // Routes API
 app.use('/api/auth', authRoutes);

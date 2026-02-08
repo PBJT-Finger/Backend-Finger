@@ -6,9 +6,9 @@
  */
 
 const indonesianTags = [
-    {
-        name: 'Authentication',
-        description: `**Autentikasi Pengguna**
+  {
+    name: 'Authentication',
+    description: `**Autentikasi Pengguna**
 
 Endpoint untuk mengelola autentikasi pengguna menggunakan JWT (JSON Web Token).
 
@@ -29,10 +29,10 @@ Endpoint untuk mengelola autentikasi pengguna menggunakan JWT (JSON Web Token).
 - Token expired dalam 1 jam (access) dan 7 hari (refresh)
 - Rate limiting untuk mencegah brute force attack
 `
-    },
-    {
-        name: 'User Profile',
-        description: `**Profil Pengguna**
+  },
+  {
+    name: 'User Profile',
+    description: `**Profil Pengguna**
 
 Endpoint untuk mendapatkan dan mengupdate informasi profil pengguna yang sedang login.
 
@@ -51,10 +51,10 @@ Endpoint untuk mendapatkan dan mengupdate informasi profil pengguna yang sedang 
 - User hanya bisa lihat dan edit profil sendiri
 - Admin dapat melihat profil user lain via endpoint User Management
 `
-    },
-    {
-        name: 'Attendance',
-        description: `**Manajemen Absensi**
+  },
+  {
+    name: 'Attendance',
+    description: `**Manajemen Absensi**
 
 Endpoint untuk operasi CRUD (Create, Read, Update, Delete) data absensi karyawan.
 
@@ -82,10 +82,10 @@ Endpoint untuk operasi CRUD (Create, Read, Update, Delete) data absensi karyawan
 
 **Timezone:** Asia/Jakarta (UTC+7)
 `
-    },
-    {
-        name: 'Attendance Summary',
-        description: `**Ringkasan Absensi**
+  },
+  {
+    name: 'Attendance Summary',
+    description: `**Ringkasan Absensi**
 
 Endpoint untuk mendapatkan summary dan statistik absensi karyawan dalam periode tertentu.
 
@@ -123,10 +123,10 @@ Endpoint untuk mendapatkan summary dan statistik absensi karyawan dalam periode 
 }
 \`\`\`
 `
-    },
-    {
-        name: 'Dashboard',
-        description: `**Dashboard & Statistik Real-time**
+  },
+  {
+    name: 'Dashboard',
+    description: `**Dashboard & Statistik Real-time**
 
 Endpoint untuk mendapatkan metrik dan statistik sistem absensi secara real-time.
 
@@ -156,7 +156,7 @@ Endpoint untuk mendapatkan metrik dan statistik sistem absensi secara real-time.
 - Data di-cache selama 5 menit
 - Auto-refresh available
 `
-    }
+  }
 ];
 
 module.exports = { indonesianTags };
