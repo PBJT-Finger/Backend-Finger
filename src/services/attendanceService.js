@@ -1,5 +1,5 @@
 // src/services/attendanceService.js - Service untuk logika bisnis absensi (Prisma)
-const { prisma } = require('../models');
+const prisma = require('../config/prisma');
 const logger = require('../utils/logger');
 
 class AttendanceService {

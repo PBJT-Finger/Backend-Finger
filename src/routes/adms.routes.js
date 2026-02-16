@@ -13,7 +13,7 @@ const router = express.Router();
  *       Endpoint internal untuk mesin fingerprint mengirim data absensi.
  *       Membutuhkan API key yang valid dan validasi perangkat.
  *       Tidak ditujukan untuk panggilan API langsung.
- *     tags: [Device]
+ *     tags: [System]
  *     requestBody:
  *       required: true
  *       content:
@@ -95,7 +95,7 @@ router.post('/push', ADMSController.pushAttendance);
  *   get:
  *     summary: Pemeriksaan kesehatan layanan ADMS
  *     description: Endpoint pemeriksaan kesehatan untuk mesin fingerprint
- *     tags: [Device]
+ *     tags: [System]
  *     responses:
  *       200:
  *         description: Layanan sehat

@@ -8,9 +8,9 @@ const options = {
     info: {
       title: 'API Finger - Sistem Absensi Sidik Jari',
       version: '2.0.0',
-      description: `**API Finger** adalah sistem manajemen absensi berbasis sidik jari yang terintegrasi dengan perangkat fingerprint, dirancang khusus untuk kebutuhan kampus dan institusi.
+      description: `**API Finger** adalah sistem manajemen absensi berbasis sidik jari yang dirancang khusus untuk kebutuhan kampus dan institusi.
 
-API REST yang komprehensif untuk mengelola absensi karyawan dengan integrasi sidik jari, sinkronisasi real-time, dan kemampuan analitik tingkat lanjut.
+API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan import data absensi dan analitik tingkat lanjut.
 
 **Base URL:** http://localhost:${process.env.PORT || 3333}/api
 
@@ -67,13 +67,13 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan integrasi sid
           'Operasi absensi sidik jari - check in/out, lihat rekaman, dan manajemen absensi'
       },
       {
-        name: 'Attendance Summary',
+        name: 'Report',
         description:
           'Analitik absensi, statistik, dan laporan ringkasan dengan perhitungan persentase'
       },
       {
         name: 'Dashboard',
-        description: 'Statistik dashboard real-time, tren, dan metrik kinerja utama'
+        description: 'Statistik dashboard, tren, dan metrik kinerja utama'
       },
       {
         name: 'Export',
@@ -82,10 +82,6 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan integrasi sid
       {
         name: 'Admin',
         description: 'Manajemen akun admin - CRUD operasi untuk user management sistem'
-      },
-      {
-        name: 'Device',
-        description: 'Manajemen dan sinkronisasi perangkat sidik jari ADMS'
       },
       {
         name: 'System',

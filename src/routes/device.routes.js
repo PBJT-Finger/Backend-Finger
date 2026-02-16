@@ -12,192 +12,24 @@ router.use(authenticateToken);
 const deviceLimiter = createUserRateLimiter('moderate');
 router.use(deviceLimiter);
 
-// Device Management endpoints - using Device tag for documentation
+// Device Management endpoints - DOCUMENTASI SWAGGER DIHAPUS AGAR TIDAK MUNCUL DI API DOCS
 
-
-/**
- * @swagger
- * /api/device:
- *   get:
- *     summary: Dapatkan semua perangkat (paginasi)
- *     tags: [Device]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, inactive, maintenance]
- *       - in: query
- *         name: lokasi
- *         schema:
- *           type: string
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Daftar perangkat
- */
+// GET /api/device - Get all devices
 router.get('/', DeviceController.getDevices);
 
-/**
- * @swagger
- * /api/device/{id}:
- *   get:
- *     summary: Dapatkan perangkat berdasarkan ID
- *     tags: [Device]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Detail perangkat
- *       404:
- *         description: Perangkat tidak ditemukan
- */
+// GET /api/device/:id - Get device by ID
 router.get('/:id', DeviceController.getDeviceById);
 
-/**
- * @swagger
- * /api/device:
- *   post:
- *     summary: Buat perangkat baru
- *     tags: [Device]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - serial_number
- *               - nama_device
- *             properties:
- *               serial_number:
- *                 type: string
- *                 maxLength: 100
- *               nama_device:
- *                 type: string
- *                 maxLength: 100
- *               lokasi:
- *                 type: string
- *                 maxLength: 200
- *               ip_address:
- *                 type: string
- *                 pattern: '^(\d{1,3}\.){3}\d{1,3}$'
- *               keterangan:
- *                 type: string
- *     responses:
- *       201:
- *         description: Perangkat berhasil dibuat
- *       409:
- *         description: Nomor seri sudah ada
- */
+// POST /api/device - Create new device
 router.post('/', DeviceController.createDevice);
 
-/**
- * @swagger
- * /api/device/{id}:
- *   put:
- *     summary: Perbarui perangkat
- *     tags: [Device]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               nama_device:
- *                 type: string
- *                 maxLength: 100
- *               lokasi:
- *                 type: string
- *                 maxLength: 200
- *               ip_address:
- *                 type: string
- *               status:
- *                 type: string
- *                 enum: [active, inactive, maintenance]
- *               keterangan:
- *                 type: string
- *     responses:
- *       200:
- *         description: Perangkat berhasil diperbarui
- *       404:
- *         description: Perangkat tidak ditemukan
- */
+// PUT /api/device/:id - Update device
 router.put('/:id', DeviceController.updateDevice);
 
-/**
- * @swagger
- * /api/device/{id}:
- *   delete:
- *     summary: Hapus perangkat
- *     tags: [Device]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Perangkat berhasil dihapus
- *       404:
- *         description: Perangkat tidak ditemukan
- */
+// DELETE /api/device/:id - Delete device
 router.delete('/:id', DeviceController.deleteDevice);
 
-/**
- * @swagger
- * /api/device/{id}/sync:
- *   post:
- *     summary: Perbarui waktu sinkronisasi perangkat terakhir
- *     tags: [Device]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Perangkat berhasil disinkronkan
- *       404:
- *         description: Perangkat tidak ditemukan
- */
+// POST /api/device/:id/sync - Sync device
 router.post('/:id/sync', DeviceController.syncDevice);
 
 module.exports = router;

@@ -1,5 +1,5 @@
 // src/controllers/attendance.controller.js - Attendance Management (Prisma)
-const { prisma } = require('../models');
+const prisma = require('../config/prisma');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 
@@ -162,22 +162,30 @@ class AttendanceController {
    */
   static async getAttendanceSummary(req, res) {
     try {
-      const { start_date, end_date, nip } = req.query;
+      // Support both camelCase (frontend) and snake_case (legacy) parameter names
+      const startDate = req.query.startDate || req.query.start_date;
+      const endDate = req.query.endDate || req.query.end_date;
+      const nip = req.query.nip;
+      const jabatan = req.query.jabatan;
 
-      if (!start_date || !end_date) {
-        return errorResponse(res, 'start_date and end_date are required', 400);
+      if (!startDate || !endDate) {
+        return errorResponse(res, 'startDate and endDate are required', 400);
       }
 
       const whereClause = {
         tanggal: {
-          gte: new Date(start_date),
-          lte: new Date(end_date)
+          gte: new Date(startDate),
+          lte: new Date(endDate)
         },
         is_deleted: false
       };
 
       if (nip) {
         whereClause.nip = nip;
+      }
+
+      if (jabatan) {
+        whereClause.jabatan = jabatan;
       }
 
       const attendance = await prisma.attendance.findMany({
@@ -195,59 +203,113 @@ class AttendanceController {
             nip: record.nip,
             nama: record.nama,
             jabatan: record.jabatan,
-            total_hadir: 0,
+            attendanceDates: new Set(), // Track unique dates
             total_terlambat: 0,
-            total_days: 0,
             last_check_in: null,
-            last_check_out: null
+            last_check_out: null,
+            last_check_in_date: null, // Track date for check-in
+            last_check_out_date: null  // Track date for check-out
           };
         }
 
-        employeeStats[key].total_days++;
+        // Add unique date (convert to date string)
+        const dateStr = record.tanggal.toISOString().split('T')[0];
+        employeeStats[key].attendanceDates.add(dateStr);
+
+        // Track latest check-in time (combine date + time)
         if (record.jam_masuk) {
-          employeeStats[key].total_hadir++;
+          const checkInDateTime = new Date(record.jam_masuk);
           if (
             !employeeStats[key].last_check_in ||
-            new Date(record.jam_masuk) > new Date(employeeStats[key].last_check_in)
+            checkInDateTime > new Date(employeeStats[key].last_check_in)
           ) {
-            employeeStats[key].last_check_in = record.jam_masuk;
+            employeeStats[key].last_check_in = checkInDateTime;
+            employeeStats[key].last_check_in_date = record.tanggal; // Store associated date
           }
         }
 
+        // Track latest check-out time (combine date + time)
         if (record.jam_keluar) {
+          const checkOutDateTime = new Date(record.jam_keluar);
           if (
             !employeeStats[key].last_check_out ||
-            new Date(record.jam_keluar) > new Date(employeeStats[key].last_check_out)
+            checkOutDateTime > new Date(employeeStats[key].last_check_out)
           ) {
-            employeeStats[key].last_check_out = record.jam_keluar;
+            employeeStats[key].last_check_out = checkOutDateTime;
+            employeeStats[key].last_check_out_date = record.tanggal; // Store associated date
           }
         }
 
+        // Count late attendance
         if (record.status === 'TERLAMBAT') {
           employeeStats[key].total_terlambat++;
         }
       });
 
-      const summary = Object.values(employeeStats).map((emp, index) => ({
-        no: index + 1,
-        nama: emp.nama,
-        nip: emp.nip,
-        jabatan: emp.jabatan,
-        check_in_terakhir: emp.last_check_in,
-        check_out_terakhir: emp.last_check_out,
-        total_hadir: emp.total_hadir,
-        total_terlambat: emp.total_terlambat,
-        total_days: emp.total_days,
-        persentase: emp.total_days > 0 ? Math.round((emp.total_hadir / emp.total_days) * 100) : 0
-      }));
+      // Helper function to format TIME only (HH:mm:ss)
+      const formatTimeOnly = (dateTime) => {
+        if (!dateTime) return null;
+        const d = new Date(dateTime);
+        if (isNaN(d.getTime())) return null;
+
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const seconds = String(d.getSeconds()).padStart(2, '0');
+
+        return `${hours}:${minutes}:${seconds}`;
+      };
+
+      // Helper to format date range in Indonesian
+      const formatDateRange = (dates) => {
+        if (!dates || dates.length === 0) return null;
+
+        // Indonesian month names
+        const months = [
+          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+
+        const firstDate = new Date(dates[0]);
+        const lastDate = new Date(dates[dates.length - 1]);
+
+        const startDay = firstDate.getDate();
+        const startMonth = months[firstDate.getMonth()];
+        const startYear = firstDate.getFullYear();
+
+        const endDay = lastDate.getDate();
+        const endMonth = months[lastDate.getMonth()];
+        const endYear = lastDate.getFullYear();
+
+        if (startMonth === endMonth && startYear === endYear) {
+          return `${startDay} ${startMonth} ${startYear} - ${endDay} ${endMonth} ${endYear}`;
+        }
+        return `${startDay} ${startMonth} ${startYear} - ${endDay} ${endMonth} ${endYear}`;
+      };
+
+      const summary = Object.values(employeeStats).map((emp, index) => {
+        const attendanceDatesArray = Array.from(emp.attendanceDates).sort();
+        const totalHadir = attendanceDatesArray.length; // Unique dates count
+        const totalHariKerja = totalHadir; // Same for now, can be adjusted for work days calculation
+
+        return {
+          id: index + 1,
+          no: index + 1,
+          nama: emp.nama,
+          nip: emp.nip,
+          jabatan: emp.jabatan,
+          totalHadir: totalHadir,
+          totalTerlambat: emp.total_terlambat,
+          totalHariKerja: totalHariKerja,
+          attendanceDates: formatDateRange(attendanceDatesArray), // Format: "15-31 Mei 2025"
+          lastCheckIn: formatTimeOnly(emp.last_check_in),
+          lastCheckOut: formatTimeOnly(emp.last_check_out),
+          persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0
+        };
+      });
 
       return successResponse(
         res,
-        {
-          summary,
-          period: { start_date, end_date },
-          total_employees: summary.length
-        },
+        summary, // Return summary array directly as 'data' field
         'Attendance summary calculated successfully'
       );
     } catch (error) {
@@ -455,6 +517,151 @@ class AttendanceController {
         },
         'Device is offline'
       );
+    }
+  }
+
+  /**
+   * Import attendance data from Excel/CSV file
+   * POST /api/attendance/import
+   */
+  static async importAttendance(req, res) {
+    try {
+      // Check if file exists (should be caught by validator, but double-check)
+      if (!req.file) {
+        return errorResponse(res, 'File tidak ditemukan', 400);
+      }
+
+      const AttendanceImportService = require('../services/attendance.import.service');
+
+      logger.info('Processing attendance import', {
+        filename: req.file.originalname,
+        size: req.file.size,
+        user: req.user?.id
+      });
+
+      // Process import
+      const result = await AttendanceImportService.processImport(
+        req.file.buffer,
+        req.file.originalname,
+        {
+          skipDuplicates: true // Default behavior: skip duplicates
+        }
+      );
+
+      // Log audit trail
+      logger.audit('ATTENDANCE_IMPORT', req.user?.id, {
+        filename: req.file.originalname,
+        total: result.total,
+        imported: result.imported,
+        skipped: result.skipped,
+        duplicates: result.duplicates
+      });
+
+      // Return response based on result
+      if (!result.success) {
+        return errorResponse(res, result.message, 400, result.errors);
+      }
+
+      // Success response with detailed report
+      const statusCode = result.imported > 0 ? 200 : 400;
+      return res.status(statusCode).json({
+        success: result.imported > 0,
+        message: result.message,
+        data: {
+          summary: {
+            total: result.total,
+            imported: result.imported,
+            skipped: result.skipped,
+            duplicates: result.duplicates,
+            errors: result.errors.length
+          },
+          errors: result.errors.length > 0 ? result.errors : undefined,
+          duplicateDetails: result.duplicateDetails
+        }
+      });
+    } catch (error) {
+      logger.error('Import attendance error:', { error: error.message, stack: error.stack });
+      return errorResponse(res, `Gagal memproses file import: ${error.message}`, 500);
+    }
+  }
+
+  /**
+   * Download import template
+   * GET /api/attendance/import/template
+   */
+  static async downloadImportTemplate(req, res) {
+    try {
+      const XLSX = require('xlsx');
+      const path = require('path');
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // Create sample data with headers in Indonesian
+      const sampleData = [
+        {
+          nip: '123456',
+          nama: 'John Doe',
+          jabatan: 'DOSEN',
+          tanggal: '2026-02-15',
+          jam_masuk: '08:00:00',
+          jam_keluar: '17:00:00',
+          status: 'HADIR',
+          verification_method: 'MANUAL'
+        },
+        {
+          nip: '123457',
+          nama: 'Jane Smith',
+          jabatan: 'KARYAWAN',
+          tanggal: '2026-02-15',
+          jam_masuk: '08:30:00',
+          jam_keluar: '17:30:00',
+          status: 'HADIR',
+          verification_method: 'MANUAL'
+        },
+        {
+          nip: '123458',
+          nama: '',
+          jabatan: '',
+          tanggal: '2026-02-15',
+          jam_masuk: '09:00:00',
+          jam_keluar: '',
+          status: '',
+          verification_method: ''
+        }
+      ];
+
+      // Convert to worksheet
+      const ws = XLSX.utils.json_to_sheet(sampleData);
+
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 15 }, // nip
+        { wch: 25 }, // nama
+        { wch: 12 }, // jabatan
+        { wch: 12 }, // tanggal
+        { wch: 12 }, // jam_masuk
+        { wch: 12 }, // jam_keluar
+        { wch: 12 }, // status
+        { wch: 20 }  // verification_method
+      ];
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Template Absensi');
+
+      // Generate buffer
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      // Set headers for download
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=template_import_absensi.xlsx');
+      res.setHeader('Content-Length', buffer.length);
+
+      // Send file
+      return res.send(buffer);
+    } catch (error) {
+      logger.error('Download template error:', { error: error.message });
+      return errorResponse(res, 'Gagal mengunduh template', 500);
     }
   }
 }

@@ -40,7 +40,7 @@ module.exports = {
   // Summary/Analytics endpoints (calculation intensive)
   SUMMARY_API: {
     windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 30,
+    max: 500, // Increased from 30 to allow frontend date picker usage
     message: {
       success: false,
       message: 'Too many summary requests. Please try again in a few minutes.'

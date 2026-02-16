@@ -14,7 +14,6 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 const exportRoutes = require('./routes/export.routes');
 const admsRoutes = require('./routes/adms.routes');
 const adminRoutes = require('./routes/admin.routes'); // Admin management
-const deviceRoutes = require('./routes/device.routes'); // Device management
 const healthRoutes = require('./routes/health.routes'); // Advanced monitoring
 const metricsRoutes = require('./routes/metrics.routes'); // Prometheus
 
@@ -273,7 +272,6 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/admin', adminRoutes); // Admin management
-app.use('/api/device', deviceRoutes); // Device management
 
 // Routes ADMS (terpisah dari API utama)
 app.use('/adms', admsRoutes);

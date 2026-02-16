@@ -84,7 +84,7 @@ Endpoint untuk operasi CRUD (Create, Read, Update, Delete) data absensi karyawan
 `
   },
   {
-    name: 'Attendance Summary',
+    name: 'Report',
     description: `**Ringkasan Absensi**
 
 Endpoint untuk mendapatkan summary dan statistik absensi karyawan dalam periode tertentu.
@@ -126,9 +126,9 @@ Endpoint untuk mendapatkan summary dan statistik absensi karyawan dalam periode 
   },
   {
     name: 'Dashboard',
-    description: `**Dashboard & Statistik Real-time**
+    description: `**Dashboard & Statistik**
 
-Endpoint untuk mendapatkan metrik dan statistik sistem absensi secara real-time.
+Endpoint untuk mendapatkan metrik dan statistik sistem absensi.
 
 **Metrics untuk Admin:**
 - Total karyawan aktif di sistem
@@ -149,7 +149,6 @@ Endpoint untuk mendapatkan metrik dan statistik sistem absensi secara real-time.
 **Fitur Visualisasi:**
 - Data siap untuk charts dan graphs
 - Format JSON untuk easy integration
-- Real-time updates
 - Historical data comparison
 
 **Refresh Rate:**

@@ -6,3 +6,6 @@ exports/
 .vscode/
 .idea/
 /src/generated/prisma
+Backend-Finger/
+fix-git.bat
+

@@ -75,28 +75,14 @@ class ExportController {
 
       // Format data for Excel
       const excelData = attendance.map(record => {
-        // For KARYAWAN, exclude NIP and Jabatan columns
-        if (jabatan === 'KARYAWAN') {
-          return {
-            Tanggal: formatDate(record.tanggal),
-            Nama: record.nama,
-            'Jam Masuk': formatTime(record.jam_masuk),
-            'Jam Keluar': formatTime(record.jam_keluar),
-            Status: record.status,
-            Device: record.device_id || '-'
-          };
-        } else {
-          // For DOSEN, exclude Jabatan (redundant - already filtered)
-          return {
-            Tanggal: formatDate(record.tanggal),
-            NIP: record.nip,
-            Nama: record.nama,
-            'Jam Masuk': formatTime(record.jam_masuk),
-            'Jam Keluar': formatTime(record.jam_keluar),
-            Status: record.status,
-            Device: record.device_id || '-'
-          };
-        }
+        return {
+          Tanggal: formatDate(record.tanggal),
+          NIP: record.nip,
+          Nama: record.nama,
+          'Jam Masuk': formatTime(record.jam_masuk),
+          'Jam Keluar': formatTime(record.jam_keluar),
+          Status: record.status
+        };
       });
 
       // Create workbook
@@ -105,32 +91,16 @@ class ExportController {
 
       // Set column widths
       const wscols = [
-        { wch: 12 }, // Tanggal
-        { wch: 15 }, // NIP
+        { wch: 14 }, // Tanggal
+        { wch: 20 }, // NIP
         { wch: 30 }, // Nama
-        { wch: 12 }, // Jabatan
-        { wch: 12 }, // Jam Masuk
-        { wch: 12 }, // Jam Keluar
-        { wch: 12 }, // Status
-        { wch: 15 } // Device
+        { wch: 15 }, // Jam Masuk
+        { wch: 15 }, // Jam Keluar
+        { wch: 12 }  // Status
       ];
       ws['!cols'] = wscols;
 
       XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absensi');
-
-      // Add summary sheet
-      const summaryData = [
-        {
-          'Total Records': attendance.length,
-          Period: `${start_date} to ${end_date}`,
-          'Jabatan Filter': jabatan || 'All',
-          'Unique Employees': new Set(attendance.map(a => a.nip)).size,
-          'Total Hadir': attendance.filter(a => a.jam_masuk !== null).length,
-          'Total Terlambat': attendance.filter(a => a.status === 'TERLAMBAT').length
-        }
-      ];
-      const summaryWs = XLSX.utils.json_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
 
       // Generate buffer
       const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
@@ -216,8 +186,8 @@ class ExportController {
       } else if (jabatan === 'KARYAWAN') {
         transformedData = transformKaryawanAttendance(attendance);
       } else {
-        // If no jabatan specified, we cannot use transformer
-        return errorResponse(res, 'jabatan parameter is required for PDF export', 400);
+        // No jabatan filter - use karyawan transformer as unified format
+        transformedData = transformKaryawanAttendance(attendance);
       }
 
       // Create PDF document - use landscape for better fit with improved margins
@@ -240,7 +210,7 @@ class ExportController {
         .text(`Periode: ${formatDateID(start_date)} s/d ${formatDateID(end_date)}`, {
           align: 'center'
         });
-      doc.text(`Jabatan: ${jabatan}`, { align: 'center' });
+      doc.text(`Jabatan: ${jabatan || 'Semua'}`, { align: 'center' });
       doc.moveDown(1.5);
 
       // Table header - different columns for DOSEN vs KARYAWAN
@@ -250,7 +220,6 @@ class ExportController {
 
       if (jabatan === 'KARYAWAN') {
         // KARYAWAN: No, Nama, Hadir, Terlambat, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
-        // Adjusted widths: removed 'Tidak Hadir' column
         colWidths = [35, 150, 50, 60, 70, 145, 90, 90];
         headers = [
           'No',
@@ -263,8 +232,7 @@ class ExportController {
           'Check Out\nTerakhir'
         ];
       } else {
-        // DOSEN: No, Nama, NIP, Hadir, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
-        // Removed 'Tidak Hadir' column, redistributed width
+        // DOSEN or ALL: No, Nama, NIP, Hadir, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
         colWidths = [35, 120, 100, 50, 70, 145, 90, 90];
         headers = [
           'No',
@@ -322,7 +290,7 @@ class ExportController {
         let rowData;
 
         if (jabatan === 'KARYAWAN') {
-          // KARYAWAN data without 'Tidak Hadir'
+          // KARYAWAN data
           rowData = [
             String(index + 1),
             record.nama || '-',
@@ -334,7 +302,7 @@ class ExportController {
             record.lastCheckOut || 'Belum ada data'
           ];
         } else {
-          // DOSEN data without 'Tidak Hadir'
+          // DOSEN or ALL data with NIP
           rowData = [
             String(index + 1),
             record.nama || '-',
@@ -447,28 +415,14 @@ class ExportController {
 
       // Format data for CSV
       const csvData = attendance.map(record => {
-        // For KARYAWAN, exclude NIP and Jabatan columns
-        if (jabatan === 'KARYAWAN') {
-          return {
-            tanggal: formatDate(record.tanggal),
-            nama: record.nama,
-            jam_masuk: formatTime(record.jam_masuk),
-            jam_keluar: formatTime(record.jam_keluar),
-            status: record.status,
-            device: record.device_id || '-'
-          };
-        } else {
-          // For DOSEN, exclude Jabatan (redundant - already filtered)
-          return {
-            tanggal: formatDate(record.tanggal),
-            nip: record.nip,
-            nama: record.nama,
-            jam_masuk: formatTime(record.jam_masuk),
-            jam_keluar: formatTime(record.jam_keluar),
-            status: record.status,
-            device: record.device_id || '-'
-          };
-        }
+        return {
+          tanggal: formatDate(record.tanggal),
+          nip: record.nip,
+          nama: record.nama,
+          jam_masuk: formatTime(record.jam_masuk),
+          jam_keluar: formatTime(record.jam_keluar),
+          status: record.status
+        };
       });
 
       // Create CSV string

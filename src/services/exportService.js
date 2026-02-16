@@ -137,7 +137,7 @@ const exportSummaryToExcel = async (data, filePath) => {
   const excelData = data.map(record => ({
     No: record.no,
     Nama: record.nama,
-    NIP: record.nip,
+    ID: record.nip,
     Jabatan: record.jabatan,
     Hadir: record.hadir,
     'Total Hari Kerja': record.total_hari_kerja,
@@ -164,7 +164,7 @@ const exportSummaryToPDF = async (data, filePath) => {
   data.forEach((record, index) => {
     doc.fontSize(12).text(`No: ${record.no}`);
     doc.text(`Nama: ${record.nama}`);
-    doc.text(`NIP: ${record.nip}`);
+    doc.text(`ID: ${record.nip}`);
     doc.text(`Jabatan: ${record.jabatan}`);
     doc.text(`Hadir: ${record.hadir}`);
     doc.text(`Total Hari Kerja: ${record.total_hari_kerja}`);
@@ -185,7 +185,7 @@ const exportSummaryToCSV = async (data, filePath) => {
     header: [
       { id: 'no', title: 'No' },
       { id: 'nama', title: 'Nama' },
-      { id: 'nip', title: 'NIP' },
+      { id: 'nip', title: 'ID' },
       { id: 'jabatan', title: 'Jabatan' },
       { id: 'hadir', title: 'Hadir' },
       { id: 'total_hari_kerja', title: 'Total Hari Kerja' },

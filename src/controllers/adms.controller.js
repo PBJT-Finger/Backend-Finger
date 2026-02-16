@@ -1,7 +1,7 @@
 // src/controllers/adms.controller.js
 // Controller for ADMS fingerprint device endpoints (Prisma)
 
-const { prisma } = require('../models');
+const prisma = require('../config/prisma');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 

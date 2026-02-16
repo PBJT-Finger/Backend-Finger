@@ -1,5 +1,6 @@
 // src/routes/attendance.routes.js
 const express = require('express');
+const multer = require('multer');
 const AttendanceController = require('../controllers/attendance.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 const { handleValidationErrors, sanitizeInputs } = require('../middlewares/validate.middleware');
@@ -8,8 +9,27 @@ const {
   validateSummary,
   validateAttendanceFilters,
   validateAttendanceId,
-  validateRekapParams
+  validateRekapParams,
+  validateImportFile
 } = require('../validators/attendance.validators');
+
+// Configure multer for file uploads (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB max file size
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedExtensions = ['.xlsx', '.xls', '.csv'];
+    const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+
+    if (allowedExtensions.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Hanya file Excel (.xlsx, .xls) atau CSV yang diperbolehkan'));
+    }
+  }
+});
 
 const router = express.Router();
 
@@ -29,7 +49,7 @@ router.use(sanitizeInputs);
  *       - Terlambat (hari terlambat berdasarkan shift untuk KARYAWAN)
  *       - Presentase (persentase kehadiran)
  *       - Check In/Out Terakhir (waktu check-in/out terakhir)
- *     tags: [Attendance Summary]
+ *     tags: [Report]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -468,5 +488,151 @@ router.post('/sync-fingerprint', AttendanceController.syncFromFingerprint);
  *         description: Gagal mendapatkan status perangkat
  */
 router.get('/device-status', AttendanceController.getDeviceStatus);
+
+/**
+ * @swagger
+ * /api/attendance/import/template:
+ *   get:
+ *     summary: Unduh template Excel untuk import data absensi
+ *     description: Mengunduh file template Excel yang berisi format dan contoh data untuk import absensi manual
+ *     tags: [Import]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Template berhasil diunduh
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       500:
+ *         description: Gagal mengunduh template
+ */
+router.get('/import/template', AttendanceController.downloadImportTemplate);
+
+/**
+ * @swagger
+ * /api/attendance/import:
+ *   post:
+ *     summary: Import data absensi dari file Excel/CSV
+ *     description: |
+ *       Upload dan import data absensi secara manual dari file Excel atau CSV.
+ *       
+ *       **Format File:**
+ *       - Kolom wajib: `nip`, `tanggal`, `jam_masuk`
+ *       - Kolom opsional: `nama`, `jabatan`, `jam_keluar`, `status`, `verification_method`
+ *       - Format tanggal: YYYY-MM-DD (contoh: 2026-02-15)
+ *       - Format jam: HH:mm:ss (contoh: 08:30:00)
+ *       
+ *       **Validasi:**
+ *       - NIP harus terdaftar di database karyawan/dosen
+ *       - Data duplikat (NIP + tanggal + jam masuk sama) akan dilewati
+ *       - Maksimal ukuran file: 5MB
+ *       
+ *       **Auto-fill:**
+ *       - Jika `nama` atau `jabatan` kosong, akan diisi otomatis dari database
+ *     tags: [Import]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: File Excel (.xlsx, .xls) atau CSV (.csv)
+ *     responses:
+ *       200:
+ *         description: Import berhasil
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Import berhasil: 45 dari 50 baris diimport, 5 duplikat dilewati"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: integer
+ *                           description: Total baris diproses
+ *                           example: 50
+ *                         imported:
+ *                           type: integer
+ *                           description: Jumlah data berhasil diimport
+ *                           example: 45
+ *                         skipped:
+ *                           type: integer
+ *                           description: Jumlah data dilewati
+ *                           example: 5
+ *                         duplicates:
+ *                           type: integer
+ *                           description: Jumlah data duplikat
+ *                           example: 5
+ *                         errors:
+ *                           type: integer
+ *                           description: Jumlah error validasi
+ *                           example: 0
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       description: Daftar error validasi (jika ada)
+ *                       example: ["Baris 10: NIP tidak ditemukan", "Baris 15: Format tanggal tidak valid"]
+ *                     duplicateDetails:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           row:
+ *                             type: integer
+ *                           nip:
+ *                             type: string
+ *                           tanggal:
+ *                             type: string
+ *                           jam_masuk:
+ *                             type: string
+ *                       description: Detail data duplikat yang dilewati
+ *       400:
+ *         description: Validasi gagal atau tidak ada data yang berhasil diimport
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "File tidak ditemukan"
+ *                 errors:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *       500:
+ *         description: Error server
+ */
+router.post(
+  '/import',
+  upload.single('file'),
+  validateImportFile,
+  AttendanceController.importAttendance
+);
 
 module.exports = router;

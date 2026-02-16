@@ -1,5 +1,5 @@
 // src/controllers/admin.controller.js - Admin Management (Prisma)
-const { prisma } = require('../models');
+const prisma = require('../config/prisma');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 const bcrypt = require('bcrypt');

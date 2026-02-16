@@ -55,8 +55,8 @@ const validateSummary = [
 
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('limit must be between 1 and 100')
+    .isInt({ min: 1, max: 500 })
+    .withMessage('limit must be between 1 and 500')
     .toInt()
 ];
 
@@ -68,8 +68,8 @@ const validateAttendanceFilters = [
 
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('limit must be between 1 and 100')
+    .isInt({ min: 1, max: 500 })
+    .withMessage('limit must be between 1 and 500')
     .toInt(),
 
   query('user_id').optional().trim(),
@@ -128,9 +128,56 @@ const validateRekapParams = [
     .toInt()
 ];
 
+/**
+ * Validation for POST /api/attendance/import (file upload)
+ * Note: This validates req.file from multer middleware
+ */
+const validateImportFile = (req, res, next) => {
+  // Check if file exists
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: 'File tidak ditemukan',
+      errors: ['Silakan upload file Excel (.xlsx, .xls) atau CSV (.csv)']
+    });
+  }
+
+  const allowedMimeTypes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.ms-excel', // .xls
+    'text/csv', // .csv
+    'application/csv'
+  ];
+
+  const allowedExtensions = ['.xlsx', '.xls', '.csv'];
+  const fileExtension = req.file.originalname.toLowerCase().substring(req.file.originalname.lastIndexOf('.'));
+
+  // Validate MIME type
+  if (!allowedMimeTypes.includes(req.file.mimetype) && !allowedExtensions.includes(fileExtension)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Format file tidak valid',
+      errors: ['Hanya menerima file Excel (.xlsx, .xls) atau CSV (.csv)']
+    });
+  }
+
+  // Validate file size (5MB max)
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  if (req.file.size > maxSize) {
+    return res.status(400).json({
+      success: false,
+      message: 'Ukuran file terlalu besar',
+      errors: ['Ukuran file maksimal 5MB']
+    });
+  }
+
+  next();
+};
+
 module.exports = {
   validateSummary,
   validateAttendanceFilters,
   validateAttendanceId,
-  validateRekapParams
+  validateRekapParams,
+  validateImportFile
 };
