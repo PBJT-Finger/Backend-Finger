@@ -1,5 +1,7 @@
 // src/controllers/export.controller.js - Export Attendance Data (Prisma)
-const { query } = require('../lib/db');
+const prisma = require('../config/prisma');
+// Compatibility wrapper: raw SQL queries via Prisma
+const query = (sql, params = []) => prisma.$queryRawUnsafe(sql, ...params);
 const { errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 const XLSX = require('xlsx');

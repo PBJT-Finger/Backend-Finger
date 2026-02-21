@@ -1,5 +1,5 @@
-// src/controllers/auth.controller.js - Controller untuk autentikasi admin (MYSQL VERSION)
-const { query, getConnection } = require('../lib/db');
+// src/controllers/auth.controller.js - Controller untuk autentikasi admin (Prisma)
+const prisma = require('../config/prisma');
 const { generateTokens, verifyRefreshToken } = require('../utils/jwt');
 const { addToBlacklist, isBlacklisted } = require('../utils/tokenBlacklist');
 const { body, validationResult } = require('express-validator');
@@ -21,10 +21,9 @@ const {
 
 class AuthController {
   /**
-   * Admin Login - Updated with new response format
+   * Admin Login
    */
   static login = [
-    // Validation - email only
     body('email').trim().isEmail().withMessage('Email tidak valid').normalizeEmail(),
     body('password').isLength({ min: 6 }).withMessage('Password minimal 6 karakter'),
 
@@ -42,17 +41,15 @@ class AuthController {
         const { email, password } = req.body;
 
         // Find admin by email
-        const admins = await query(
-          'SELECT * FROM admins WHERE email = ? AND is_active = 1 LIMIT 1',
-          [email]
-        );
+        const admin = await prisma.admins.findFirst({
+          where: { email, is_active: true }
+        });
 
-        if (admins.length === 0) {
+        if (!admin) {
           logger.warn('Login failed: User not found', { email, ip: req.ip });
           return errorResponse(res, 'Email atau password salah', 401);
         }
 
-        const admin = admins[0];
         const isValidPassword = await bcrypt.compare(password, admin.password_hash);
 
         if (!isValidPassword) {
@@ -63,7 +60,10 @@ class AuthController {
         const { accessToken, refreshToken } = generateTokens(admin);
 
         // Update last login
-        await query('UPDATE admins SET last_login = NOW() WHERE id = ?', [admin.id]);
+        await prisma.admins.update({
+          where: { id: admin.id },
+          data: { last_login: new Date() }
+        });
 
         logger.audit('LOGIN_SUCCESS', admin.id, {
           username: admin.username,
@@ -103,35 +103,44 @@ class AuthController {
         const { username, email, password } = req.body;
 
         // Check if username exists
-        const existingUsername = await query('SELECT id FROM admins WHERE username = ? LIMIT 1', [
-          username
-        ]);
-        if (existingUsername.length > 0) {
+        const existingUsername = await prisma.admins.findFirst({
+          where: { username },
+          select: { id: true }
+        });
+        if (existingUsername) {
           return errorResponse(res, 'Username sudah digunakan', 400);
         }
 
         // Check if email exists
-        const existing = await query('SELECT id FROM admins WHERE email = ? LIMIT 1', [email]);
-        if (existing.length > 0) {
+        const existing = await prisma.admins.findFirst({
+          where: { email },
+          select: { id: true }
+        });
+        if (existing) {
           return errorResponse(res, 'Email sudah terdaftar', 400);
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
 
         // Insert new admin
-        const result = await query(
-          `INSERT INTO admins (username, email, password_hash, role, is_active, created_at, updated_at) 
-           VALUES (?, ?, ?, 'admin', 1, NOW(), NOW())`,
-          [username, email, hashedPassword]
-        );
-
-        const admin = {
-          id: result.insertId,
-          username,
-          email,
-          role: 'admin',
-          is_active: 1
-        };
+        const newAdmin = await prisma.admins.create({
+          data: {
+            username,
+            email,
+            password_hash: hashedPassword,
+            role: 'admin',
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          },
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true,
+            is_active: true
+          }
+        });
 
         try {
           await sendWelcomeEmail(email, username);
@@ -139,9 +148,9 @@ class AuthController {
           logger.warn('Failed to send welcome email', { email, error: emailError.message });
         }
 
-        logger.audit('ADMIN_REGISTERED', admin.id, { username, email, ip: req.ip });
+        logger.audit('ADMIN_REGISTERED', newAdmin.id, { username, email, ip: req.ip });
 
-        return registerResponse(res, admin);
+        return registerResponse(res, newAdmin);
       } catch (error) {
         logger.error('Register error', { error: error.message, stack: error.stack, ip: req.ip });
         return errorResponse(res, 'Gagal mendaftar. Silakan coba lagi.', 500);
@@ -164,31 +173,33 @@ class AuthController {
 
         const { email } = req.body;
 
-        const admins = await query(
-          'SELECT * FROM admins WHERE email = ? AND is_active = 1 LIMIT 1',
-          [email]
-        );
+        const admin = await prisma.admins.findFirst({
+          where: { email, is_active: true }
+        });
 
-        if (admins.length === 0) {
+        if (!admin) {
           logger.warn('Password reset requested for non-existent email', { email, ip: req.ip });
           return passwordResetResponse(res);
         }
 
-        const admin = admins[0];
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
         // Delete old unused reset requests
-        await query('DELETE FROM password_resets WHERE admin_id = ? AND used_at IS NULL', [
-          admin.id
-        ]);
+        await prisma.password_resets.deleteMany({
+          where: { admin_id: admin.id, used_at: null }
+        });
 
         // Create new reset request
-        await query(
-          `INSERT INTO password_resets (admin_id, email, code, expires_at, created_at) 
-           VALUES (?, ?, ?, ?, NOW())`,
-          [admin.id, admin.email, code, expiresAt]
-        );
+        await prisma.password_resets.create({
+          data: {
+            admin_id: admin.id,
+            email: admin.email,
+            code,
+            expires_at: expiresAt,
+            created_at: new Date()
+          }
+        });
 
         try {
           await sendPasswordResetEmail(email, code, admin.username);
@@ -232,21 +243,15 @@ class AuthController {
 
         const { email, code } = req.body;
 
-        const resets = await query(
-          `SELECT pr.*, a.is_active 
-           FROM password_resets pr
-           JOIN admins a ON pr.admin_id = a.id
-           WHERE pr.email = ? AND pr.code = ? AND pr.used_at IS NULL
-           LIMIT 1`,
-          [email, code]
-        );
+        const resetEntry = await prisma.password_resets.findFirst({
+          where: { email, code, used_at: null },
+          include: { admins: { select: { is_active: true } } }
+        });
 
-        if (resets.length === 0 || !resets[0].is_active) {
+        if (!resetEntry || !resetEntry.admins?.is_active) {
           logger.warn('Invalid verification code attempt', { email, ip: req.ip });
           return errorResponse(res, 'Kode verifikasi tidak valid', 400);
         }
-
-        const resetEntry = resets[0];
 
         if (new Date() > new Date(resetEntry.expires_at)) {
           logger.warn('Expired verification code attempt', { email, ip: req.ip });
@@ -255,10 +260,10 @@ class AuthController {
 
         const resetToken = crypto.randomBytes(32).toString('hex');
 
-        await query('UPDATE password_resets SET reset_token = ? WHERE id = ?', [
-          resetToken,
-          resetEntry.id
-        ]);
+        await prisma.password_resets.update({
+          where: { id: resetEntry.id },
+          data: { reset_token: resetToken }
+        });
 
         logger.audit('RESET_CODE_VERIFIED', resetEntry.admin_id, { email, ip: req.ip });
 
@@ -290,21 +295,15 @@ class AuthController {
 
         const { resetToken, newPassword } = req.body;
 
-        const resets = await query(
-          `SELECT pr.*, a.is_active, a.username 
-           FROM password_resets pr
-           JOIN admins a ON pr.admin_id = a.id
-           WHERE pr.reset_token = ? AND pr.used_at IS NULL
-           LIMIT 1`,
-          [resetToken]
-        );
+        const resetEntry = await prisma.password_resets.findFirst({
+          where: { reset_token: resetToken, used_at: null },
+          include: { admins: { select: { is_active: true, username: true } } }
+        });
 
-        if (resets.length === 0 || !resets[0].is_active) {
+        if (!resetEntry || !resetEntry.admins?.is_active) {
           logger.warn('Invalid reset token attempt', { ip: req.ip });
           return errorResponse(res, 'Token reset tidak valid atau sudah digunakan', 400);
         }
-
-        const resetEntry = resets[0];
 
         if (new Date() > new Date(resetEntry.expires_at)) {
           logger.warn('Expired reset token attempt', { ip: req.ip });
@@ -313,17 +312,20 @@ class AuthController {
 
         const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-        // Update password
-        await query('UPDATE admins SET password_hash = ?, updated_at = NOW() WHERE id = ?', [
-          hashedPassword,
-          resetEntry.admin_id
+        // Update password and mark reset as used in a transaction
+        await prisma.$transaction([
+          prisma.admins.update({
+            where: { id: resetEntry.admin_id },
+            data: { password_hash: hashedPassword, updated_at: new Date() }
+          }),
+          prisma.password_resets.update({
+            where: { id: resetEntry.id },
+            data: { used_at: new Date() }
+          })
         ]);
 
-        // Mark reset as used
-        await query('UPDATE password_resets SET used_at = NOW() WHERE id = ?', [resetEntry.id]);
-
         try {
-          await sendPasswordResetConfirmation(resetEntry.email, resetEntry.username);
+          await sendPasswordResetConfirmation(resetEntry.email, resetEntry.admins.username);
         } catch (emailError) {
           logger.warn('Failed to send password reset confirmation email', {
             email: resetEntry.email,
@@ -367,14 +369,14 @@ class AuthController {
 
       const decoded = verifyRefreshToken(refresh_token);
 
-      const admins = await query('SELECT * FROM admins WHERE id = ? LIMIT 1', [decoded.id]);
+      const admin = await prisma.admins.findUnique({
+        where: { id: decoded.id }
+      });
 
-      if (admins.length === 0 || !admins[0].is_active) {
+      if (!admin || !admin.is_active) {
         logger.warn('Refresh token failed: User not found or inactive', { userId: decoded.id });
         return errorResponse(res, 'Invalid refresh token', 401);
       }
-
-      const admin = admins[0];
 
       await addToBlacklist(refresh_token, 7 * 24 * 60 * 60);
       logger.info('Old refresh token blacklisted during rotation', { userId: admin.id });
@@ -440,3 +442,4 @@ class AuthController {
 }
 
 module.exports = AuthController;
+
