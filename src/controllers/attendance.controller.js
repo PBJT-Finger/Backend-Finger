@@ -101,7 +101,7 @@ class AttendanceController {
    */
   static async getAttendance(req, res) {
     try {
-      const { start_date, end_date, nip, jabatan, status, page = 1, limit = 50 } = req.query;
+      const { start_date, end_date, nip, id, jabatan, status, page = 1, limit = 50 } = req.query;
 
       const whereClause = {
         is_deleted: false
@@ -114,8 +114,9 @@ class AttendanceController {
         };
       }
 
-      if (nip) {
-        whereClause.nip = nip;
+      // Filter by ID (or legacy term NIP)
+      if (id || nip) {
+        whereClause.nip = id || nip;
       }
 
       if (jabatan) {
@@ -162,14 +163,31 @@ class AttendanceController {
    */
   static async getAttendanceSummary(req, res) {
     try {
-      // Support both camelCase (frontend) and snake_case (legacy) parameter names
-      const startDate = req.query.startDate || req.query.start_date;
-      const endDate = req.query.endDate || req.query.end_date;
-      const nip = req.query.nip;
-      const jabatan = req.query.jabatan;
+      let startDate = req.query.startDate || req.query.start_date;
+      let endDate = req.query.endDate || req.query.end_date;
+      const { id, nip, jabatan } = req.query;
 
-      if (!startDate || !endDate) {
-        return errorResponse(res, 'startDate and endDate are required', 400);
+      // If no dates provided, default to current month
+      if (!startDate && !endDate) {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = now.getMonth();
+        const firstDay = new Date(y, m, 1);
+        const lastDay = new Date(y, m + 1, 0);
+
+        // Format to YYYY-MM-DD (local time)
+        const formatDate = (d) => {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        startDate = formatDate(firstDay);
+        endDate = formatDate(lastDay);
+      } else if (!startDate || !endDate) {
+        // Partial dates provided
+        return errorResponse(res, 'Both start_date and end_date are required for custom range', 400);
       }
 
       const whereClause = {
@@ -180,8 +198,8 @@ class AttendanceController {
         is_deleted: false
       };
 
-      if (nip) {
-        whereClause.nip = nip;
+      if (id || nip) {
+        whereClause.nip = id || nip;
       }
 
       if (jabatan) {
@@ -246,17 +264,20 @@ class AttendanceController {
         }
       });
 
-      // Helper function to format TIME only (HH:mm:ss)
+      // Helper function to format TIME only (HH:mm)
+      // MySQL stores TIME in local WIB timezone, Prisma converts to UTC internally
+      // getHours() (local) converts back to original stored time
       const formatTimeOnly = (dateTime) => {
         if (!dateTime) return null;
+        // If already a string (e.g. from raw SQL), return as-is
+        if (typeof dateTime === 'string') return dateTime.substring(0, 5);
         const d = new Date(dateTime);
         if (isNaN(d.getTime())) return null;
 
         const hours = String(d.getHours()).padStart(2, '0');
         const minutes = String(d.getMinutes()).padStart(2, '0');
-        const seconds = String(d.getSeconds()).padStart(2, '0');
 
-        return `${hours}:${minutes}:${seconds}`;
+        return `${hours}:${minutes}`;
       };
 
       // Helper to format date range in Indonesian
@@ -292,18 +313,15 @@ class AttendanceController {
         const totalHariKerja = totalHadir; // Same for now, can be adjusted for work days calculation
 
         return {
-          id: index + 1,
+          id: emp.nip, // Rename NIP to ID
           no: index + 1,
           nama: emp.nama,
-          nip: emp.nip,
           jabatan: emp.jabatan,
           totalHadir: totalHadir,
-          totalTerlambat: emp.total_terlambat,
           totalHariKerja: totalHariKerja,
           attendanceDates: formatDateRange(attendanceDatesArray), // Format: "15-31 Mei 2025"
           lastCheckIn: formatTimeOnly(emp.last_check_in),
-          lastCheckOut: formatTimeOnly(emp.last_check_out),
-          persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0
+          lastCheckOut: formatTimeOnly(emp.last_check_out)
         };
       });
 
@@ -365,11 +383,50 @@ class AttendanceController {
   }
 
   /**
-   * Get monthly report (stub - not implemented yet)
+   * Get monthly report (reuse summary logic with month/year params)
    */
   static async getMonthlyReport(req, res) {
     try {
-      return errorResponse(res, 'Monthly report endpoint not implemented yet', 501);
+      const { bulan, tahun } = req.query;
+
+      if (!bulan || !tahun) {
+        return errorResponse(res, 'Bulan dan Tahun wajib diisi', 400);
+      }
+
+      // Calculate start and end date of the month
+      // Note: Month is 1-indexed in query, buy 0-indexed in Date constructor for month argument
+      // new Date(year, monthIndex, 1) -> First day of month
+      // new Date(year, monthIndex + 1, 0) -> Last day of month
+      const monthIndex = parseInt(bulan) - 1;
+      const year = parseInt(tahun);
+
+      const startDateObj = new Date(year, monthIndex, 1);
+      const endDateObj = new Date(year, monthIndex + 1, 0);
+
+      // Format to YYYY-MM-DD
+      // Note: We need local date string to ensure correct date is used
+      // Use explicit formatting to avoid timezone issues
+      const formatDate = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
+      const startDate = formatDate(startDateObj);
+      const endDate = formatDate(endDateObj);
+
+      // Inject into req.query so we can reuse getAttendanceSummary logic
+      req.query.start_date = startDate;
+      req.query.end_date = endDate;
+
+      // Also inject for filter usage if needed
+      req.query.startDate = startDate;
+      req.query.endDate = endDate;
+
+      logger.info(`Generating monthly report for ${bulan}/${tahun} (${startDate} to ${endDate})`);
+
+      return AttendanceController.getAttendanceSummary(req, res);
     } catch (error) {
       logger.error('Get monthly report error', { error: error.message });
       return errorResponse(res, 'Failed to get monthly report', 500);
@@ -585,85 +642,7 @@ class AttendanceController {
     }
   }
 
-  /**
-   * Download import template
-   * GET /api/attendance/import/template
-   */
-  static async downloadImportTemplate(req, res) {
-    try {
-      const XLSX = require('xlsx');
-      const path = require('path');
 
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-
-      // Create sample data with headers in Indonesian
-      const sampleData = [
-        {
-          nip: '123456',
-          nama: 'John Doe',
-          jabatan: 'DOSEN',
-          tanggal: '2026-02-15',
-          jam_masuk: '08:00:00',
-          jam_keluar: '17:00:00',
-          status: 'HADIR',
-          verification_method: 'MANUAL'
-        },
-        {
-          nip: '123457',
-          nama: 'Jane Smith',
-          jabatan: 'KARYAWAN',
-          tanggal: '2026-02-15',
-          jam_masuk: '08:30:00',
-          jam_keluar: '17:30:00',
-          status: 'HADIR',
-          verification_method: 'MANUAL'
-        },
-        {
-          nip: '123458',
-          nama: '',
-          jabatan: '',
-          tanggal: '2026-02-15',
-          jam_masuk: '09:00:00',
-          jam_keluar: '',
-          status: '',
-          verification_method: ''
-        }
-      ];
-
-      // Convert to worksheet
-      const ws = XLSX.utils.json_to_sheet(sampleData);
-
-      // Set column widths
-      ws['!cols'] = [
-        { wch: 15 }, // nip
-        { wch: 25 }, // nama
-        { wch: 12 }, // jabatan
-        { wch: 12 }, // tanggal
-        { wch: 12 }, // jam_masuk
-        { wch: 12 }, // jam_keluar
-        { wch: 12 }, // status
-        { wch: 20 }  // verification_method
-      ];
-
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(wb, ws, 'Template Absensi');
-
-      // Generate buffer
-      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-      // Set headers for download
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', 'attachment; filename=template_import_absensi.xlsx');
-      res.setHeader('Content-Length', buffer.length);
-
-      // Send file
-      return res.send(buffer);
-    } catch (error) {
-      logger.error('Download template error:', { error: error.message });
-      return errorResponse(res, 'Gagal mengunduh template', 500);
-    }
-  }
 }
 
 module.exports = AttendanceController;

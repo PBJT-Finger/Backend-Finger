@@ -4,46 +4,42 @@ const { query, param, body } = require('express-validator');
 /**
  * Validation for GET /api/attendance/summary
  */
+/**
+ * Validation for GET /api/attendance/summary
+ */
 const validateSummary = [
-  query('startDate')
-    .notEmpty()
-    .withMessage('startDate is required')
+  query('start_date')
+    .optional()
     .isISO8601()
-    .withMessage('startDate must be valid ISO date (YYYY-MM-DD)')
+    .withMessage('start_date must be valid ISO date (YYYY-MM-DD)')
     .custom((value, { req }) => {
       const date = new Date(value);
       if (isNaN(date.getTime())) {
-        throw new Error('Invalid startDate format');
+        throw new Error('Invalid start_date format');
       }
       return true;
     }),
 
-  query('endDate')
-    .notEmpty()
-    .withMessage('endDate is required')
+  query('end_date')
+    .optional()
     .isISO8601()
-    .withMessage('endDate must be valid ISO date (YYYY-MM-DD)')
+    .withMessage('end_date must be valid ISO date (YYYY-MM-DD)')
     .custom((value, { req }) => {
       const date = new Date(value);
       if (isNaN(date.getTime())) {
-        throw new Error('Invalid endDate format');
+        throw new Error('Invalid end_date format');
       }
 
-      // Check if endDate is after startDate
-      if (req.query.startDate) {
-        const startDate = new Date(req.query.startDate);
+      // Check if end_date is after start_date
+      if (req.query.start_date) {
+        const startDate = new Date(req.query.start_date);
         if (date < startDate) {
-          throw new Error('endDate must be after or equal to startDate');
+          throw new Error('end_date must be after or equal to start_date');
         }
       }
 
       return true;
     }),
-
-  query('jabatan')
-    .optional()
-    .isIn(['DOSEN', 'KARYAWAN'])
-    .withMessage('jabatan must be DOSEN or KARYAWAN'),
 
   query('nip')
     .optional()
@@ -76,20 +72,15 @@ const validateAttendanceFilters = [
 
   query('device_id').optional().trim(),
 
-  query('jabatan')
-    .optional()
-    .isIn(['DOSEN', 'KARYAWAN'])
-    .withMessage('jabatan must be DOSEN or KARYAWAN'),
-
-  query('tanggal_mulai')
+  query('start_date')
     .optional()
     .isISO8601()
-    .withMessage('tanggal_mulai must be valid date (YYYY-MM-DD)'),
+    .withMessage('start_date must be valid date (YYYY-MM-DD)'),
 
-  query('tanggal_akhir')
+  query('end_date')
     .optional()
     .isISO8601()
-    .withMessage('tanggal_akhir must be valid date (YYYY-MM-DD)'),
+    .withMessage('end_date must be valid date (YYYY-MM-DD)'),
 
   query('tipe_absensi')
     .optional()
@@ -110,9 +101,9 @@ const validateAttendanceId = [
 ];
 
 /**
- * Validation for GET /api/attendance/rekap
+ * Validation for GET /api/attendance/rekap/bulanan (Monthly)
  */
-const validateRekapParams = [
+const validateMonthlyParams = [
   query('bulan')
     .notEmpty()
     .withMessage('bulan is required')
@@ -126,6 +117,21 @@ const validateRekapParams = [
     .isInt({ min: 2020, max: 2100 })
     .withMessage('tahun must be between 2020 and 2100')
     .toInt()
+];
+
+/**
+ * Validation for GET /api/attendance/rekap (Date Range)
+ */
+const validateRekapRange = [
+  query('start_date')
+    .optional()
+    .isISO8601()
+    .withMessage('start_date must be valid ISO date (YYYY-MM-DD)'),
+
+  query('end_date')
+    .optional()
+    .isISO8601()
+    .withMessage('end_date must be valid ISO date (YYYY-MM-DD)')
 ];
 
 /**
@@ -178,6 +184,7 @@ module.exports = {
   validateSummary,
   validateAttendanceFilters,
   validateAttendanceId,
-  validateRekapParams,
+  validateMonthlyParams,
+  validateRekapRange,
   validateImportFile
 };

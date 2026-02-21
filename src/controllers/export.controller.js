@@ -4,6 +4,14 @@ const { errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 const XLSX = require('xlsx');
 
+const { extractTimeString, formatDateID } = require('../utils/attendanceTransformer');
+
+// Helper wrapper to handle time formatting safely
+const formatTimeFixed = (timeVal) => {
+  if (!timeVal) return '-';
+  return extractTimeString(timeVal) || '-';
+};
+
 class ExportController {
   /**
    * Export attendance to Excel
@@ -11,61 +19,53 @@ class ExportController {
    */
   static async exportToExcel(req, res) {
     try {
-      const { start_date, end_date, jabatan, nip } = req.query;
+      const { start_date, end_date, bulan, tahun, jabatan, nip, id } = req.query;
 
-      // Helper function to format date to DD/MM/YYYY
-      const formatDate = dateValue => {
-        if (!dateValue) return '-';
-        const date = new Date(dateValue);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
-      };
+      let startDate = start_date;
+      let endDate = end_date;
 
-      // Helper function to format time (handles both string and Date object)
-      const formatTime = timeValue => {
-        if (!timeValue) return '-';
-        if (typeof timeValue === 'string') return timeValue;
-        if (timeValue instanceof Date) return timeValue.toISOString().split('T')[1].substring(0, 8);
-        return String(timeValue);
-      };
+      // Handle month/year to date range conversion
+      if (bulan && tahun) {
+        const month = parseInt(bulan);
+        const year = parseInt(tahun);
 
-      if (!start_date || !end_date) {
-        return errorResponse(res, 'start_date and end_date are required', 400);
+        // Start date: 1st of the month
+        const start = new Date(year, month - 1, 1);
+        startDate = start.toISOString().split('T')[0];
+
+        // End date: Last day of the month
+        const end = new Date(year, month, 0);
+        endDate = end.toISOString().split('T')[0];
       }
 
-      // Build where clause
-      const where = {
-        tanggal: {
-          gte: new Date(start_date),
-          lte: new Date(end_date)
-        },
-        is_deleted: false
-      };
+      if (!startDate || !endDate) {
+        return errorResponse(res, 'Start date/end date OR month/year are required', 400);
+      }
 
-      if (jabatan) where.jabatan = jabatan;
-      if (nip) where.nip = nip;
-
-      // Get attendance data
+      // Get attendance data — deduplicate: one row per employee per date
       let sql = `
-        SELECT a.* 
+        SELECT a.tanggal, a.nip, a.nama, a.jabatan,
+               MIN(a.jam_masuk) AS jam_masuk,
+               MAX(a.jam_keluar) AS jam_keluar,
+               MAX(a.status) AS status
         FROM attendance a
+
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      const params = [start_date, end_date]; // Use string dates for MySQL
+      const params = [startDate, endDate];
 
       if (jabatan) {
         sql += ' AND a.jabatan = ?';
         params.push(jabatan);
       }
 
-      if (nip) {
+      if (id || nip) {
         sql += ' AND a.nip = ?';
-        params.push(nip);
+        params.push(id || nip);
       }
 
-      sql += ' ORDER BY a.tanggal DESC, a.jam_masuk ASC';
+      sql += ' GROUP BY a.tanggal, a.nip, a.nama, a.jabatan';
+      sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
 
       const attendance = await query(sql, params);
 
@@ -73,17 +73,18 @@ class ExportController {
         return errorResponse(res, 'No data found for export', 404);
       }
 
-      // Format data for Excel
-      const excelData = attendance.map(record => {
-        return {
-          Tanggal: formatDate(record.tanggal),
-          NIP: record.nip,
-          Nama: record.nama,
-          'Jam Masuk': formatTime(record.jam_masuk),
-          'Jam Keluar': formatTime(record.jam_keluar),
-          Status: record.status
-        };
-      });
+      // Format data for Excel — per-date detail rows (Daily Log)
+      // Use helper to fix time format (mysql2 string vs Prisma Date issue)
+
+
+      const excelData = attendance.map(record => ({
+        Tanggal: formatDateID(record.tanggal), // Use DD/MM/YYYY format
+        ID: record.nip,
+        Nama: record.nama,
+        'Jam Masuk': formatTimeFixed(record.jam_masuk),
+        'Jam Keluar': formatTimeFixed(record.jam_keluar),
+        Status: record.status
+      }));
 
       // Create workbook
       const wb = XLSX.utils.book_new();
@@ -91,11 +92,11 @@ class ExportController {
 
       // Set column widths
       const wscols = [
-        { wch: 14 }, // Tanggal
-        { wch: 20 }, // NIP
-        { wch: 30 }, // Nama
-        { wch: 15 }, // Jam Masuk
-        { wch: 15 }, // Jam Keluar
+        { wch: 15 }, // Tanggal
+        { wch: 15 }, // ID
+        { wch: 25 }, // Nama
+        { wch: 12 }, // Jam Masuk
+        { wch: 12 }, // Jam Keluar
         { wch: 12 }  // Status
       ];
       ws['!cols'] = wscols;
@@ -103,10 +104,10 @@ class ExportController {
       XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absensi');
 
       // Generate buffer
-      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
       // Set headers for file download
-      const filename = `rekap-absensi-${jabatan || 'all'}-${start_date}-to-${end_date}.xlsx`;
+      const filename = `rekap-absensi-${jabatan || 'all'}-${startDate}-to-${endDate}.xlsx`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader(
         'Content-Type',
@@ -119,7 +120,7 @@ class ExportController {
         user_id: req.user?.id
       });
 
-      return res.send(buf);
+      return res.send(buffer);
     } catch (error) {
       logger.error('Export to Excel error', { error: error.message, stack: error.stack });
       return errorResponse(res, 'Failed to export to Excel', 500);
@@ -132,15 +133,40 @@ class ExportController {
    */
   static async exportToPDF(req, res) {
     try {
-      const { start_date, end_date, jabatan, nip } = req.query;
+      const { start_date, end_date, bulan, tahun, jabatan, nip, id } = req.query;
 
-      if (!start_date || !end_date) {
-        return errorResponse(res, 'start_date and end_date are required', 400);
+      let startDate = start_date;
+      let endDate = end_date;
+
+      // Handle month/year to date range conversion
+      if (bulan && tahun) {
+        const month = parseInt(bulan);
+        const year = parseInt(tahun);
+
+        // Start date: 1st of the month
+        const start = new Date(year, month - 1, 1);
+        startDate = start.toISOString().split('T')[0];
+
+        // End date: Last day of the month
+        const end = new Date(year, month, 0);
+        endDate = end.toISOString().split('T')[0];
+      }
+
+      if (!startDate || !endDate) {
+        return errorResponse(res, 'Start date/end date OR month/year are required', 400);
       }
 
       // Helper function to format date to DD/MM/YYYY
       const formatDateID = dateStr => {
+        if (!dateStr) return '-';
+        if (typeof dateStr === 'string') {
+          const datePart = dateStr.split('T')[0];
+          const parts = datePart.split('-');
+          if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+          return dateStr;
+        }
         const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return '-';
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
@@ -153,27 +179,35 @@ class ExportController {
         transformKaryawanAttendance
       } = require('../utils/attendanceTransformer');
 
-      // Get attendance data
+      // Get attendance data — deduplicate: one row per employee per date
       let sql = `
-        SELECT a.* 
+        SELECT a.tanggal, a.nip, a.nama, a.jabatan,
+               MIN(a.jam_masuk) AS jam_masuk,
+               MAX(a.jam_keluar) AS jam_keluar,
+               MAX(a.status) AS status
         FROM attendance a
+
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      const params = [start_date, end_date]; // Use string dates for MySQL
+      const params = [startDate, endDate];
 
       if (jabatan) {
         sql += ' AND a.jabatan = ?';
         params.push(jabatan);
       }
 
-      if (nip) {
+      if (id || nip) {
         sql += ' AND a.nip = ?';
-        params.push(nip);
+        params.push(id || nip);
       }
 
-      sql += ' ORDER BY a.tanggal DESC, a.jam_masuk ASC';
+      sql += ' GROUP BY a.tanggal, a.nip, a.nama, a.jabatan';
+      sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
+
+      console.log(`[ExportPDF] Query Params: startDate=${startDate}, endDate=${endDate}, jabatan=${jabatan}`);
 
       const attendance = await query(sql, params);
+      console.log(`[ExportPDF] Found ${attendance.length} attendance records`);
 
       if (attendance.length === 0) {
         return errorResponse(res, 'No data found for export', 404);
@@ -182,19 +216,22 @@ class ExportController {
       // Transform to aggregated data (same as dashboard)
       let transformedData;
       if (jabatan === 'DOSEN') {
-        transformedData = transformDosenAttendance(attendance);
+        transformedData = transformDosenAttendance(attendance, startDate, endDate);
       } else if (jabatan === 'KARYAWAN') {
-        transformedData = transformKaryawanAttendance(attendance);
+        transformedData = transformKaryawanAttendance(attendance, startDate, endDate);
       } else {
         // No jabatan filter - use karyawan transformer as unified format
-        transformedData = transformKaryawanAttendance(attendance);
+        transformedData = transformKaryawanAttendance(attendance, startDate, endDate);
       }
+
+      console.log(`[ExportPDF] Transformed ${transformedData.length} records for PDF`);
 
       // Create PDF document - use landscape for better fit with improved margins
       const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
 
       // Set response headers
-      const filename = `rekap-absensi-${jabatan || 'all'}-${start_date}-to-${end_date}.pdf`;
+
+      const filename = `rekap-absensi-${jabatan || 'all'}-${startDate}-to-${endDate}.pdf`;
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
@@ -203,41 +240,49 @@ class ExportController {
 
       // Add header with better spacing
       doc.fontSize(20).font('Helvetica-Bold').text('REKAP ABSENSI KAMPUS', { align: 'center' });
-      doc.moveDown(0.5);
+      doc.moveDown(0.2);
+
+      // Determine Jabatan label
+      let jabatanLabel = 'SEMUA PEGAWAI';
+      if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN';
+      if (jabatan === 'KARYAWAN') jabatanLabel = 'KARYAWAN';
+
+      doc.fontSize(14).font('Helvetica-Bold').text(jabatanLabel, { align: 'center' });
+      doc.moveDown(0.2);
+
       doc
         .fontSize(12)
         .font('Helvetica')
-        .text(`Periode: ${formatDateID(start_date)} s/d ${formatDateID(end_date)}`, {
+        .text(`Periode: ${formatDateID(startDate)} s/d ${formatDateID(endDate)}`, {
           align: 'center'
         });
-      doc.text(`Jabatan: ${jabatan || 'Semua'}`, { align: 'center' });
       doc.moveDown(1.5);
 
       // Table header - different columns for DOSEN vs KARYAWAN
       const tableTop = doc.y;
-      const startX = 50; // Start from left margin
+      const startX = 30; // Reduce left margin to maximize space
       let colWidths, headers;
 
+      // Adjusted widths for A4 Landscape (Total width approx 780px)
       if (jabatan === 'KARYAWAN') {
-        // KARYAWAN: No, Nama, Hadir, Terlambat, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
-        colWidths = [35, 150, 50, 60, 70, 145, 90, 90];
+        // KARYAWAN: No, Nama, Hadir, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
+        colWidths = [35, 170, 60, 80, 165, 110, 110];
         headers = [
           'No',
           'Nama',
           'Hadir',
-          'Terlambat',
           'Total Hari\nKerja',
           'Waktu Kehadiran',
           'Check In\nTerakhir',
           'Check Out\nTerakhir'
         ];
       } else {
-        // DOSEN or ALL: No, Nama, NIP, Hadir, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
-        colWidths = [35, 120, 100, 50, 70, 145, 90, 90];
+        // DOSEN or ALL: No, Nama, ID, Hadir, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
+        colWidths = [35, 140, 110, 60, 80, 165, 100, 100];
         headers = [
           'No',
           'Nama',
-          'NIP',
+          'ID', // Renamed from NIP
           'Hadir',
           'Total Hari\nKerja',
           'Waktu Kehadiran',
@@ -246,24 +291,24 @@ class ExportController {
         ];
       }
 
-      const rowHeight = 25;
-      const headerHeight = 30;
+      const rowHeight = 25; // Adjusted height for tighter layout (was 30)
+      const headerHeight = 30; // Adjusted header height (was 35)
 
       // Helper function to draw table header with individual cell borders
       const drawTableHeader = startY => {
         let xPos = startX;
 
-        doc.fontSize(9).fillColor('black').font('Helvetica-Bold');
+        doc.fontSize(10).fillColor('black').font('Helvetica-Bold'); // Increased header font size
         headers.forEach((header, i) => {
           // Draw cell border and background
           doc.rect(xPos, startY, colWidths[i], headerHeight).fillAndStroke('#f0f0f0', '#000000');
 
           // Draw text centered vertically and horizontally
-          const textY = startY + 8;
+          const textY = startY + 10;
           doc.fillColor('black').text(header, xPos + 2, textY, {
             width: colWidths[i] - 4,
             align: 'center',
-            lineBreak: false
+            lineBreak: true // Allow wrapping for multi-line headers
           });
           xPos += colWidths[i];
         });
@@ -295,7 +340,6 @@ class ExportController {
             String(index + 1),
             record.nama || '-',
             String(record.totalHadir || 0),
-            String(record.totalTerlambat || 0),
             String(record.totalHariKerja || 0),
             record.attendanceDates || 'Belum ada data',
             record.lastCheckIn || 'Belum ada data',
@@ -306,7 +350,7 @@ class ExportController {
           rowData = [
             String(index + 1),
             record.nama || '-',
-            record.nip || '-',
+            record.id || record.nip || '-', // Prioritize ID
             String(record.totalHadir || 0),
             String(record.totalHariKerja || 0),
             record.attendanceDates || 'Belum ada data',
@@ -324,12 +368,12 @@ class ExportController {
           const align = i === 1 ? 'left' : 'center';
 
           // Calculate vertical center for text (center text in cell)
-          const textY = yPos + (rowHeight - 8) / 2;
-          const padding = 4;
+          const textY = yPos + (rowHeight - 10) / 2; // Adjusted for bigger font
+          const padding = 5;
 
           doc
             .fillColor('black')
-            .fontSize(8)
+            .fontSize(10) // Increased cell font size (was 8)
             .text(data, xPos + padding, textY, {
               width: colWidths[i] - padding * 2,
               align: align,
@@ -363,49 +407,53 @@ class ExportController {
    */
   static async exportToCSV(req, res) {
     try {
-      const { start_date, end_date, jabatan, nip } = req.query;
+      const { start_date, end_date, bulan, tahun, jabatan, nip, id } = req.query;
 
-      // Helper function to format date to DD/MM/YYYY
-      const formatDate = dateValue => {
-        if (!dateValue) return '-';
-        const date = new Date(dateValue);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
-      };
+      let startDate = start_date;
+      let endDate = end_date;
 
-      // Helper function to format time (handles both string and Date object)
-      const formatTime = timeValue => {
-        if (!timeValue) return '-';
-        if (typeof timeValue === 'string') return timeValue;
-        if (timeValue instanceof Date) return timeValue.toISOString().split('T')[1].substring(0, 8);
-        return String(timeValue);
-      };
+      // Handle month/year to date range conversion
+      if (bulan && tahun) {
+        const month = parseInt(bulan);
+        const year = parseInt(tahun);
 
-      if (!start_date || !end_date) {
-        return errorResponse(res, 'start_date and end_date are required', 400);
+        // Start date: 1st of the month
+        const start = new Date(year, month - 1, 1);
+        startDate = start.toISOString().split('T')[0];
+
+        // End date: Last day of the month
+        const end = new Date(year, month, 0);
+        endDate = end.toISOString().split('T')[0];
       }
 
-      // Get attendance data
+      if (!startDate || !endDate) {
+        return errorResponse(res, 'Start date/end date OR month/year are required', 400);
+      }
+
+      // Get attendance data — deduplicate: one row per employee per date
       let sql = `
-        SELECT a.* 
+        SELECT a.tanggal, a.nip, a.nama, a.jabatan,
+               MIN(a.jam_masuk) AS jam_masuk,
+               MAX(a.jam_keluar) AS jam_keluar,
+               MAX(a.status) AS status
         FROM attendance a
+
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      const params = [start_date, end_date]; // Use string dates for MySQL
+      const params = [startDate, endDate];
 
       if (jabatan) {
         sql += ' AND a.jabatan = ?';
         params.push(jabatan);
       }
 
-      if (nip) {
+      if (id || nip) {
         sql += ' AND a.nip = ?';
-        params.push(nip);
+        params.push(id || nip);
       }
 
-      sql += ' ORDER BY a.tanggal DESC, a.jam_masuk ASC';
+      sql += ' GROUP BY a.tanggal, a.nip, a.nama, a.jabatan';
+      sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
 
       const attendance = await query(sql, params);
 
@@ -416,11 +464,11 @@ class ExportController {
       // Format data for CSV
       const csvData = attendance.map(record => {
         return {
-          tanggal: formatDate(record.tanggal),
-          nip: record.nip,
+          tanggal: formatDateID(record.tanggal),
+          id: record.nip, // Rename nip to id
           nama: record.nama,
-          jam_masuk: formatTime(record.jam_masuk),
-          jam_keluar: formatTime(record.jam_keluar),
+          jam_masuk: formatTimeFixed(record.jam_masuk),
+          jam_keluar: formatTimeFixed(record.jam_keluar),
           status: record.status
         };
       });
@@ -442,7 +490,7 @@ class ExportController {
       const csvContent = csvRows.join('\n');
 
       // Set headers for file download
-      const filename = `rekap-absensi-${jabatan || 'all'}-${start_date}-to-${end_date}.csv`;
+      const filename = `rekap-absensi-${jabatan || 'all'}-${startDate}-to-${endDate}.csv`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
 

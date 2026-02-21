@@ -80,32 +80,7 @@ const router = express.Router();
  */
 router.post('/login', AuthController.login);
 
-/**
- * @swagger
- * /api/auth/refresh:
- *   post:
- *     summary: Refresh access token
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - refresh_token
- *             properties:
- *               refresh_token:
- *                 type: string
- *                 description: Refresh token
- *     responses:
- *       200:
- *         description: Token berhasil di-refresh
- *       401:
- *         description: Refresh token tidak valid
- */
+
 router.post('/refresh', AuthController.refreshToken);
 
 /**
@@ -122,42 +97,7 @@ router.post('/refresh', AuthController.refreshToken);
  */
 router.post('/logout', authenticateToken, AuthController.logout);
 
-/**
- * @swagger
- * /api/auth/register:
- *   post:
- *     summary: Daftar akun admin baru
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - username
- *               - email
- *               - password
- *             properties:
- *               username:
- *                 type: string
- *                 description: Unique username (for display after login)
- *                 minLength: 3
- *                 maxLength: 50
- *               email:
- *                 type: string
- *                 format: email
- *                 description: Admin email address
- *               password:
- *                 type: string
- *                 format: password
- *                 description: Strong password (min 8 chars, uppercase, lowercase, number)
- *     responses:
- *       201:
- *         description: Pendaftaran berhasil
- *       400:
- *         description: Error validasi atau username/email sudah ada
- */
+
 router.post('/register', AuthController.register);
 
 /**

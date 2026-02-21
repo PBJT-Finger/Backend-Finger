@@ -62,9 +62,21 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           'Operasi login pengguna, refresh token, dan logout. Autentikasi berbasis JWT dengan Bearer token.'
       },
       {
+        name: 'Import',
+        description: 'Upload dan import data absensi manual dari file Excel/CSV'
+      },
+      {
         name: 'Attendance',
         description:
-          'Operasi absensi sidik jari - check in/out, lihat rekaman, dan manajemen absensi'
+          'Operasi absensi - check in/out, lihat rekaman, dan rekapitulasi'
+      },
+      {
+        name: 'Export',
+        description: 'Ekspor data absensi dalam berbagai format (Excel, CSV, PDF)'
+      },
+      {
+        name: 'Dashboard',
+        description: 'Statistik dashboard, tren, dan metrik kinerja utama'
       },
       {
         name: 'Report',
@@ -72,20 +84,8 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           'Analitik absensi, statistik, dan laporan ringkasan dengan perhitungan persentase'
       },
       {
-        name: 'Dashboard',
-        description: 'Statistik dashboard, tren, dan metrik kinerja utama'
-      },
-      {
-        name: 'Export',
-        description: 'Ekspor data absensi dalam berbagai format (Excel, CSV, PDF)'
-      },
-      {
         name: 'Admin',
         description: 'Manajemen akun admin - CRUD operasi untuk user management sistem'
-      },
-      {
-        name: 'System',
-        description: 'Health check, monitoring, dan metrik sistem'
       }
     ],
     components: {
@@ -98,241 +98,140 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
         }
       },
       schemas: {
-        // ==================== EMPLOYEE ====================
-        Employee: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'integer',
-              description: 'ID karyawan unik',
-              example: 1
-            },
-            nip: {
-              type: 'string',
-              description: 'Nomor Induk Pegawai (unique)',
-              example: '199001012020011001'
-            },
-            nama: {
-              type: 'string',
-              description: 'Nama lengkap',
-              example: 'Dr. Budi Santoso, M.Kom'
-            },
-            jabatan: {
-              type: 'string',
-              enum: ['DOSEN', 'KARYAWAN'],
-              description: 'Tipe jabatan',
-              example: 'KARYAWAN'
-            },
-            email: {
-              type: 'string',
-              format: 'email',
-              example: 'budi.santoso@kampus.edu'
-            },
-            phone: {
-              type: 'string',
-              example: '08123456789'
-            },
-            shift_id: {
-              type: 'integer',
-              nullable: true,
-              description: 'Penugasan shift (NULL untuk DOSEN - jadwal fleksibel)',
-              example: 1
-            },
-            status: {
-              type: 'string',
-              enum: ['AKTIF', 'CUTI', 'RESIGN', 'NON_AKTIF'],
-              description: 'Status kepegawaian',
-              example: 'AKTIF'
-            },
-            tanggal_masuk: {
-              type: 'string',
-              format: 'date',
-              description: 'Tanggal bergabung',
-              example: '2020-01-01'
-            },
-            is_active: {
-              type: 'boolean',
-              description: 'Status aktif',
-              example: true
-            }
-          }
-        },
-
-        // ==================== SHIFT ====================
-        Shift: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'integer',
-              example: 1
-            },
-            nama_shift: {
-              type: 'string',
-              description: 'Nama shift',
-              example: 'Shift Pagi'
-            },
-            jam_masuk: {
-              type: 'string',
-              format: 'time',
-              description: 'Waktu check-in yang diharapkan',
-              example: '08:00:00'
-            },
-            toleransi_menit: {
-              type: 'integer',
-              description: 'Masa tenggang dalam menit',
-              example: 0
-            },
-            deskripsi: {
-              type: 'string',
-              example: 'Shift pagi untuk staff - masuk jam 08:00'
-            },
-            is_active: {
-              type: 'boolean',
-              example: true
-            }
-          }
-        },
 
         // ==================== ATTENDANCE ====================
+        // Berdasarkan tabel `attendance` di database (via Prisma schema)
         Attendance: {
           type: 'object',
           properties: {
             id: {
               type: 'integer',
-              description: 'ID rekaman absensi',
+              description: 'Auto-increment primary key',
               example: 1234
-            },
-            cloud_id: {
-              type: 'string',
-              description: 'Identifikasi sistem cloud',
-              example: 'CLOUD-001'
-            },
-            device_id: {
-              type: 'string',
-              description: 'ID perangkat sidik jari',
-              example: 'FP-DEVICE-01'
             },
             user_id: {
               type: 'string',
-              description: 'Identifikasi pengguna dari perangkat',
-              example: 'USER-001'
-            },
-            nama: {
-              type: 'string',
-              description: 'Nama karyawan',
-              example: 'Budi Santoso'
+              description: 'ID pengguna (sama dengan NIP)',
+              example: '198805121234561001'
             },
             nip: {
               type: 'string',
-              description: 'NIP (Nomor Induk Pegawai)',
-              example: '199001012020011001'
+              description: 'Nomor Induk Pegawai',
+              example: '198805121234561001'
+            },
+            nama: {
+              type: 'string',
+              description: 'Nama karyawan/dosen',
+              example: 'Dr. Budi Santoso, M.Kom'
             },
             jabatan: {
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
-              description: 'Jabatan',
+              description: 'Jabatan karyawan',
               example: 'KARYAWAN'
             },
-            tanggal_absensi: {
+            tanggal: {
               type: 'string',
               format: 'date',
               description: 'Tanggal absensi (YYYY-MM-DD)',
               example: '2026-01-14'
             },
-            waktu_absensi: {
+            jam_masuk: {
               type: 'string',
               format: 'time',
-              description: 'Waktu absensi (HH:mm:ss)',
-              example: '08:15:30'
+              nullable: true,
+              description: 'Waktu check-in (HH:mm:ss)',
+              example: '08:15:00'
             },
-            tipe_absensi: {
+            jam_keluar: {
               type: 'string',
-              enum: ['MASUK', 'PULANG'],
-              description: 'Check-in atau check-out',
-              example: 'MASUK'
+              format: 'time',
+              nullable: true,
+              description: 'Waktu check-out (HH:mm:ss)',
+              example: '16:30:00'
             },
-            verifikasi: {
+            device_id: {
               type: 'string',
-              description: 'Metode verifikasi',
+              nullable: true,
+              description: 'ID perangkat absensi',
+              example: 'FP-GEDUNG-A-001'
+            },
+            cloud_id: {
+              type: 'string',
+              nullable: true,
+              description: 'ID cloud sistem',
+              example: 'CLOUD-001'
+            },
+            verification_method: {
+              type: 'string',
+              description: 'Metode verifikasi absensi',
               example: 'SIDIK_JARI'
+            },
+            status: {
+              type: 'string',
+              description: 'Status kehadiran',
+              example: 'HADIR'
+            },
+            is_deleted: {
+              type: 'boolean',
+              description: 'Soft delete flag',
+              example: false
             }
           }
         },
 
         // ==================== ATTENDANCE SUMMARY ====================
+        // Berdasarkan response aktual dari AttendanceController.getAttendanceSummary
         AttendanceSummary: {
           type: 'object',
           properties: {
-            nip: {
+            id: {
               type: 'string',
-              example: '199001012020011001'
+              description: 'NIP / User ID',
+              example: '198805121234561001'
+            },
+            no: {
+              type: 'integer',
+              description: 'Nomor urut',
+              example: 1
             },
             nama: {
               type: 'string',
-              example: 'Budi Santoso'
+              description: 'Nama karyawan/dosen',
+              example: 'Dr. Budi Santoso, M.Kom'
             },
             jabatan: {
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
+              description: 'Jabatan karyawan',
               example: 'KARYAWAN'
             },
-            shift: {
-              type: 'string',
-              description: 'Shift name or "Fleksibel" for DOSEN',
-              example: 'Shift Pagi'
-            },
-            hadir: {
+            totalHadir: {
               type: 'integer',
-              description: 'Number of days present (with check-in)',
+              description: 'Jumlah hari hadir (berdasarkan check-in)',
               example: 18
             },
             totalHariKerja: {
               type: 'integer',
-              description: 'Total working days (excluding weekends & holidays)',
-              example: 22
+              description: 'Total hari kerja dalam periode',
+              example: 18
             },
-            terlambat: {
-              type: 'integer',
-              description: 'Number of late days (shift-based for KARYAWAN, 0 for DOSEN)',
-              example: 3
+            attendanceDates: {
+              type: 'string',
+              description: 'Rentang tanggal kehadiran (format Indonesia)',
+              example: '3 Januari 2026 - 4 Februari 2026'
             },
-            presentase: {
-              type: 'number',
-              format: 'float',
-              description: 'Attendance percentage',
-              example: 81.82
-            },
-            checkInTerakhir: {
-              type: 'object',
+            lastCheckIn: {
+              type: 'string',
               nullable: true,
-              properties: {
-                tanggal: {
-                  type: 'string',
-                  format: 'date',
-                  example: '2026-01-14'
-                },
-                waktu: {
-                  type: 'string',
-                  format: 'time',
-                  example: '08:15:00'
-                }
-              }
+              description: 'Waktu check-in terakhir (HH:mm)',
+              example: '08:10'
             },
-            checkOutTerakhir: {
-              type: 'object',
+            lastCheckOut: {
+              type: 'string',
               nullable: true,
-              properties: {
-                tanggal: {
-                  type: 'string',
-                  format: 'date',
-                  example: '2026-01-14'
-                },
-                waktu: {
-                  type: 'string',
-                  format: 'time',
-                  example: '17:30:00'
-                }
-              }
+              description: 'Waktu check-out terakhir (HH:mm)',
+              example: '16:30'
             }
           }
         },

@@ -14,67 +14,6 @@ router.use(adminLimiter);
 
 // Admin Management endpoints - using System tag for cleaner documentation
 
-/**
- * @swagger
- * /api/admin:
- *   get:
- *     summary: Dapatkan semua admin (paginasi)
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *       - in: query
- *         name: role
- *         schema:
- *           type: string
- *           enum: [admin, super_admin]
- *       - in: query
- *         name: is_active
- *         schema:
- *           type: boolean
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Daftar admin
- *       401:
- *         description: Tidak terautentikasi
- */
-router.get('/', AdminController.getAdmins);
-
-/**
- * @swagger
- * /api/admin/{id}:
- *   get:
- *     summary: Dapatkan admin berdasarkan ID
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Detail admin
- *       404:
- *         description: Admin tidak ditemukan
- */
-router.get('/:id', AdminController.getAdminById);
 
 /**
  * @swagger
@@ -116,6 +55,41 @@ router.get('/:id', AdminController.getAdminById);
  *         description: Username atau email sudah ada
  */
 router.post('/', AdminController.createAdmin);
+
+/**
+ * @swagger
+ * /api/admin/password:
+ *   put:
+ *     summary: Ubah password admin
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - current_password
+ *               - new_password
+ *             properties:
+ *               current_password:
+ *                 type: string
+ *                 example: "password123"
+ *               new_password:
+ *                 type: string
+ *                 minLength: 8
+ *                 example: "newpassword123"
+ *     responses:
+ *       200:
+ *         description: Password berhasil diubah
+ *       400:
+ *         description: Input tidak valid
+ *       401:
+ *         description: Password saat ini salah
+ */
+router.put('/password', AdminController.changePassword);
 
 /**
  * @swagger
@@ -177,41 +151,6 @@ router.put('/:id', AdminController.updateAdmin);
  */
 router.delete('/:id', AdminController.deleteAdmin);
 
-/**
- * @swagger
- * /api/admin/{id}/password:
- *   put:
- *     summary: Ubah password admin
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - current_password
- *               - new_password
- *             properties:
- *               current_password:
- *                 type: string
- *               new_password:
- *                 type: string
- *                 minLength: 8
- *     responses:
- *       200:
- *         description: Password berhasil diubah
- *       401:
- *         description: Password saat ini salah
- */
-router.put('/:id/password', AdminController.changePassword);
+
 
 module.exports = router;

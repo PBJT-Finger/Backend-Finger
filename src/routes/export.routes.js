@@ -30,11 +30,10 @@ router.use(authenticateToken);
  *           type: string
  *         description: Tahun (YYYY)
  *       - in: query
- *         name: jabatan
+ *         name: id
  *         schema:
  *           type: string
- *           enum: [DOSEN, KARYAWAN]
- *         description: Filter berdasarkan jabatan (opsional)
+ *         description: Filter berdasarkan ID pengguna
  *     responses:
  *       200:
  *         description: File Excel berhasil diunduh
@@ -68,11 +67,10 @@ router.get('/excel', ExportController.exportToExcel);
  *           type: string
  *         description: Tahun (YYYY)
  *       - in: query
- *         name: jabatan
+ *         name: id
  *         schema:
  *           type: string
- *           enum: [DOSEN, KARYAWAN]
- *         description: Filter berdasarkan jabatan (opsional)
+ *         description: Filter berdasarkan ID pengguna
  *     responses:
  *       200:
  *         description: File PDF berhasil diunduh
@@ -105,12 +103,6 @@ router.get('/pdf', ExportController.exportToPDF);
  *         schema:
  *           type: string
  *         description: Tahun (YYYY)
- *       - in: query
- *         name: jabatan
- *         schema:
- *           type: string
- *           enum: [DOSEN, KARYAWAN]
- *         description: Filter berdasarkan jabatan (opsional)
  *     responses:
  *       200:
  *         description: File CSV berhasil diunduh

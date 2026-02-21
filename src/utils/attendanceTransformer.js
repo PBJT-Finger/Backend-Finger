@@ -2,6 +2,83 @@
 const logger = require('./logger');
 
 /**
+ * Extract time string "HH:MM" from various formats.
+ *
+ * IMPORTANT: MySQL TIME is stored in UTC. Data sources behave differently:
+ *   - Prisma: returns Date object (1970-01-01T00:50:00.000Z) → getHours() gives local WIB time
+ *   - mysql2 raw SQL: returns UTC string "00:50:00" → must be converted to local time
+ *
+ * This function normalizes both formats to a correct local time "HH:MM" string.
+ *
+ * @param {string|Date|null} timeValue - Time from Prisma (Date) or mysql2 (string)
+ * @returns {string|null} "HH:MM" in local time or null
+ */
+function extractTimeString(timeValue) {
+  if (!timeValue) return null;
+  if (typeof timeValue === 'string') {
+    // mysql2 returns TIME as UTC string like "00:50:00"
+    // Wrap in Date as UTC, then use getHours() to get local (WIB) time
+    const match = timeValue.match(/^(\d{2}):(\d{2})/);
+    if (match) {
+      const utcDate = new Date(Date.UTC(1970, 0, 1, parseInt(match[1], 10), parseInt(match[2], 10)));
+      const h = String(utcDate.getHours()).padStart(2, '0');
+      const m = String(utcDate.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    return timeValue.substring(0, 5);
+  }
+  if (timeValue instanceof Date && !isNaN(timeValue.getTime())) {
+    // Prisma returns TIME as Date (1970-01-01T00:50:00.000Z)
+    // getHours() returns local (WIB) time = correct original value
+    const h = String(timeValue.getHours()).padStart(2, '0');
+    const m = String(timeValue.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  return String(timeValue).substring(0, 5);
+}
+
+/**
+ * Extract date string "YYYY-MM-DD" from various formats
+ * MySQL stores DATE in local timezone. Prisma/mysql2 converts local→UTC internally.
+ * We use local date methods to convert back to the original stored date.
+ * @param {string|Date|null} dateValue
+ * @returns {string} "YYYY-MM-DD" or empty string
+ */
+function extractDateString(dateValue) {
+  if (!dateValue) return '';
+  if (typeof dateValue === 'string') return dateValue.split('T')[0];
+  if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+    // Use local methods — MySQL stores local time, driver converts to UTC
+    const y = dateValue.getFullYear();
+    const m = String(dateValue.getMonth() + 1).padStart(2, '0');
+    const d = String(dateValue.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return '';
+}
+
+/**
+ * Convert a TIME value (string or Date) to a UTC Date for comparison.
+ * This mirrors how the dashboard compares jam_masuk/jam_keluar:
+ *   Dashboard (Prisma): new Date(record.jam_masuk) → gives UTC epoch Date
+ *   Export (mysql2):    string "00:50:00" → we create Date(UTC) equivalent
+ * Both produce the same comparable Date.
+ * @param {string|Date|null} timeValue
+ * @returns {Date|null}
+ */
+function toUTCDate(timeValue) {
+  if (!timeValue) return null;
+  if (timeValue instanceof Date) return timeValue; // Already a Date (Prisma path)
+  if (typeof timeValue === 'string') {
+    const match = timeValue.match(/^(\d{2}):(\d{2})(:(\d{2}))?/);
+    if (match) {
+      return new Date(Date.UTC(1970, 0, 1, parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[4] || '0', 10)));
+    }
+  }
+  return null;
+}
+
+/**
  * Calculate number of working days between two dates (excluding Sundays)
  * Sunday is considered a holiday and excluded from working day count.
  * @param {string|Date} startDate - Start date
@@ -32,8 +109,13 @@ function calculateWorkingDays(startDate, endDate) {
 }
 
 /**
- * Transform raw Prisma attendance records into aggregated dosen data
- * @param {Array} attendanceRecords - Raw attendance records
+ * Transform raw attendance records into aggregated dosen data.
+ * This MUST match the dashboard's getAttendanceSummary logic exactly:
+ *   - totalHadir = count of UNIQUE attendance dates
+ *   - totalHariKerja = totalHadir (same as dashboard)
+ *   - lastCheckIn/Out = latest time by comparing jam_masuk as Date (UTC epoch)
+ *
+ * @param {Array} attendanceRecords - Raw attendance records (from mysql2 raw SQL)
  * @param {string|Date} startDate - Start date of the period
  * @param {string|Date} endDate - End date of the period
  * @returns {Array} Transformed attendance data
@@ -44,100 +126,71 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
       return [];
     }
 
-    // Group by NIP
+    // Group by NIP — mirrors dashboard's employeeStats grouping
     const grouped = {};
 
     attendanceRecords.forEach(record => {
       const nip = record.nip;
+      if (!nip) return;
 
       if (!grouped[nip]) {
         grouped[nip] = {
           nip: nip,
-          nama: record.nama || record.employee?.nama || 'Unknown',
-          matakuliah: record.employee?.department || record.department || 'N/A',
-          records: [],
-          attendanceDates: new Set(),
-          lastCheckIn: null,
-          lastCheckOut: null
+          nama: record.nama || 'Unknown',
+          attendanceDates: new Set(), // Unique dates (for totalHadir)
+          totalTerlambat: 0,
+          lastCheckInUTC: null,   // Store as UTC Date for comparison (mirrors dashboard)
+          lastCheckOutUTC: null
         };
       }
 
-      grouped[nip].records.push(record);
+      // Add unique date — mirrors dashboard: employeeStats[key].attendanceDates.add(dateStr)
+      const dateStr = extractDateString(record.tanggal);
+      if (dateStr) grouped[nip].attendanceDates.add(dateStr);
 
-      // Track attendance dates
-      if (record.jam_masuk && record.tanggal) {
-        const dateStr =
-          record.tanggal instanceof Date
-            ? record.tanggal.toISOString().split('T')[0]
-            : String(record.tanggal).split('T')[0];
-        grouped[nip].attendanceDates.add(dateStr);
-      }
-
-      // Track last check-in (MySQL returns TIME as string "HH:MM:SS")
-      if (record.jam_masuk && record.tanggal) {
-        // Combine date + time to create valid Date object
-        const dateStr =
-          record.tanggal instanceof Date
-            ? record.tanggal.toISOString().split('T')[0]
-            : String(record.tanggal).split('T')[0];
-
-        const timeStr =
-          typeof record.jam_masuk === 'string'
-            ? record.jam_masuk
-            : record.jam_masuk.toISOString().split('T')[1].substring(0, 8);
-
-        const checkInTime = new Date(`${dateStr}T${timeStr}`);
-
-        if (!isNaN(checkInTime.getTime())) {
-          if (!grouped[nip].lastCheckIn || checkInTime > grouped[nip].lastCheckIn) {
-            grouped[nip].lastCheckIn = checkInTime;
-          }
+      // Track latest check-in — mirrors dashboard: compares Date objects
+      // Dashboard: checkInDateTime = new Date(record.jam_masuk) then picks the greater one
+      // mysql2 returns string "00:50:00" (UTC), so we create Date(UTC) for comparison
+      if (record.jam_masuk) {
+        const checkInUTC = toUTCDate(record.jam_masuk);
+        if (checkInUTC && (!grouped[nip].lastCheckInUTC || checkInUTC > grouped[nip].lastCheckInUTC)) {
+          grouped[nip].lastCheckInUTC = checkInUTC;
         }
       }
 
-      // Track last check-out (MySQL returns TIME as string "HH:MM:SS")
-      if (record.jam_keluar && record.tanggal) {
-        // Combine date + time to create valid Date object
-        const dateStr =
-          record.tanggal instanceof Date
-            ? record.tanggal.toISOString().split('T')[0]
-            : String(record.tanggal).split('T')[0];
-
-        const timeStr =
-          typeof record.jam_keluar === 'string'
-            ? record.jam_keluar
-            : record.jam_keluar.toISOString().split('T')[1].substring(0, 8);
-
-        const checkOutTime = new Date(`${dateStr}T${timeStr}`);
-
-        if (!isNaN(checkOutTime.getTime())) {
-          if (!grouped[nip].lastCheckOut || checkOutTime > grouped[nip].lastCheckOut) {
-            grouped[nip].lastCheckOut = checkOutTime;
-          }
+      // Track latest check-out — same approach
+      if (record.jam_keluar) {
+        const checkOutUTC = toUTCDate(record.jam_keluar);
+        if (checkOutUTC && (!grouped[nip].lastCheckOutUTC || checkOutUTC > grouped[nip].lastCheckOutUTC)) {
+          grouped[nip].lastCheckOutUTC = checkOutUTC;
         }
+      }
+
+      // Count late
+      if (record.status === 'TERLAMBAT') {
+        grouped[nip].totalTerlambat++;
       }
     });
 
-    // Calculate total working days in the period
-    const totalWorkingDays = calculateWorkingDays(startDate, endDate);
-
-    // Transform to array with calculations
+    // Transform to array — mirrors dashboard's summary mapping
     const result = Object.values(grouped).map(group => {
-      const totalHadir = group.records.filter(r => r.jam_masuk !== null).length;
-      const totalHariKerja = totalWorkingDays > 0 ? totalWorkingDays : group.records.length;
-      const tidakHadir = totalHariKerja - totalHadir;
+      // Dashboard: totalHadir = attendanceDatesArray.length (unique dates)
+      const totalHadir = group.attendanceDates.size;
+      // Dashboard: totalHariKerja = totalHadir
+      const totalHariKerja = totalHadir;
 
       return {
-        id: group.nip, // Use NIP as unique ID
+        id: group.nip,
         nip: group.nip,
-        nama: group.nama || 'Unknown',
+        nama: group.nama,
         totalHadir,
-        tidakHadir,
+        tidakHadir: 0,
         totalHariKerja,
-        persentase: totalHariKerja > 0 ? (totalHadir / totalHariKerja) * 100 : 0,
+        persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
         attendanceDates: formatAttendanceDates(group.attendanceDates),
-        lastCheckIn: group.lastCheckIn ? formatTimeOnly(group.lastCheckIn) : 'Belum ada data',
-        lastCheckOut: group.lastCheckOut ? formatTimeOnly(group.lastCheckOut) : 'Belum ada data'
+        // Convert UTC Date back to local "HH:MM" string for display
+        lastCheckIn: group.lastCheckInUTC ? extractTimeString(group.lastCheckInUTC) : 'Belum ada data',
+        lastCheckOut: group.lastCheckOutUTC ? extractTimeString(group.lastCheckOutUTC) : 'Belum ada data'
       };
     });
 
@@ -152,8 +205,13 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
 }
 
 /**
- * Transform raw Prisma attendance records into aggregated karyawan data
- * @param {Array} attendanceRecords - Raw attendance records
+ * Transform raw attendance records into aggregated karyawan data.
+ * This MUST match the dashboard's getAttendanceSummary logic exactly:
+ *   - totalHadir = count of UNIQUE attendance dates
+ *   - totalHariKerja = totalHadir (same as dashboard)
+ *   - lastCheckIn/Out = latest time by comparing jam_masuk as Date (UTC epoch)
+ *
+ * @param {Array} attendanceRecords - Raw attendance records (from mysql2 raw SQL)
  * @param {string|Date} startDate - Start date of the period
  * @param {string|Date} endDate - End date of the period
  * @returns {Array} Transformed attendance data
@@ -164,111 +222,70 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
       return [];
     }
 
-    // Group by NIP
+    // Group by NIP — mirrors dashboard's employeeStats grouping
     const grouped = {};
 
     attendanceRecords.forEach(record => {
       const nip = record.nip;
-      if (!nip) return; // Skip if no NIP
+      if (!nip) return;
 
       if (!grouped[nip]) {
         grouped[nip] = {
           nip: nip,
-          nama: record.nama || record.employee?.nama || 'Unknown',
-          records: [],
-          attendanceDates: new Set(),
-          uniqueDates: new Set(),
-          lastCheckIn: null,
-          lastCheckOut: null
+          nama: record.nama || 'Unknown',
+          attendanceDates: new Set(), // Unique dates (for totalHadir)
+          totalTerlambat: 0,
+          lastCheckInUTC: null,   // Store as UTC Date for comparison (mirrors dashboard)
+          lastCheckOutUTC: null
         };
       }
 
-      grouped[nip].records.push(record);
+      // Add unique date — mirrors dashboard: employeeStats[key].attendanceDates.add(dateStr)
+      const dateStr = extractDateString(record.tanggal);
+      if (dateStr) grouped[nip].attendanceDates.add(dateStr);
 
-      // Track ALL dates for this employee (for total hari kerja)
-      if (record.tanggal) {
-        const dateStr =
-          record.tanggal instanceof Date
-            ? record.tanggal.toISOString().split('T')[0]
-            : String(record.tanggal).split('T')[0];
-        grouped[nip].uniqueDates.add(dateStr);
-      }
-
-      // Track attendance dates (only when there's check-in)
-      if (record.jam_masuk && record.tanggal) {
-        const dateStr =
-          record.tanggal instanceof Date
-            ? record.tanggal.toISOString().split('T')[0]
-            : String(record.tanggal).split('T')[0];
-        grouped[nip].attendanceDates.add(dateStr);
-      }
-
-      // Track last check-in
-      if (record.jam_masuk && record.tanggal) {
-        const dateStr =
-          record.tanggal instanceof Date
-            ? record.tanggal.toISOString().split('T')[0]
-            : String(record.tanggal).split('T')[0];
-
-        const timeStr =
-          typeof record.jam_masuk === 'string'
-            ? record.jam_masuk
-            : record.jam_masuk.toISOString().split('T')[1].substring(0, 8);
-
-        const checkInTime = new Date(`${dateStr}T${timeStr}`);
-
-        if (!isNaN(checkInTime.getTime())) {
-          if (!grouped[nip].lastCheckIn || checkInTime > grouped[nip].lastCheckIn) {
-            grouped[nip].lastCheckIn = checkInTime;
-          }
+      // Track latest check-in — mirrors dashboard: compares Date objects
+      if (record.jam_masuk) {
+        const checkInUTC = toUTCDate(record.jam_masuk);
+        if (checkInUTC && (!grouped[nip].lastCheckInUTC || checkInUTC > grouped[nip].lastCheckInUTC)) {
+          grouped[nip].lastCheckInUTC = checkInUTC;
         }
       }
 
-      // Track last check-out (MySQL returns TIME as string "HH:MM:SS")
-      if (record.jam_keluar && record.tanggal) {
-        // Combine date + time to create valid Date object
-        const dateStr =
-          record.tanggal instanceof Date
-            ? record.tanggal.toISOString().split('T')[0]
-            : String(record.tanggal).split('T')[0];
-
-        const timeStr =
-          typeof record.jam_keluar === 'string'
-            ? record.jam_keluar
-            : record.jam_keluar.toISOString().split('T')[1].substring(0, 8);
-
-        const checkOutTime = new Date(`${dateStr}T${timeStr}`);
-
-        if (!isNaN(checkOutTime.getTime())) {
-          if (!grouped[nip].lastCheckOut || checkOutTime > grouped[nip].lastCheckOut) {
-            grouped[nip].lastCheckOut = checkOutTime;
-          }
+      // Track latest check-out — same approach
+      if (record.jam_keluar) {
+        const checkOutUTC = toUTCDate(record.jam_keluar);
+        if (checkOutUTC && (!grouped[nip].lastCheckOutUTC || checkOutUTC > grouped[nip].lastCheckOutUTC)) {
+          grouped[nip].lastCheckOutUTC = checkOutUTC;
         }
+      }
+
+      // Count late
+      if (record.status === 'TERLAMBAT') {
+        grouped[nip].totalTerlambat++;
       }
     });
 
-    // Calculate total working days in the period
-    const totalWorkingDays = calculateWorkingDays(startDate, endDate);
-
-    // Transform to array with calculations
+    // Transform to array — mirrors dashboard's summary mapping
     const result = Object.values(grouped).map(group => {
-      const totalHadir = group.records.filter(r => r.jam_masuk !== null).length;
-      const totalTerlambat = group.records.filter(r => r.status === 'TERLAMBAT').length;
-      const totalHariKerja = totalWorkingDays > 0 ? totalWorkingDays : group.uniqueDates.size;
-      const tidakHadir = totalHariKerja - totalHadir;
+      // Dashboard: totalHadir = attendanceDatesArray.length (unique dates)
+      const totalHadir = group.attendanceDates.size;
+      // Dashboard: totalHariKerja = totalHadir
+      const totalHariKerja = totalHadir;
 
       return {
         id: group.nip,
         nip: group.nip,
-        nama: group.nama || 'Unknown',
+        nama: group.nama,
         totalHadir,
-        tidakHadir,
-        totalTerlambat,
+        tidakHadir: 0,
+        totalTerlambat: group.totalTerlambat,
         totalHariKerja,
-        persentase: totalHariKerja > 0 ? (totalHadir / totalHariKerja) * 100 : 0,
+        persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
         attendanceDates: formatAttendanceDates(group.attendanceDates),
-        lastCheckIn: group.lastCheckIn ? formatTimeOnly(group.lastCheckIn) : 'Belum ada data',
-        lastCheckOut: group.lastCheckOut ? formatTimeOnly(group.lastCheckOut) : 'Belum ada data'
+        // Convert UTC Date back to local "HH:MM" string for display
+        lastCheckIn: group.lastCheckInUTC ? extractTimeString(group.lastCheckInUTC) : 'Belum ada data',
+        lastCheckOut: group.lastCheckOutUTC ? extractTimeString(group.lastCheckOutUTC) : 'Belum ada data'
       };
     });
 
@@ -282,117 +299,80 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
   }
 }
 
-// Helper function to format attendance dates
+// Helper function to format attendance dates (timezone-safe using UTC)
 function formatAttendanceDates(datesSet) {
   if (!datesSet || datesSet.size === 0) return 'Belum ada data';
 
   const dates = Array.from(datesSet).sort();
+  const monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+  ];
+
+  // Parse YYYY-MM-DD string directly — no Date constructor needed
+  const parseDateParts = (dateStr) => {
+    const parts = dateStr.split('-');
+    return {
+      year: parseInt(parts[0], 10),
+      month: parseInt(parts[1], 10) - 1, // 0-indexed for monthNames
+      day: parseInt(parts[2], 10)
+    };
+  };
 
   // If only 1 day, show single date
   if (dates.length === 1) {
-    const date = new Date(dates[0]);
-    const day = date.getDate();
-    const monthNames = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des'
-    ];
-    const month = monthNames[date.getMonth()];
-    const year = date.getFullYear();
-    return `${day} ${month} ${year}`;
+    const d = parseDateParts(dates[0]);
+    return `${d.day} ${monthNames[d.month]} ${d.year}`;
   }
 
   // If multiple days, show range
-  const firstDate = new Date(dates[0]);
-  const lastDate = new Date(dates[dates.length - 1]);
-
-  const monthNames = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'Mei',
-    'Jun',
-    'Jul',
-    'Agu',
-    'Sep',
-    'Okt',
-    'Nov',
-    'Des'
-  ];
-
-  const firstDay = firstDate.getDate();
-  const firstMonth = monthNames[firstDate.getMonth()];
-
-  const lastDay = lastDate.getDate();
-  const lastMonth = monthNames[lastDate.getMonth()];
-  const lastYear = lastDate.getFullYear();
+  const first = parseDateParts(dates[0]);
+  const last = parseDateParts(dates[dates.length - 1]);
 
   // If same month, show: "22 - 28 Jan 2026"
-  if (
-    firstDate.getMonth() === lastDate.getMonth() &&
-    firstDate.getFullYear() === lastDate.getFullYear()
-  ) {
-    return `${firstDay} - ${lastDay} ${lastMonth} ${lastYear}`;
+  if (first.month === last.month && first.year === last.year) {
+    return `${first.day} - ${last.day} ${monthNames[last.month]} ${last.year}`;
   }
 
   // If different months, show: "22 Jan - 28 Feb 2026"
-  return `${firstDay} ${firstMonth} - ${lastDay} ${lastMonth} ${lastYear}`;
+  return `${first.day} ${monthNames[first.month]} - ${last.day} ${monthNames[last.month]} ${last.year}`;
 }
 
-// Helper function to format time
+// Helper function to format time (timezone-safe)
 function formatTime(time) {
   if (!time) return 'Belum ada data';
-  if (typeof time === 'string') return time;
-
-  const date = new Date(time);
-  if (isNaN(date.getTime())) return 'Belum ada data';
-
-  return date.toLocaleTimeString('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
+  // Use extractTimeString for consistent timezone-safe extraction
+  const timeStr = extractTimeString(time);
+  return timeStr || 'Belum ada data';
 }
 
-// Helper function to format time only (HH:MM from Date object)
-function formatTimeOnly(dateTime) {
-  if (!dateTime) return 'Belum ada data';
-
-  const date = dateTime instanceof Date ? dateTime : new Date(dateTime);
-  if (isNaN(date.getTime())) return 'Belum ada data';
-
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-
-  return `${hours}:${minutes}`;
+// Helper function to format time only — now just returns the already-clean "HH:MM" string
+function formatTimeOnly(timeValue) {
+  if (!timeValue) return 'Belum ada data';
+  // If already a clean string from extractTimeString, just return it
+  if (typeof timeValue === 'string') return timeValue;
+  // Fallback: extract from Date using UTC (timezone-safe)
+  return extractTimeString(timeValue) || 'Belum ada data';
 }
 
-// Helper function to format date in Indonesian format (DD/MM/YYYY)
+// Helper function to format date in Indonesian format (DD/MM/YYYY) — timezone-safe
 function formatDateID(dateString) {
   if (!dateString) return '-';
 
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return dateString;
+  // Try direct string parsing first (YYYY-MM-DD)
+  const dateStr = extractDateString(dateString);
+  if (dateStr && dateStr.includes('-')) {
+    const parts = dateStr.split('-');
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
 
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-
-  return `${day}/${month}/${year}`;
+  // Fallback
+  return String(dateString);
 }
 
 module.exports = {
   transformDosenAttendance,
   transformKaryawanAttendance,
-  formatDateID
+  formatDateID,
+  extractTimeString
 };

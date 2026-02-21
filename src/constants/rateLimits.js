@@ -25,14 +25,10 @@ module.exports = {
     legacyHeaders: false
   },
 
-  // Export endpoints (resource intensive)
+  // Export endpoints (no limit)
   EXPORT_API: {
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10,
-    message: {
-      success: false,
-      message: 'Export request limit exceeded. Maximum 10 exports per hour.'
-    },
+    max: 10000, // Effectively unlimited (v7 treats 0 as block-all)
     standardHeaders: true,
     legacyHeaders: false
   },
