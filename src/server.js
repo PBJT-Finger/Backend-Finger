@@ -8,16 +8,16 @@ const env = validateEnv();
 
 const PORT = env.PORT;
 
-// Initialize Database Connection
-const { testConnection, closePool } = require('./lib/db');
+// Initialize Database Connection via Prisma
+const prisma = require('./config/prisma');
 const { connect: connectRedis, disconnect: disconnectRedis } = require('./utils/tokenBlacklist');
 const { connectUserRateLimiter } = require('./middlewares/userRateLimit');
 
 const initializeApp = async () => {
   try {
-    // Test MySQL database connection
-    await testConnection();
-    logger.info('✅ MySQL connected to database');
+    // Test database connection via Prisma
+    await prisma.$connect();
+    logger.info('✅ MySQL connected to database (Prisma)');
 
     // Connect to Redis for token blacklist (Phase 2)
     // DISABLED for development - uncomment when Redis is available
@@ -88,7 +88,7 @@ const gracefulShutdown = async signal => {
 
       try {
         // Close database connection
-        await closePool();
+        await prisma.$disconnect();
 
         // Disconnect Redis (Phase 2)
         // DISABLED for development - uncomment when Redis is available
@@ -138,3 +138,4 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start the server
 startServer();
+
