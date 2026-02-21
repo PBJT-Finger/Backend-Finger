@@ -293,24 +293,29 @@ class ExportController {
         ];
       }
 
-      const rowHeight = 25; // Adjusted height for tighter layout (was 30)
-      const headerHeight = 30; // Adjusted header height (was 35)
+      const rowHeight = 30;
+      const headerHeight = 40;
 
       // Helper function to draw table header with individual cell borders
       const drawTableHeader = startY => {
         let xPos = startX;
 
-        doc.fontSize(10).fillColor('black').font('Helvetica-Bold'); // Increased header font size
+        doc.fontSize(9).fillColor('black').font('Helvetica-Bold');
+        const lineH = doc.currentLineHeight();
+
         headers.forEach((header, i) => {
           // Draw cell border and background
           doc.rect(xPos, startY, colWidths[i], headerHeight).fillAndStroke('#f0f0f0', '#000000');
 
-          // Draw text centered vertically and horizontally
-          const textY = startY + 10;
-          doc.fillColor('black').text(header, xPos + 2, textY, {
-            width: colWidths[i] - 4,
+          // Count lines in header text for vertical centering
+          const lines = header.split('\n');
+          const textBlockHeight = lines.length * lineH;
+          const textY = startY + (headerHeight - textBlockHeight) / 2;
+
+          doc.fillColor('black').text(header, xPos + 4, textY, {
+            width: colWidths[i] - 8,
             align: 'center',
-            lineBreak: true // Allow wrapping for multi-line headers
+            lineBreak: true
           });
           xPos += colWidths[i];
         });
@@ -320,16 +325,17 @@ class ExportController {
       drawTableHeader(tableTop);
 
       // Draw data rows
-      doc.font('Helvetica');
+      doc.font('Helvetica').fontSize(9);
+      const dataLineH = doc.currentLineHeight();
       let yPos = tableTop + headerHeight;
 
       transformedData.forEach((record, index) => {
-        // Check if we need a new page (adjusted for new margins)
+        // Check if we need a new page
         if (yPos + rowHeight > 550) {
           doc.addPage();
           const newTableTop = 50;
           drawTableHeader(newTableTop);
-          doc.font('Helvetica');
+          doc.font('Helvetica').fontSize(9);
           yPos = newTableTop + headerHeight;
         }
 
@@ -369,13 +375,13 @@ class ExportController {
           // Determine alignment: left for Nama only, center for all other columns
           const align = i === 1 ? 'left' : 'center';
 
-          // Calculate vertical center for text (center text in cell)
-          const textY = yPos + (rowHeight - 10) / 2; // Adjusted for bigger font
-          const padding = 5;
+          // Calculate vertical center for text
+          const textY = yPos + (rowHeight - dataLineH) / 2;
+          const padding = 6;
 
           doc
             .fillColor('black')
-            .fontSize(10) // Increased cell font size (was 8)
+            .fontSize(9)
             .text(data, xPos + padding, textY, {
               width: colWidths[i] - padding * 2,
               align: align,
