@@ -307,10 +307,14 @@ class AttendanceController {
         return `${startDay} ${startMonth} ${startYear} - ${endDay} ${endMonth} ${endYear}`;
       };
 
+      // Calculate actual working days in the selected period (Mon-Sat, excluding Sunday)
+      const { calculateWorkingDays } = require('../utils/attendanceTransformer');
+      const totalWorkingDaysInPeriod = calculateWorkingDays(startDate, endDate);
+
       const summary = Object.values(employeeStats).map((emp, index) => {
         const attendanceDatesArray = Array.from(emp.attendanceDates).sort();
         const totalHadir = attendanceDatesArray.length; // Unique dates count
-        const totalHariKerja = totalHadir; // Same for now, can be adjusted for work days calculation
+        const totalHariKerja = totalWorkingDaysInPeriod; // Actual working days in the period
 
         return {
           id: emp.nip, // Rename NIP to ID
@@ -319,6 +323,7 @@ class AttendanceController {
           jabatan: emp.jabatan,
           totalHadir: totalHadir,
           totalHariKerja: totalHariKerja,
+          persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
           attendanceDates: formatDateRange(attendanceDatesArray), // Format: "15-31 Mei 2025"
           lastCheckIn: formatTimeOnly(emp.last_check_in),
           lastCheckOut: formatTimeOnly(emp.last_check_out)

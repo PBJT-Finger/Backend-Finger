@@ -373,6 +373,7 @@ function formatDateID(dateString) {
 module.exports = {
   transformDosenAttendance,
   transformKaryawanAttendance,
+  calculateWorkingDays,
   formatDateID,
   extractTimeString
 };
