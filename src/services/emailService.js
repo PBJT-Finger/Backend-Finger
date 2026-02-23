@@ -65,19 +65,19 @@ const sendEmail = async (to, subject, html, text = '') => {
   };
 
   try {
-    // If in development mode or SMTP not configured, just log to console
-    if (process.env.NODE_ENV === 'development' || !transporter) {
-      logger.info('📧 EMAIL (Development Mode)', {
+    // If SMTP not configured, fall back to console logging
+    if (!transporter) {
+      logger.info('📧 EMAIL (Console Mode - SMTP not configured)', {
         to,
         subject,
         preview: html.substring(0, 200)
       });
-      console.log('\n=== EMAIL PREVIEW ===');
+      console.log('\n=== EMAIL PREVIEW (SMTP belum dikonfigurasi) ===');
       console.log(`To: ${to}`);
       console.log(`Subject: ${subject}`);
       console.log(`Body:\n${text || html}`);
       console.log('===================\n');
-      return { success: true, messageId: 'dev-mode' };
+      return { success: true, messageId: 'console-mode' };
     }
 
     // Send actual email in production
