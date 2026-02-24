@@ -118,6 +118,17 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
+      - name: "[DEBUG] Verify network connectivity"
+        run: |
+          echo "=== Tailscale Status ==="
+          tailscale status || echo "tailscale CLI not found"
+          echo "=== Ping server ==="
+          ping -c 3 "${{ secrets.SSH_HOST }}" || echo "ping failed"
+          echo "=== Test port 22 ==="
+          nc -zv "${{ secrets.SSH_HOST }}" 22 && echo "Port 22 OPEN" || echo "Port 22 CLOSED/UNREACHABLE"
+          echo "=== SSH Keyscan ==="
+          ssh-keyscan -v -H "${{ secrets.SSH_HOST }}" 2>&1 | head -20 || echo "keyscan failed"
+
       - name: Add SSH known host
         run: |
           mkdir -p ~/.ssh
