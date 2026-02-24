@@ -36,8 +36,8 @@ COPY --chown=express:nodejs prisma ./prisma/
 COPY --chown=express:nodejs src ./src/
 COPY --chown=express:nodejs package.json ./
 
-# Create exports directory (needed by exportService.js)
-RUN mkdir -p exports && chown express:nodejs exports
+# Create required directories (exports + logs) before switching to non-root user
+RUN mkdir -p exports logs && chown -R express:nodejs exports logs
 
 # Switch to non-root user
 USER express
