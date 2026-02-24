@@ -113,14 +113,6 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          tags: tag:webperpus
-
-      - name: Wait for Tailscale routing
-        run: sleep 5
 
       - name: Setup SSH key
         run: |
