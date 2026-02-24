@@ -119,120 +119,129 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Wait for Tailscale routing
-        run: sleep 3
+        run: sleep 5
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null && echo "✅ Key valid: $(ssh-keygen -l -f ~/.ssh/deploy_key | awk '{print $2}')" || { echo "❌ Key parse failed"; exit 1; }
 
       - name: Add SSH known host
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
           chmod 644 ~/.ssh/known_hosts
+          echo "✅ Known host added: $(wc -l < ~/.ssh/known_hosts) entries"
 
-      # ── Preflight ──────────────────────────────────────────
+      # ── Preflight ──────────────────────────────────────────────
       - name: Preflight checks
-        uses: appleboy/ssh-action@v1.2.0
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          envs: DEPLOY_PATH
-          script: |
-            set -e
-            echo "📋 Preflight — $DEPLOY_PATH"
-            [ -d "$DEPLOY_PATH" ] || { echo "❌ Deploy dir not found"; exit 1; }
-            cd "$DEPLOY_PATH"
-            [ -f .env.docker ] || { echo "❌ .env.docker not found"; exit 1; }
-            docker info > /dev/null 2>&1 || { echo "❌ Docker daemon down"; exit 1; }
-            docker compose config > /dev/null 2>&1 || { echo "❌ Compose config invalid"; exit 1; }
-            if docker compose ps finger-mysql 2>/dev/null | grep -q "healthy"; then
-              echo "✅ MySQL healthy"
-            else
-              echo "⚠️ MySQL not healthy or not running (first deploy?)"
-            fi
-            echo "✅ Preflight passed"
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=15 \
+            -o ServerAliveInterval=10 \
+            -p "${{ secrets.SSH_PORT || 22 }}" \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "set -e
+             DEPLOY_PATH='${DEPLOY_PATH}'
+             echo \"📋 Preflight — \$DEPLOY_PATH\"
+             [ -d \"\$DEPLOY_PATH\" ] || { echo '❌ Deploy dir not found'; exit 1; }
+             cd \"\$DEPLOY_PATH\"
+             [ -f .env.docker ] || { echo '❌ .env.docker not found'; exit 1; }
+             docker info > /dev/null 2>&1 || { echo '❌ Docker daemon down'; exit 1; }
+             docker compose config > /dev/null 2>&1 || { echo '❌ Compose config invalid'; exit 1; }
+             if docker compose ps finger-mysql 2>/dev/null | grep -q 'healthy'; then
+               echo '✅ MySQL healthy'
+             else
+               echo '⚠️ MySQL not healthy or not running (first deploy?)'
+             fi
+             echo '✅ Preflight passed'"
 
-      # ── Deploy ────────────────────────────────────────────
+      # ── Deploy ────────────────────────────────────────────────
       - name: Deploy backend
-        uses: appleboy/ssh-action@v1.2.0
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
-          REGISTRY: ${{ env.REGISTRY }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           GHCR_USER: ${{ secrets.GHCR_USERNAME || github.repository_owner }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          envs: DEPLOY_PATH,IMAGE_TAG,REGISTRY,IMAGE_NAME,GHCR_PAT,GHCR_USER
-          script: |
-            set -e
-            cd "$DEPLOY_PATH"
+        run: |
+          IMG_REPO=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          BACKEND_IMAGE="${IMG_REPO}:${IMAGE_TAG}"
 
-            # GHCR login
-            if [ -n "$GHCR_PAT" ]; then
-              echo "$GHCR_PAT" | docker login "$REGISTRY" -u "$GHCR_USER" --password-stdin
-            fi
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=15 \
+            -o ServerAliveInterval=10 \
+            -p "${{ secrets.SSH_PORT || 22 }}" \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "set -e
+             DEPLOY_PATH='${DEPLOY_PATH}'
+             BACKEND_IMAGE='${BACKEND_IMAGE}'
+             GHCR_PAT='${GHCR_PAT}'
+             GHCR_USER='${GHCR_USER}'
+             IMG_REPO='${IMG_REPO}'
+             IMAGE_TAG='${IMAGE_TAG}'
 
-            # Capture current tag for rollback
-            CURRENT_IMAGE=$(docker inspect finger-backend --format='{{.Config.Image}}' 2>/dev/null || echo "none")
-            echo "📌 Current: $CURRENT_IMAGE"
-            echo "📌 Deploying: $IMAGE_TAG"
+             cd \"\$DEPLOY_PATH\"
 
-            # Pull new image
-            export BACKEND_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-            docker pull "$BACKEND_IMAGE"
+             # GHCR login
+             if [ -n \"\$GHCR_PAT\" ]; then
+               echo \"\$GHCR_PAT\" | docker login ghcr.io -u \"\$GHCR_USER\" --password-stdin
+             fi
 
-            # Run migrations (idempotent)
-            docker compose run --rm \
-              -e DATABASE_URL \
-              finger-backend \
-              npx prisma migrate deploy
+             # Capture current image for rollback
+             CURRENT_IMAGE=\$(docker inspect finger-backend --format='{{.Config.Image}}' 2>/dev/null || echo 'none')
+             echo \"📌 Current: \$CURRENT_IMAGE\"
+             echo \"📌 Deploying: \$BACKEND_IMAGE\"
 
-            # Rolling update — stop old, start new (minimal downtime)
-            docker compose up -d --no-deps --force-recreate finger-backend
+             # Pull new image
+             docker pull \"\$BACKEND_IMAGE\"
 
-            # Wait for health
-            echo "⏳ Waiting for health check..."
-            for i in $(seq 1 20); do
-              if curl -sf http://localhost:3333/health > /dev/null; then
-                echo "✅ Backend healthy after ${i}x3s"
-                break
-              fi
-              if [ "$i" -eq 20 ]; then
-                echo "❌ Health check timeout — rolling back to $CURRENT_IMAGE"
-                docker pull "$CURRENT_IMAGE" || true
-                BACKEND_IMAGE="$CURRENT_IMAGE" docker compose up -d --no-deps finger-backend
-                exit 1
-              fi
-              sleep 3
-            done
+             # Run migrations (idempotent)
+             BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose run --rm finger-backend npx prisma migrate deploy
 
-            # Cleanup old images (keep last 5)
-            docker images "$(echo ${REGISTRY}/${IMAGE_NAME} | tr '[:upper:]' '[:lower:]')" \
-              --format "{{.Tag}}" | \
-              grep "^main-" | sort -r | tail -n +6 | \
-              xargs -r -I {} docker rmi "$(echo ${REGISTRY}/${IMAGE_NAME} | tr '[:upper:]' '[:lower:]'):{}}" || true
-            docker image prune -f || true
+             # Rolling update
+             BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose up -d --no-deps --force-recreate finger-backend
 
-            echo "🎉 Backend deployed: $IMAGE_TAG"
+             # Wait for health (60s max)
+             echo '⏳ Waiting for health check...'
+             for i in \$(seq 1 20); do
+               if curl -sf http://localhost:3333/health > /dev/null; then
+                 echo \"✅ Backend healthy after \${i}x3s\"
+                 break
+               fi
+               if [ \"\$i\" -eq 20 ]; then
+                 echo \"❌ Health check timeout — rolling back to \$CURRENT_IMAGE\"
+                 BACKEND_IMAGE=\"\$CURRENT_IMAGE\" docker compose up -d --no-deps finger-backend || true
+                 exit 1
+               fi
+               sleep 3
+             done
+
+             # Cleanup old images (keep last 5)
+             docker images \"\$IMG_REPO\" --format '{{.Tag}}' | grep '^main-' | sort -r | tail -n +6 | \
+               xargs -r -I {} docker rmi \"\${IMG_REPO}:{}\" || true
+             docker image prune -f || true
+
+             echo \"🎉 Backend deployed: \$BACKEND_IMAGE\""
 
       - name: Deployment summary
+        if: always()
         run: |
-          echo "### 🚀 Backend Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Backend Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]'):${{ needs.build.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Digest:** \`${{ needs.build.outputs.image-digest }}\`" >> $GITHUB_STEP_SUMMARY
 
 # REQUIRED SECRETS:
-# - SSH_HOST          : Production server IP/hostname
-# - SSH_USER          : SSH username
-# - SSH_PRIVATE_KEY   : SSH private key (full content)
+# - SSH_HOST          : Production server IP (Tailscale: 100.72.45.110)
+# - SSH_USER          : SSH username (deploy)
+# - SSH_PRIVATE_KEY   : SSH private key — finger_back (full content, LF only)
 # - SSH_PORT          : SSH port (optional, default: 22)
-# - DEPLOY_PATH       : Deploy directory (optional, default: /opt/finger-app)
+# - DEPLOY_PATH       : Deploy directory (default: /opt/fingerback)
 # - TAILSCALE_AUTHKEY : Tailscale auth key
-# - GHCR_PAT          : GHCR Personal Access Token (optional, public images)
+# - GHCR_PAT          : GHCR Personal Access Token
 # - GHCR_USERNAME     : GHCR username (optional)
