@@ -32,7 +32,7 @@ const verifyAccessToken = (token) => {
       issuer: 'kampus-attendance-system',
       audience: 'kampus-api',
     });
-  } catch (error) {
+  } catch (_error) {
     throw new Error('Invalid or expired access token');
   }
 };
@@ -44,7 +44,7 @@ const verifyRefreshToken = (token) => {
       issuer: 'kampus-attendance-system',
       audience: 'kampus-api',
     });
-  } catch (error) {
+  } catch (_error) {
     throw new Error('Invalid or expired refresh token');
   }
 };

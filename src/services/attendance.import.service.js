@@ -144,7 +144,7 @@ class AttendanceImportService {
         } else {
           tanggal = new Date(tanggalStr);
         }
-      } catch (e) {
+      } catch (_e) {
         logger.warn(`Invalid date at row ${index + 2}:`, tanggalStr);
         return null;
       }
@@ -300,7 +300,7 @@ class AttendanceImportService {
       if (isNaN(tanggal.getTime())) {
         throw new Error('Invalid date');
       }
-    } catch (error) {
+    } catch (_error) {
       errors.push(`Baris ${rowNum}: Format tanggal tidak valid (gunakan YYYY-MM-DD)`);
       return { valid: false, errors, data: null };
     }
@@ -562,7 +562,7 @@ class AttendanceImportService {
    * @returns {Promise<Object>} Import result report
    */
   static async processImport(fileBuffer, filename, options = {}) {
-    const { skipDuplicates = true } = options;
+    const { skipDuplicates: _skipDuplicates = true } = options;
 
     try {
       // Parse file (async with ExcelJS)

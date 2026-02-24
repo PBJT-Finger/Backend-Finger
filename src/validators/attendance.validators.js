@@ -1,5 +1,5 @@
 // src/validators/attendance.validators.js - Input validation for attendance endpoints
-const { query, param, body } = require('express-validator');
+const { query, param } = require('express-validator');
 
 /**
  * Validation for GET /api/attendance/summary
@@ -12,7 +12,7 @@ const validateSummary = [
     .optional()
     .isISO8601()
     .withMessage('start_date must be valid ISO date (YYYY-MM-DD)')
-    .custom((value, { req }) => {
+    .custom((value, { req: _req }) => {
       const date = new Date(value);
       if (isNaN(date.getTime())) {
         throw new Error('Invalid start_date format');

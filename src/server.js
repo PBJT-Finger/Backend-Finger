@@ -10,8 +10,8 @@ const PORT = env.PORT;
 
 // Initialize Database Connection via Prisma
 const prisma = require('./config/prisma');
-const { connect: connectRedis, disconnect: disconnectRedis } = require('./utils/tokenBlacklist');
-const { connectUserRateLimiter } = require('./middlewares/userRateLimit');
+const { connect: _connectRedis, disconnect: _disconnectRedis } = require('./utils/tokenBlacklist');
+const { connectUserRateLimiter: _connectUserRateLimiter } = require('./middlewares/userRateLimit');
 
 const initializeApp = async () => {
   try {

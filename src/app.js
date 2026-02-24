@@ -206,7 +206,7 @@ app.get('/', (req, res) => {
 });
 
 // Helper function to render documentation pages with EJS
-const renderDocsPage = (page, title, options = {}) => {
+const _renderDocsPage = (page, title, options = {}) => {
   return (req, res) => {
     res.render('layouts/main', {
       title,

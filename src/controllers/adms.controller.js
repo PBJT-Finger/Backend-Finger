@@ -22,7 +22,7 @@ class ADMSController {
         waktu_absensi,
         tipe_absensi,
         verifikasi = 'SIDIK_JARI',
-        api_key,
+        // api_key intentionally received but not validated here
       } = req.body;
 
       // Validate required fields (jabatan is no longer required - will be auto-detected)

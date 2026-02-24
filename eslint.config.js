@@ -18,7 +18,14 @@ module.exports = [
     },
     rules: {
       // Best practices
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'no-console': 'off', // We use Winston for logging
       'prefer-const': 'error',
       'no-var': 'error',

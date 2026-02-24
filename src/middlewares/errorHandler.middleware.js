@@ -7,7 +7,7 @@ const { HTTP_STATUS } = require('../constants/app');
  * Global error handler middleware
  * Must be placed after all routes
  */
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, req, res, _next) => {
   let error = err;
 
   // Convert non-AppError errors to AppError
@@ -69,7 +69,7 @@ const errorHandler = (err, req, res, next) => {
  * Handler for 404 Not Found
  * Place this before error handler
  */
-const notFoundHandler = (req, res, next) => {
+const notFoundHandler = (req, res, _next) => {
   logger.warn('Route not found', {
     path: req.path,
     method: req.method,

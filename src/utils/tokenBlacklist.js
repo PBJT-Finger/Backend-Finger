@@ -3,10 +3,10 @@ const logger = require('./logger');
 // DISABLED Redis for development - mock implementation
 const redis = {
   status: 'disabled',
-  on: () => {},
-  connect: async () => {},
-  quit: async () => {},
-  setex: async () => {},
+  on: () => { },
+  connect: async () => { },
+  quit: async () => { },
+  setex: async () => { },
   exists: async () => 0,
   keys: async () => [],
   info: async () => 'memory:0',
@@ -15,7 +15,7 @@ const redis = {
 /**
  * Add JWT token to blacklist (Mocked)
  */
-async function addToBlacklist(token, expirySeconds) {
+async function addToBlacklist(_token, _expirySeconds) {
   logger.info('MOCK: Token added to blacklist (Redis disabled)');
   return true;
 }
@@ -23,7 +23,7 @@ async function addToBlacklist(token, expirySeconds) {
 /**
  * Check if JWT token is blacklisted (Mocked)
  */
-async function isBlacklisted(token) {
+async function isBlacklisted(_token) {
   // Fail open: always return false when Redis is disabled
   return false;
 }

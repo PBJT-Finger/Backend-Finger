@@ -1,6 +1,6 @@
 // src/config/scalar.config.js - Hide Models for cleaner docs
 
-function generateScalarHTML(spec) {
+function generateScalarHTML(_spec) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

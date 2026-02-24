@@ -2,10 +2,10 @@
 let ZKLib;
 try {
   ZKLib = require('zklib-js');
-} catch (e) {
+} catch (_e) {
   try {
     ZKLib = require('node-zklib');
-  } catch (e2) {
+  } catch (_e2) {
     console.error('No ZKLib package found. Please install: npm install zklib-js');
     ZKLib = null;
   }

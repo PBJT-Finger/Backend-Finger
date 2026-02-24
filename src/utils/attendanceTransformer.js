@@ -131,7 +131,7 @@ function calculateWorkingDays(startDate, endDate) {
  * @param {string|Date} endDate - End date of the period
  * @returns {Array} Transformed attendance data
  */
-function transformDosenAttendance(attendanceRecords, startDate, endDate) {
+function transformDosenAttendance(attendanceRecords, _startDate, _endDate) {
   try {
     if (!attendanceRecords || attendanceRecords.length === 0) {
       return [];
@@ -237,7 +237,7 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
  * @param {string|Date} endDate - End date of the period
  * @returns {Array} Transformed attendance data
  */
-function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
+function transformKaryawanAttendance(attendanceRecords, _startDate, _endDate) {
   try {
     if (!attendanceRecords || attendanceRecords.length === 0) {
       return [];
@@ -380,7 +380,8 @@ function formatAttendanceDates(datesSet) {
 }
 
 // Helper function to format time (timezone-safe)
-function formatTime(time) {
+// Helper function to format time (timezone-safe)
+function _formatTime(time) {
   if (!time) return 'Belum ada data';
   // Use extractTimeString for consistent timezone-safe extraction
   const timeStr = extractTimeString(time);
@@ -388,7 +389,8 @@ function formatTime(time) {
 }
 
 // Helper function to format time only — now just returns the already-clean "HH:MM" string
-function formatTimeOnly(timeValue) {
+// Helper function to format time only — now just returns the already-clean "HH:MM" string
+function _formatTimeOnly(timeValue) {
   if (!timeValue) return 'Belum ada data';
   // If already a clean string from extractTimeString, just return it
   if (typeof timeValue === 'string') return timeValue;
