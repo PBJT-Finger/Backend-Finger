@@ -11,7 +11,7 @@ const register = new promClient.Registry();
 // Enable default metrics (CPU, memory, event loop, GC)
 promClient.collectDefaultMetrics({
   register,
-  prefix: 'finger_api_'
+  prefix: 'finger_api_',
 });
 
 // ==================== CUSTOM METRICS ====================
@@ -21,7 +21,7 @@ const httpRequestDuration = new promClient.Histogram({
   name: 'finger_api_http_request_duration_seconds',
   help: 'Duration of HTTP requests in seconds',
   labelNames: ['method', 'route', 'status_code'],
-  buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10]
+  buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
 });
 register.registerMetric(httpRequestDuration);
 
@@ -29,14 +29,14 @@ register.registerMetric(httpRequestDuration);
 const httpRequestTotal = new promClient.Counter({
   name: 'finger_api_http_requests_total',
   help: 'Total number of HTTP requests',
-  labelNames: ['method', 'route', 'status_code']
+  labelNames: ['method', 'route', 'status_code'],
 });
 register.registerMetric(httpRequestTotal);
 
 // 3. Active Requests Gauge
 const activeRequests = new promClient.Gauge({
   name: 'finger_api_http_requests_active',
-  help: 'Number of currently active HTTP requests'
+  help: 'Number of currently active HTTP requests',
 });
 register.registerMetric(activeRequests);
 
@@ -44,7 +44,7 @@ register.registerMetric(activeRequests);
 const errorCounter = new promClient.Counter({
   name: 'finger_api_errors_total',
   help: 'Total number of application errors',
-  labelNames: ['type', 'route']
+  labelNames: ['type', 'route'],
 });
 register.registerMetric(errorCounter);
 
@@ -52,7 +52,7 @@ register.registerMetric(errorCounter);
 const redisOps = new promClient.Counter({
   name: 'finger_api_redis_operations_total',
   help: 'Total Redis operations',
-  labelNames: ['operation', 'status']
+  labelNames: ['operation', 'status'],
 });
 register.registerMetric(redisOps);
 
@@ -61,7 +61,7 @@ const dbQueryDuration = new promClient.Histogram({
   name: 'finger_api_db_query_duration_seconds',
   help: 'Database query execution time',
   labelNames: ['query_type'],
-  buckets: [0.001, 0.01, 0.05, 0.1, 0.5, 1, 2]
+  buckets: [0.001, 0.01, 0.05, 0.1, 0.5, 1, 2],
 });
 register.registerMetric(dbQueryDuration);
 
@@ -69,7 +69,7 @@ register.registerMetric(dbQueryDuration);
 const attendanceRecords = new promClient.Counter({
   name: 'finger_api_attendance_records_total',
   help: 'Total attendance records created',
-  labelNames: ['type'] // MASUK, PULANG
+  labelNames: ['type'], // MASUK, PULANG
 });
 register.registerMetric(attendanceRecords);
 
@@ -77,14 +77,14 @@ register.registerMetric(attendanceRecords);
 const authAttempts = new promClient.Counter({
   name: 'finger_api_auth_attempts_total',
   help: 'Total authentication attempts',
-  labelNames: ['status'] // success, failure
+  labelNames: ['status'], // success, failure
 });
 register.registerMetric(authAttempts);
 
 // 9. Token Blacklist Size
 const tokenBlacklistSize = new promClient.Gauge({
   name: 'finger_api_token_blacklist_size',
-  help: 'Current number of blacklisted tokens in Redis'
+  help: 'Current number of blacklisted tokens in Redis',
 });
 register.registerMetric(tokenBlacklistSize);
 
@@ -92,7 +92,7 @@ register.registerMetric(tokenBlacklistSize);
 const rateLimitViolations = new promClient.Counter({
   name: 'finger_api_rate_limit_violations_total',
   help: 'Total rate limit violations',
-  labelNames: ['type'] // ip, user
+  labelNames: ['type'], // ip, user
 });
 register.registerMetric(rateLimitViolations);
 
@@ -107,5 +107,5 @@ module.exports = {
   attendanceRecords,
   authAttempts,
   tokenBlacklistSize,
-  rateLimitViolations
+  rateLimitViolations,
 };

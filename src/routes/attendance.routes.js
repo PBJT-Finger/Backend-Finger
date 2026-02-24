@@ -10,14 +10,14 @@ const {
   validateAttendanceId,
   validateRekapRange,
   validateMonthlyParams,
-  validateImportFile
+  validateImportFile,
 } = require('../validators/attendance.validators');
 
 // Configure multer for file uploads (memory storage)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB max file size
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
   },
   fileFilter: (req, file, cb) => {
     const allowedExtensions = ['.xlsx', '.xls', '.csv'];
@@ -28,7 +28,7 @@ const upload = multer({
     } else {
       cb(new Error('Hanya file Excel (.xlsx, .xls) atau CSV yang diperbolehkan'));
     }
-  }
+  },
 });
 
 const router = express.Router();
@@ -41,8 +41,6 @@ router.use(sanitizeInputs);
  *Routes - Import Data (Prioritas Tinggi)
  */
 
-
-
 /**
  * @swagger
  * /api/attendance/import:
@@ -50,18 +48,18 @@ router.use(sanitizeInputs);
  *     summary: Import data absensi dari file Excel/CSV
  *     description: |
  *       Upload dan import data absensi secara manual dari file Excel atau CSV.
- *       
+ *
  *       **Format File:**
  *       - Kolom wajib: `nip`, `tanggal`, `jam_masuk`
  *       - Kolom opsional: `nama`, `jabatan`, `jam_keluar`, `status`, `verification_method`
  *       - Format tanggal: YYYY-MM-DD (contoh: 2026-02-15)
  *       - Format jam: HH:mm:ss (contoh: 08:30:00)
- *       
+ *
  *       **Validasi:**
  *       - NIP harus terdaftar di database karyawan/dosen
  *       - Data duplikat (NIP + tanggal + jam masuk sama) akan dilewati
  *       - Maksimal ukuran file: 5MB
- *       
+ *
  *       **Auto-fill:**
  *       - Jika `nama` atau `jabatan` kosong, akan diisi otomatis dari database
  *     tags: [Import]

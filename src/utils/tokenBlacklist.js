@@ -9,7 +9,7 @@ const redis = {
   setex: async () => {},
   exists: async () => 0,
   keys: async () => [],
-  info: async () => 'memory:0'
+  info: async () => 'memory:0',
 };
 
 /**
@@ -35,7 +35,7 @@ async function getStats() {
   return {
     totalBlacklisted: 0,
     redisStatus: 'disabled',
-    memoryUsage: '0'
+    memoryUsage: '0',
   };
 }
 
@@ -59,5 +59,5 @@ module.exports = {
   getStats,
   connect,
   disconnect,
-  redis
+  redis,
 };

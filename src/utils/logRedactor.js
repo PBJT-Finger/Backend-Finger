@@ -38,14 +38,14 @@ function redactSensitiveData(obj) {
     'jwt',
     'bearer',
     'key',
-    'hash'
+    'hash',
   ];
 
   for (const key in redacted) {
     const lowerKey = key.toLowerCase();
 
     // Check if key matches sensitive pattern
-    const isSensitive = sensitiveKeys.some(sensitive => lowerKey.includes(sensitive));
+    const isSensitive = sensitiveKeys.some((sensitive) => lowerKey.includes(sensitive));
 
     if (isSensitive) {
       // Redact based on value type
@@ -78,7 +78,7 @@ function redactUrl(url) {
   const sensitiveParams = ['token', 'key', 'password', 'secret'];
   let redactedUrl = url;
 
-  sensitiveParams.forEach(param => {
+  sensitiveParams.forEach((param) => {
     const regex = new RegExp(`(${param}=)[^&]*`, 'gi');
     redactedUrl = redactedUrl.replace(regex, `$1[REDACTED]`);
   });
@@ -88,5 +88,5 @@ function redactUrl(url) {
 
 module.exports = {
   redactSensitiveData,
-  redactUrl
+  redactUrl,
 };

@@ -19,10 +19,10 @@ const redis = {
       [null, 0],
       [null, 0],
       [null, 0],
-      [null, 0]
-    ]
+      [null, 0],
+    ],
   }),
-  zrem: async () => {}
+  zrem: async () => {},
 };
 
 let isConnected = false;
@@ -49,7 +49,7 @@ function createUserRateLimiter(options = {}) {
     max = 100, // Max requests per window
     keyPrefix = 'ratelimit:user:',
     message = 'Too many requests from this user, please try again later.',
-    skipFailedRequests = false // Don't count failed requests
+    skipFailedRequests = false, // Don't count failed requests
   } = options;
 
   return async (req, res, next) => {
@@ -88,7 +88,7 @@ function createUserRateLimiter(options = {}) {
       const results = await multi.exec();
 
       // Check for Redis errors
-      if (!results || results.some(r => r[0])) {
+      if (!results || results.some((r) => r[0])) {
         throw new Error('Redis pipeline failed');
       }
 
@@ -105,7 +105,7 @@ function createUserRateLimiter(options = {}) {
           currentCount,
           limit: max,
           window: `${windowMs / 1000}s`,
-          path: req.path
+          path: req.path,
         });
 
         // Set Retry-After header (seconds)
@@ -117,7 +117,7 @@ function createUserRateLimiter(options = {}) {
           message,
           retryAfter: retryAfter,
           limit: max,
-          current: currentCount
+          current: currentCount,
         });
       }
 
@@ -131,9 +131,9 @@ function createUserRateLimiter(options = {}) {
       res.send = function (data) {
         if (skipFailedRequests && res.statusCode >= 400) {
           // Remove request from count if it failed
-          redis.zrem(key, requestId).catch(err =>
+          redis.zrem(key, requestId).catch((err) =>
             logger.error('Failed to remove failed request from rate limit', {
-              error: err.message
+              error: err.message,
             })
           );
         }
@@ -145,7 +145,7 @@ function createUserRateLimiter(options = {}) {
       logger.error('User rate limit error', {
         error: error.message,
         userId,
-        path: req.path
+        path: req.path,
       });
       // Fail open - don't block requests on Redis errors
       next();
@@ -161,26 +161,26 @@ const userRateLimits = {
   strict: createUserRateLimiter({
     windowMs: 15 * 60 * 1000,
     max: 50,
-    message: 'Too many write requests from your account. Please try again later.'
+    message: 'Too many write requests from your account. Please try again later.',
   }),
 
   // Moderate: For read operations (GET)
   moderate: createUserRateLimiter({
     windowMs: 15 * 60 * 1000,
     max: 200,
-    message: 'Too many read requests from your account. Please try again later.'
+    message: 'Too many read requests from your account. Please try again later.',
   }),
 
   // Lenient: For lightweight endpoints
   lenient: createUserRateLimiter({
     windowMs: 15 * 60 * 1000,
     max: 500,
-    message: 'Too many requests from your account. Please try again later.'
-  })
+    message: 'Too many requests from your account. Please try again later.',
+  }),
 };
 
 module.exports = {
   createUserRateLimiter,
   connectUserRateLimiter,
-  userRateLimits
+  userRateLimits,
 };

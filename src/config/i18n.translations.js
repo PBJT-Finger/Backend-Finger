@@ -20,8 +20,8 @@ const translations = {
       'User Management': 'User Management',
       'Report Profiles': 'Report Profiles',
       'ADMS Devices': 'ADMS Devices',
-      'Health & Monitoring': 'Health & Monitoring'
-    }
+      'Health & Monitoring': 'Health & Monitoring',
+    },
   },
   id: {
     title: 'API Finger',
@@ -37,7 +37,7 @@ const translations = {
       'User Management': 'Manajemen Pengguna',
       'Report Profiles': 'Profil Laporan',
       'ADMS Devices': 'Perangkat ADMS',
-      'Health & Monitoring': 'Kesehatan & Monitoring'
+      'Health & Monitoring': 'Kesehatan & Monitoring',
     },
     descriptions: {
       'Enterprise Attendance Management System': 'Sistem Manajemen Absensi Enterprise',
@@ -56,9 +56,9 @@ const translations = {
       'Manage reporting profiles and configurations': 'Kelola profil laporan dan konfigurasi',
       'Fingerprint device integration (internal use)':
         'Integrasi perangkat sidik jari (penggunaan internal)',
-      'System health checks and metrics': 'Pemeriksaan kesehatan sistem dan metrik'
-    }
-  }
+      'System health checks and metrics': 'Pemeriksaan kesehatan sistem dan metrik',
+    },
+  },
 };
 
 /**
@@ -80,7 +80,7 @@ function getTranslation(lang, key, category = null) {
 function translateTags(tags, lang) {
   if (lang === 'en') return tags;
 
-  return tags.map(tag => {
+  return tags.map((tag) => {
     // Remove emoji from name
     const cleanName = tag.name.replace(/[^\w\s&-]/g, '').trim();
     const translatedName = getTranslation(lang, cleanName, 'tags');
@@ -89,7 +89,7 @@ function translateTags(tags, lang) {
     return {
       ...tag,
       name: translatedName,
-      description: translatedDesc
+      description: translatedDesc,
     };
   });
 }
@@ -114,5 +114,5 @@ module.exports = {
   translations,
   getTranslation,
   translateTags,
-  translateDescription
+  translateDescription,
 };

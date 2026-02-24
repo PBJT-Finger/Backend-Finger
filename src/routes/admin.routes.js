@@ -14,7 +14,6 @@ router.use(adminLimiter);
 
 // Admin Management endpoints - using System tag for cleaner documentation
 
-
 /**
  * @swagger
  * /api/admin:
@@ -150,7 +149,5 @@ router.put('/:id', AdminController.updateAdmin);
  *         description: Admin tidak ditemukan
  */
 router.delete('/:id', AdminController.deleteAdmin);
-
-
 
 module.exports = router;

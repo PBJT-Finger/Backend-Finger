@@ -8,7 +8,6 @@ const BCRYPT_SALT_ROUNDS = 12;
 const VALID_ROLES = ['admin', 'super_admin'];
 
 class AdminController {
-
   /**
    * Create a new admin
    * POST /api/admin
@@ -46,12 +45,9 @@ class AdminController {
       // --- Check duplicates ---
       const existingAdmin = await prisma.admins.findFirst({
         where: {
-          OR: [
-            { username: username },
-            { email: email.toLowerCase() }
-          ]
+          OR: [{ username: username }, { email: email.toLowerCase() }],
         },
-        select: { username: true, email: true }
+        select: { username: true, email: true },
       });
 
       if (existingAdmin) {
@@ -70,7 +66,7 @@ class AdminController {
           role,
           is_active: true,
           created_at: new Date(),
-          updated_at: new Date()
+          updated_at: new Date(),
         },
         select: {
           id: true,
@@ -78,15 +74,15 @@ class AdminController {
           email: true,
           role: true,
           is_active: true,
-          created_at: true
-        }
+          created_at: true,
+        },
       });
 
       logger.audit('ADMIN_CREATED', req.user.id, {
         created_admin_id: newAdmin.id,
         username: newAdmin.username,
         role: newAdmin.role,
-        ip: req.ip
+        ip: req.ip,
       });
 
       return successResponse(res, newAdmin, 'Admin berhasil dibuat', 201);
@@ -134,7 +130,7 @@ class AdminController {
 
       // Check admin exists
       const existingAdmin = await prisma.admins.findUnique({
-        where: { id: adminId }
+        where: { id: adminId },
       });
 
       if (!existingAdmin) {
@@ -144,7 +140,7 @@ class AdminController {
       // Check email uniqueness if email is being updated
       if (email && email.toLowerCase() !== existingAdmin.email) {
         const emailTaken = await prisma.admins.findUnique({
-          where: { email: email.toLowerCase() }
+          where: { email: email.toLowerCase() },
         });
         if (emailTaken) {
           return errorResponse(res, 'Email sudah digunakan oleh admin lain', 409);
@@ -166,14 +162,14 @@ class AdminController {
           email: true,
           role: true,
           is_active: true,
-          updated_at: true
-        }
+          updated_at: true,
+        },
       });
 
       logger.audit('ADMIN_UPDATED', req.user.id, {
         target_admin_id: adminId,
-        fields_updated: Object.keys(updateData).filter(k => k !== 'updated_at'),
-        ip: req.ip
+        fields_updated: Object.keys(updateData).filter((k) => k !== 'updated_at'),
+        ip: req.ip,
       });
 
       return successResponse(res, updatedAdmin, 'Admin berhasil diperbarui');
@@ -204,7 +200,7 @@ class AdminController {
       // Check admin exists
       const existingAdmin = await prisma.admins.findUnique({
         where: { id: adminId },
-        select: { id: true, username: true }
+        select: { id: true, username: true },
       });
 
       if (!existingAdmin) {
@@ -214,13 +210,13 @@ class AdminController {
       // Delete related password_resets first (cascade), then the admin
       await prisma.$transaction([
         prisma.password_resets.deleteMany({ where: { admin_id: adminId } }),
-        prisma.admins.delete({ where: { id: adminId } })
+        prisma.admins.delete({ where: { id: adminId } }),
       ]);
 
       logger.audit('ADMIN_DELETED', req.user.id, {
         deleted_admin_id: adminId,
         deleted_username: existingAdmin.username,
-        ip: req.ip
+        ip: req.ip,
       });
 
       return successResponse(res, null, 'Admin berhasil dihapus');
@@ -250,7 +246,11 @@ class AdminController {
         adminId = parseInt(id);
         // Validate ID is a safe integer and within MySQL INT range
         if (isNaN(adminId) || adminId > 2147483647) {
-          return errorResponse(res, 'Invalid Admin ID. Please provide a valid integer ID (not NIP).', 400);
+          return errorResponse(
+            res,
+            'Invalid Admin ID. Please provide a valid integer ID (not NIP).',
+            400
+          );
         }
       } else {
         // Otherwise use the authenticated user's ID (changing own password)
@@ -259,7 +259,7 @@ class AdminController {
 
       // 1. Get admin
       const admin = await prisma.admins.findUnique({
-        where: { id: adminId }
+        where: { id: adminId },
       });
 
       if (!admin) {
@@ -281,8 +281,8 @@ class AdminController {
         where: { id: adminId },
         data: {
           password_hash: hashedPassword,
-          updated_at: new Date()
-        }
+          updated_at: new Date(),
+        },
       });
 
       return successResponse(res, null, 'Password changed successfully');

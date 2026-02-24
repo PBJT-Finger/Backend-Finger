@@ -4,7 +4,6 @@ const ADMSController = require('../controllers/adms.controller');
 
 const router = express.Router();
 
-
 router.get('/health', ADMSController.healthCheck);
 
 module.exports = router;

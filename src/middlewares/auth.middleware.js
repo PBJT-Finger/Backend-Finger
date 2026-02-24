@@ -18,11 +18,11 @@ const authenticateToken = async (req, res, next) => {
       logger.warn('Autentikasi gagal: Token tidak disediakan', {
         ip: req.ip,
         userAgent: req.get('User-Agent'),
-        path: req.path
+        path: req.path,
       });
       return res.status(401).json({
         success: false,
-        message: 'Access token diperlukan'
+        message: 'Access token diperlukan',
       });
     }
 
@@ -32,11 +32,11 @@ const authenticateToken = async (req, res, next) => {
       logger.warn('Autentikasi gagal: Token has been revoked', {
         ip: req.ip,
         tokenPrefix: token.substring(0, 15) + '...',
-        path: req.path
+        path: req.path,
       });
       return res.status(401).json({
         success: false,
-        message: 'Token has been revoked. Please login again.'
+        message: 'Token has been revoked. Please login again.',
       });
     }
 
@@ -46,11 +46,11 @@ const authenticateToken = async (req, res, next) => {
         logger.warn('Autentikasi gagal: Token tidak valid', {
           ip: req.ip,
           error: err.message,
-          path: req.path
+          path: req.path,
         });
         return res.status(403).json({
           success: false,
-          message: 'Invalid or expired token'
+          message: 'Invalid or expired token',
         });
       }
 
@@ -58,7 +58,7 @@ const authenticateToken = async (req, res, next) => {
       req.user = {
         id: decoded.id,
         username: decoded.username,
-        role: decoded.role
+        role: decoded.role,
       };
 
       // Log successful authentication
@@ -66,7 +66,7 @@ const authenticateToken = async (req, res, next) => {
         userId: req.user.id,
         username: req.user.username,
         path: req.path,
-        method: req.method
+        method: req.method,
       });
 
       next();
@@ -76,11 +76,11 @@ const authenticateToken = async (req, res, next) => {
       error: error.message,
       stack: error.stack,
       ip: req.ip,
-      path: req.path
+      path: req.path,
     });
     return res.status(500).json({
       success: false,
-      message: 'Authentication error'
+      message: 'Authentication error',
     });
   }
 };
@@ -96,11 +96,11 @@ const requireAdmin = (req, res, next) => {
       userId: req.user?.id,
       username: req.user?.username,
       role: req.user?.role,
-      path: req.path
+      path: req.path,
     });
     return res.status(403).json({
       success: false,
-      message: 'Admin access required'
+      message: 'Admin access required',
     });
   }
   next();
@@ -119,7 +119,7 @@ const requestLogger = (req, res, next) => {
     path: req.path,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    userId: req.user?.id || 'unauthenticated'
+    userId: req.user?.id || 'unauthenticated',
   });
 
   // Log response
@@ -130,7 +130,7 @@ const requestLogger = (req, res, next) => {
       path: req.path,
       statusCode: res.statusCode,
       duration: `${duration}ms`,
-      userId: req.user?.id || 'unauthenticated'
+      userId: req.user?.id || 'unauthenticated',
     });
   });
 
@@ -140,5 +140,5 @@ const requestLogger = (req, res, next) => {
 module.exports = {
   authenticateToken,
   requireAdmin,
-  requestLogger
+  requestLogger,
 };

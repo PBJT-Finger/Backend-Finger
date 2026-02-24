@@ -20,7 +20,9 @@ function extractTimeString(timeValue) {
     // Wrap in Date as UTC, then use getHours() to get local (WIB) time
     const match = timeValue.match(/^(\d{2}):(\d{2})/);
     if (match) {
-      const utcDate = new Date(Date.UTC(1970, 0, 1, parseInt(match[1], 10), parseInt(match[2], 10)));
+      const utcDate = new Date(
+        Date.UTC(1970, 0, 1, parseInt(match[1], 10), parseInt(match[2], 10))
+      );
       const h = String(utcDate.getHours()).padStart(2, '0');
       const m = String(utcDate.getMinutes()).padStart(2, '0');
       return `${h}:${m}`;
@@ -72,7 +74,16 @@ function toUTCDate(timeValue) {
   if (typeof timeValue === 'string') {
     const match = timeValue.match(/^(\d{2}):(\d{2})(:(\d{2}))?/);
     if (match) {
-      return new Date(Date.UTC(1970, 0, 1, parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[4] || '0', 10)));
+      return new Date(
+        Date.UTC(
+          1970,
+          0,
+          1,
+          parseInt(match[1], 10),
+          parseInt(match[2], 10),
+          parseInt(match[4] || '0', 10)
+        )
+      );
     }
   }
   return null;
@@ -129,7 +140,7 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
     // Group by NIP — mirrors dashboard's employeeStats grouping
     const grouped = {};
 
-    attendanceRecords.forEach(record => {
+    attendanceRecords.forEach((record) => {
       const nip = record.nip;
       if (!nip) return;
 
@@ -139,8 +150,8 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
           nama: record.nama || 'Unknown',
           attendanceDates: new Set(), // Unique dates (for totalHadir)
           totalTerlambat: 0,
-          lastCheckInUTC: null,   // Store as UTC Date for comparison (mirrors dashboard)
-          lastCheckOutUTC: null
+          lastCheckInUTC: null, // Store as UTC Date for comparison (mirrors dashboard)
+          lastCheckOutUTC: null,
         };
       }
 
@@ -153,7 +164,10 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
       // mysql2 returns string "00:50:00" (UTC), so we create Date(UTC) for comparison
       if (record.jam_masuk) {
         const checkInUTC = toUTCDate(record.jam_masuk);
-        if (checkInUTC && (!grouped[nip].lastCheckInUTC || checkInUTC > grouped[nip].lastCheckInUTC)) {
+        if (
+          checkInUTC &&
+          (!grouped[nip].lastCheckInUTC || checkInUTC > grouped[nip].lastCheckInUTC)
+        ) {
           grouped[nip].lastCheckInUTC = checkInUTC;
         }
       }
@@ -161,7 +175,10 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
       // Track latest check-out — same approach
       if (record.jam_keluar) {
         const checkOutUTC = toUTCDate(record.jam_keluar);
-        if (checkOutUTC && (!grouped[nip].lastCheckOutUTC || checkOutUTC > grouped[nip].lastCheckOutUTC)) {
+        if (
+          checkOutUTC &&
+          (!grouped[nip].lastCheckOutUTC || checkOutUTC > grouped[nip].lastCheckOutUTC)
+        ) {
           grouped[nip].lastCheckOutUTC = checkOutUTC;
         }
       }
@@ -173,7 +190,7 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
     });
 
     // Transform to array — mirrors dashboard's summary mapping
-    const result = Object.values(grouped).map(group => {
+    const result = Object.values(grouped).map((group) => {
       // Dashboard: totalHadir = attendanceDatesArray.length (unique dates)
       const totalHadir = group.attendanceDates.size;
       // Dashboard: totalHariKerja = totalHadir
@@ -189,8 +206,12 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
         persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
         attendanceDates: formatAttendanceDates(group.attendanceDates),
         // Convert UTC Date back to local "HH:MM" string for display
-        lastCheckIn: group.lastCheckInUTC ? extractTimeString(group.lastCheckInUTC) : 'Belum ada data',
-        lastCheckOut: group.lastCheckOutUTC ? extractTimeString(group.lastCheckOutUTC) : 'Belum ada data'
+        lastCheckIn: group.lastCheckInUTC
+          ? extractTimeString(group.lastCheckInUTC)
+          : 'Belum ada data',
+        lastCheckOut: group.lastCheckOutUTC
+          ? extractTimeString(group.lastCheckOutUTC)
+          : 'Belum ada data',
       };
     });
 
@@ -198,7 +219,7 @@ function transformDosenAttendance(attendanceRecords, startDate, endDate) {
   } catch (error) {
     logger.error('Error transforming dosen attendance', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     return [];
   }
@@ -225,7 +246,7 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
     // Group by NIP — mirrors dashboard's employeeStats grouping
     const grouped = {};
 
-    attendanceRecords.forEach(record => {
+    attendanceRecords.forEach((record) => {
       const nip = record.nip;
       if (!nip) return;
 
@@ -235,8 +256,8 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
           nama: record.nama || 'Unknown',
           attendanceDates: new Set(), // Unique dates (for totalHadir)
           totalTerlambat: 0,
-          lastCheckInUTC: null,   // Store as UTC Date for comparison (mirrors dashboard)
-          lastCheckOutUTC: null
+          lastCheckInUTC: null, // Store as UTC Date for comparison (mirrors dashboard)
+          lastCheckOutUTC: null,
         };
       }
 
@@ -247,7 +268,10 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
       // Track latest check-in — mirrors dashboard: compares Date objects
       if (record.jam_masuk) {
         const checkInUTC = toUTCDate(record.jam_masuk);
-        if (checkInUTC && (!grouped[nip].lastCheckInUTC || checkInUTC > grouped[nip].lastCheckInUTC)) {
+        if (
+          checkInUTC &&
+          (!grouped[nip].lastCheckInUTC || checkInUTC > grouped[nip].lastCheckInUTC)
+        ) {
           grouped[nip].lastCheckInUTC = checkInUTC;
         }
       }
@@ -255,7 +279,10 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
       // Track latest check-out — same approach
       if (record.jam_keluar) {
         const checkOutUTC = toUTCDate(record.jam_keluar);
-        if (checkOutUTC && (!grouped[nip].lastCheckOutUTC || checkOutUTC > grouped[nip].lastCheckOutUTC)) {
+        if (
+          checkOutUTC &&
+          (!grouped[nip].lastCheckOutUTC || checkOutUTC > grouped[nip].lastCheckOutUTC)
+        ) {
           grouped[nip].lastCheckOutUTC = checkOutUTC;
         }
       }
@@ -267,7 +294,7 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
     });
 
     // Transform to array — mirrors dashboard's summary mapping
-    const result = Object.values(grouped).map(group => {
+    const result = Object.values(grouped).map((group) => {
       // Dashboard: totalHadir = attendanceDatesArray.length (unique dates)
       const totalHadir = group.attendanceDates.size;
       // Dashboard: totalHariKerja = totalHadir
@@ -284,8 +311,12 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
         persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
         attendanceDates: formatAttendanceDates(group.attendanceDates),
         // Convert UTC Date back to local "HH:MM" string for display
-        lastCheckIn: group.lastCheckInUTC ? extractTimeString(group.lastCheckInUTC) : 'Belum ada data',
-        lastCheckOut: group.lastCheckOutUTC ? extractTimeString(group.lastCheckOutUTC) : 'Belum ada data'
+        lastCheckIn: group.lastCheckInUTC
+          ? extractTimeString(group.lastCheckInUTC)
+          : 'Belum ada data',
+        lastCheckOut: group.lastCheckOutUTC
+          ? extractTimeString(group.lastCheckOutUTC)
+          : 'Belum ada data',
       };
     });
 
@@ -293,7 +324,7 @@ function transformKaryawanAttendance(attendanceRecords, startDate, endDate) {
   } catch (error) {
     logger.error('Error transforming karyawan attendance', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     return [];
   }
@@ -305,8 +336,18 @@ function formatAttendanceDates(datesSet) {
 
   const dates = Array.from(datesSet).sort();
   const monthNames = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
   ];
 
   // Parse YYYY-MM-DD string directly — no Date constructor needed
@@ -315,7 +356,7 @@ function formatAttendanceDates(datesSet) {
     return {
       year: parseInt(parts[0], 10),
       month: parseInt(parts[1], 10) - 1, // 0-indexed for monthNames
-      day: parseInt(parts[2], 10)
+      day: parseInt(parts[2], 10),
     };
   };
 
@@ -375,5 +416,5 @@ module.exports = {
   transformKaryawanAttendance,
   calculateWorkingDays,
   formatDateID,
-  extractTimeString
+  extractTimeString,
 };

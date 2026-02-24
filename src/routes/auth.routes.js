@@ -80,7 +80,6 @@ const router = express.Router();
  */
 router.post('/login', AuthController.login);
 
-
 router.post('/refresh', AuthController.refreshToken);
 
 /**
@@ -96,7 +95,6 @@ router.post('/refresh', AuthController.refreshToken);
  *         description: Logout berhasil
  */
 router.post('/logout', authenticateToken, AuthController.logout);
-
 
 router.post('/register', AuthController.register);
 

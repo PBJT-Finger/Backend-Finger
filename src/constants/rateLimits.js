@@ -6,10 +6,10 @@ module.exports = {
     max: 100,
     message: {
       success: false,
-      message: 'Too many requests from this IP, please try again later.'
+      message: 'Too many requests from this IP, please try again later.',
     },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
   },
 
   // Authentication endpoints (strict)
@@ -19,10 +19,10 @@ module.exports = {
     skipSuccessfulRequests: true,
     message: {
       success: false,
-      message: 'Too many authentication attempts, please try again later.'
+      message: 'Too many authentication attempts, please try again later.',
     },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
   },
 
   // Export endpoints (no limit)
@@ -30,7 +30,7 @@ module.exports = {
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 10000, // Effectively unlimited (v7 treats 0 as block-all)
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
   },
 
   // Summary/Analytics endpoints (calculation intensive)
@@ -39,10 +39,10 @@ module.exports = {
     max: 500, // Increased from 30 to allow frontend date picker usage
     message: {
       success: false,
-      message: 'Too many summary requests. Please try again in a few minutes.'
+      message: 'Too many summary requests. Please try again in a few minutes.',
     },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
   },
 
   // ADMS push endpoint (external device integration)
@@ -51,10 +51,10 @@ module.exports = {
     max: 100, // Max 100 attendance records per minute
     message: {
       success: false,
-      message: 'ADMS push rate exceeded. Maximum 100 records per minute.'
+      message: 'ADMS push rate exceeded. Maximum 100 records per minute.',
     },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
   },
 
   // Dashboard endpoints
@@ -63,9 +63,9 @@ module.exports = {
     max: 20,
     message: {
       success: false,
-      message: 'Too many dashboard requests. Please wait a moment.'
+      message: 'Too many dashboard requests. Please wait a moment.',
     },
     standardHeaders: true,
-    legacyHeaders: false
-  }
+    legacyHeaders: false,
+  },
 };

@@ -28,7 +28,7 @@ Endpoint untuk mengelola autentikasi pengguna menggunakan JWT (JSON Web Token).
 - Password di-hash menggunakan bcrypt
 - Token expired dalam 1 jam (access) dan 7 hari (refresh)
 - Rate limiting untuk mencegah brute force attack
-`
+`,
   },
   {
     name: 'User Profile',
@@ -50,7 +50,7 @@ Endpoint untuk mendapatkan dan mengupdate informasi profil pengguna yang sedang 
 - Memerlukan autentikasi (Bearer token)
 - User hanya bisa lihat dan edit profil sendiri
 - Admin dapat melihat profil user lain via endpoint User Management
-`
+`,
   },
   {
     name: 'Attendance',
@@ -81,7 +81,7 @@ Endpoint untuk operasi CRUD (Create, Read, Update, Delete) data absensi karyawan
 - Status dihitung otomatis berdasarkan jam masuk
 
 **Timezone:** Asia/Jakarta (UTC+7)
-`
+`,
   },
   {
     name: 'Report',
@@ -122,7 +122,7 @@ Endpoint untuk mendapatkan summary dan statistik absensi karyawan dalam periode 
   "records": [...]
 }
 \`\`\`
-`
+`,
   },
   {
     name: 'Dashboard',
@@ -154,8 +154,8 @@ Endpoint untuk mendapatkan metrik dan statistik sistem absensi.
 **Refresh Rate:**
 - Data di-cache selama 5 menit
 - Auto-refresh available
-`
-  }
+`,
+  },
 ];
 
 module.exports = { indonesianTags };

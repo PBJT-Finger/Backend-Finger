@@ -14,13 +14,13 @@ class AttendanceController {
 
       const whereClause = {
         jabatan: 'DOSEN',
-        is_deleted: false
+        is_deleted: false,
       };
 
       if (start_date && end_date) {
         whereClause.tanggal = {
           gte: new Date(start_date),
-          lte: new Date(end_date)
+          lte: new Date(end_date),
         };
       }
 
@@ -30,7 +30,7 @@ class AttendanceController {
 
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }]
+        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }],
       });
 
       // Transform to aggregated data
@@ -60,13 +60,13 @@ class AttendanceController {
 
       const whereClause = {
         jabatan: 'KARYAWAN',
-        is_deleted: false
+        is_deleted: false,
       };
 
       if (start_date && end_date) {
         whereClause.tanggal = {
           gte: new Date(start_date),
-          lte: new Date(end_date)
+          lte: new Date(end_date),
         };
       }
 
@@ -76,7 +76,7 @@ class AttendanceController {
 
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }]
+        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }],
       });
 
       // Transform to aggregated data
@@ -104,13 +104,13 @@ class AttendanceController {
       const { start_date, end_date, nip, id, jabatan, status, page = 1, limit = 50 } = req.query;
 
       const whereClause = {
-        is_deleted: false
+        is_deleted: false,
       };
 
       if (start_date && end_date) {
         whereClause.tanggal = {
           gte: new Date(start_date),
-          lte: new Date(end_date)
+          lte: new Date(end_date),
         };
       }
 
@@ -136,7 +136,7 @@ class AttendanceController {
         where: whereClause,
         orderBy: { tanggal: 'desc' },
         skip: skip,
-        take: parseInt(limit)
+        take: parseInt(limit),
       });
 
       return successResponse(
@@ -147,8 +147,8 @@ class AttendanceController {
             page: parseInt(page),
             limit: parseInt(limit),
             total,
-            total_pages: Math.ceil(total / parseInt(limit))
-          }
+            total_pages: Math.ceil(total / parseInt(limit)),
+          },
         },
         'Attendance retrieved successfully'
       );
@@ -187,15 +187,19 @@ class AttendanceController {
         endDate = formatDate(lastDay);
       } else if (!startDate || !endDate) {
         // Partial dates provided
-        return errorResponse(res, 'Both start_date and end_date are required for custom range', 400);
+        return errorResponse(
+          res,
+          'Both start_date and end_date are required for custom range',
+          400
+        );
       }
 
       const whereClause = {
         tanggal: {
           gte: new Date(startDate),
-          lte: new Date(endDate)
+          lte: new Date(endDate),
         },
-        is_deleted: false
+        is_deleted: false,
       };
 
       if (id || nip) {
@@ -208,13 +212,13 @@ class AttendanceController {
 
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'desc' }]
+        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'desc' }],
       });
 
       // Group by employee
       const employeeStats = {};
 
-      attendance.forEach(record => {
+      attendance.forEach((record) => {
         const key = record.nip;
         if (!employeeStats[key]) {
           employeeStats[key] = {
@@ -226,7 +230,7 @@ class AttendanceController {
             last_check_in: null,
             last_check_out: null,
             last_check_in_date: null, // Track date for check-in
-            last_check_out_date: null  // Track date for check-out
+            last_check_out_date: null, // Track date for check-out
           };
         }
 
@@ -286,8 +290,18 @@ class AttendanceController {
 
         // Indonesian month names
         const months = [
-          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+          'Januari',
+          'Februari',
+          'Maret',
+          'April',
+          'Mei',
+          'Juni',
+          'Juli',
+          'Agustus',
+          'September',
+          'Oktober',
+          'November',
+          'Desember',
         ];
 
         const firstDate = new Date(dates[0]);
@@ -326,7 +340,7 @@ class AttendanceController {
           persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
           attendanceDates: formatDateRange(attendanceDatesArray), // Format: "15-31 Mei 2025"
           lastCheckIn: formatTimeOnly(emp.last_check_in),
-          lastCheckOut: formatTimeOnly(emp.last_check_out)
+          lastCheckOut: formatTimeOnly(emp.last_check_out),
         };
       });
 
@@ -349,7 +363,7 @@ class AttendanceController {
       const { id } = req.params;
 
       const attendance = await prisma.attendance.findUnique({
-        where: { id: parseInt(id) }
+        where: { id: parseInt(id) },
       });
 
       if (!attendance) {
@@ -358,13 +372,13 @@ class AttendanceController {
 
       await prisma.attendance.update({
         where: { id: parseInt(id) },
-        data: { is_deleted: true }
+        data: { is_deleted: true },
       });
 
       logger.audit('ATTENDANCE_DELETED', req.user?.id, {
         attendance_id: id,
         nip: attendance.nip,
-        tanggal: attendance.tanggal
+        tanggal: attendance.tanggal,
       });
 
       return successResponse(res, null, 'Attendance record deleted successfully');
@@ -472,7 +486,7 @@ class AttendanceController {
 
           // Get employee info
           const employee = await prisma.employees.findUnique({
-            where: { nip: String(nip) }
+            where: { nip: String(nip) },
           });
 
           if (!employee) {
@@ -492,8 +506,8 @@ class AttendanceController {
               nip: employee.nip,
               tanggal: tanggal,
               jam_masuk: jamMasuk,
-              is_deleted: false
-            }
+              is_deleted: false,
+            },
           });
 
           if (existing) {
@@ -514,8 +528,8 @@ class AttendanceController {
               device_id: process.env.FINGERPRINT_DEVICE_ID || 'FP-MAIN-001',
               verification_method: 'SIDIK_JARI',
               status: 'HADIR',
-              is_deleted: false
-            }
+              is_deleted: false,
+            },
           });
 
           syncedCount++;
@@ -534,7 +548,7 @@ class AttendanceController {
           synced: syncedCount,
           skipped: skippedCount,
           total: logs.length,
-          errors: errors.length > 0 ? errors : undefined
+          errors: errors.length > 0 ? errors : undefined,
         },
         `Successfully synced ${syncedCount} attendance records`
       );
@@ -562,7 +576,7 @@ class AttendanceController {
           status: 'connected',
           ip: process.env.FINGERPRINT_IP || '192.168.1.201',
           port: process.env.FINGERPRINT_PORT || 4370,
-          message: 'Device is online and ready'
+          message: 'Device is online and ready',
         },
         'Device status retrieved successfully'
       );
@@ -575,7 +589,7 @@ class AttendanceController {
           ip: process.env.FINGERPRINT_IP || '192.168.1.201',
           port: process.env.FINGERPRINT_PORT || 4370,
           message: error.message,
-          error: 'Device is offline or unreachable'
+          error: 'Device is offline or unreachable',
         },
         'Device is offline'
       );
@@ -598,7 +612,7 @@ class AttendanceController {
       logger.info('Processing attendance import', {
         filename: req.file.originalname,
         size: req.file.size,
-        user: req.user?.id
+        user: req.user?.id,
       });
 
       // Process import
@@ -606,7 +620,7 @@ class AttendanceController {
         req.file.buffer,
         req.file.originalname,
         {
-          skipDuplicates: true // Default behavior: skip duplicates
+          skipDuplicates: true, // Default behavior: skip duplicates
         }
       );
 
@@ -616,7 +630,7 @@ class AttendanceController {
         total: result.total,
         imported: result.imported,
         skipped: result.skipped,
-        duplicates: result.duplicates
+        duplicates: result.duplicates,
       });
 
       // Return response based on result
@@ -635,19 +649,17 @@ class AttendanceController {
             imported: result.imported,
             skipped: result.skipped,
             duplicates: result.duplicates,
-            errors: result.errors.length
+            errors: result.errors.length,
           },
           errors: result.errors.length > 0 ? result.errors : undefined,
-          duplicateDetails: result.duplicateDetails
-        }
+          duplicateDetails: result.duplicateDetails,
+        },
       });
     } catch (error) {
       logger.error('Import attendance error:', { error: error.message, stack: error.stack });
       return errorResponse(res, `Gagal memproses file import: ${error.message}`, 500);
     }
   }
-
-
 }
 
 module.exports = AttendanceController;

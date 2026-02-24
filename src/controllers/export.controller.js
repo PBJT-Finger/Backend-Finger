@@ -4,7 +4,7 @@ const prisma = require('../config/prisma');
 const query = (sql, params = []) => prisma.$queryRawUnsafe(sql, ...params);
 const { errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 
 const { extractTimeString, formatDateID } = require('../utils/attendanceTransformer');
 
@@ -78,35 +78,37 @@ class ExportController {
       // Format data for Excel — per-date detail rows (Daily Log)
       // Use helper to fix time format (mysql2 string vs Prisma Date issue)
 
-
-      const excelData = attendance.map(record => ({
+      const excelData = attendance.map((record) => ({
         Tanggal: formatDateID(record.tanggal), // Use DD/MM/YYYY format
         ID: record.nip,
         Nama: record.nama,
         'Jam Masuk': formatTimeFixed(record.jam_masuk),
         'Jam Keluar': formatTimeFixed(record.jam_keluar),
-        Status: record.status
+        Status: record.status,
       }));
 
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
+      // Create workbook with ExcelJS
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Rekap Absensi');
 
-      // Set column widths
-      const wscols = [
-        { wch: 15 }, // Tanggal
-        { wch: 15 }, // ID
-        { wch: 25 }, // Nama
-        { wch: 12 }, // Jam Masuk
-        { wch: 12 }, // Jam Keluar
-        { wch: 12 }  // Status
+      // Set columns with headers and widths
+      worksheet.columns = [
+        { header: 'Tanggal', key: 'Tanggal', width: 15 },
+        { header: 'ID', key: 'ID', width: 15 },
+        { header: 'Nama', key: 'Nama', width: 25 },
+        { header: 'Jam Masuk', key: 'Jam Masuk', width: 14 },
+        { header: 'Jam Keluar', key: 'Jam Keluar', width: 14 },
+        { header: 'Status', key: 'Status', width: 12 },
       ];
-      ws['!cols'] = wscols;
 
-      XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absensi');
+      // Bold header row
+      worksheet.getRow(1).font = { bold: true };
 
-      // Generate buffer
-      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      // Add data rows
+      excelData.forEach((row) => worksheet.addRow(row));
+
+      // Generate buffer in memory
+      const buffer = await workbook.xlsx.writeBuffer();
 
       // Set headers for file download
       const filename = `rekap-absensi-${jabatan || 'all'}-${startDate}-to-${endDate}.xlsx`;
@@ -119,7 +121,7 @@ class ExportController {
       logger.info('Excel export generated', {
         filename,
         records: attendance.length,
-        user_id: req.user?.id
+        user_id: req.user?.id,
       });
 
       return res.send(buffer);
@@ -159,7 +161,7 @@ class ExportController {
       }
 
       // Helper function to format date to DD/MM/YYYY
-      const formatDateID = dateStr => {
+      const formatDateID = (dateStr) => {
         if (!dateStr) return '-';
         if (typeof dateStr === 'string') {
           const datePart = dateStr.split('T')[0];
@@ -178,7 +180,7 @@ class ExportController {
       const PDFDocument = require('pdfkit');
       const {
         transformDosenAttendance,
-        transformKaryawanAttendance
+        transformKaryawanAttendance,
       } = require('../utils/attendanceTransformer');
 
       // Get attendance data — deduplicate: one row per employee per date
@@ -206,7 +208,9 @@ class ExportController {
       sql += ' GROUP BY a.tanggal, a.nip, a.nama, a.jabatan';
       sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
 
-      console.log(`[ExportPDF] Query Params: startDate=${startDate}, endDate=${endDate}, jabatan=${jabatan}`);
+      console.log(
+        `[ExportPDF] Query Params: startDate=${startDate}, endDate=${endDate}, jabatan=${jabatan}`
+      );
 
       const attendance = await query(sql, params);
       console.log(`[ExportPDF] Found ${attendance.length} attendance records`);
@@ -256,7 +260,7 @@ class ExportController {
         .fontSize(12)
         .font('Helvetica')
         .text(`Periode: ${formatDateID(startDate)} s/d ${formatDateID(endDate)}`, {
-          align: 'center'
+          align: 'center',
         });
       doc.moveDown(1.5);
 
@@ -276,7 +280,7 @@ class ExportController {
           'Total Hari\nKerja',
           'Waktu Kehadiran',
           'Check In\nTerakhir',
-          'Check Out\nTerakhir'
+          'Check Out\nTerakhir',
         ];
       } else {
         // DOSEN or ALL: No, Nama, ID, Hadir, Total Hari Kerja, Waktu Kehadiran, Check In, Check Out
@@ -289,7 +293,7 @@ class ExportController {
           'Total Hari\nKerja',
           'Waktu Kehadiran',
           'Check In\nTerakhir',
-          'Check Out\nTerakhir'
+          'Check Out\nTerakhir',
         ];
       }
 
@@ -297,7 +301,7 @@ class ExportController {
       const headerHeight = 40;
 
       // Helper function to draw table header with individual cell borders
-      const drawTableHeader = startY => {
+      const drawTableHeader = (startY) => {
         let xPos = startX;
 
         doc.fontSize(9).fillColor('black').font('Helvetica-Bold');
@@ -315,7 +319,7 @@ class ExportController {
           doc.fillColor('black').text(header, xPos + 4, textY, {
             width: colWidths[i] - 8,
             align: 'center',
-            lineBreak: true
+            lineBreak: true,
           });
           xPos += colWidths[i];
         });
@@ -351,7 +355,7 @@ class ExportController {
             String(record.totalHariKerja || 0),
             record.attendanceDates || 'Belum ada data',
             record.lastCheckIn || 'Belum ada data',
-            record.lastCheckOut || 'Belum ada data'
+            record.lastCheckOut || 'Belum ada data',
           ];
         } else {
           // DOSEN or ALL data with NIP
@@ -363,7 +367,7 @@ class ExportController {
             String(record.totalHariKerja || 0),
             record.attendanceDates || 'Belum ada data',
             record.lastCheckIn || 'Belum ada data',
-            record.lastCheckOut || 'Belum ada data'
+            record.lastCheckOut || 'Belum ada data',
           ];
         }
 
@@ -386,7 +390,7 @@ class ExportController {
               width: colWidths[i] - padding * 2,
               align: align,
               lineBreak: false,
-              ellipsis: true
+              ellipsis: true,
             });
 
           xPos += colWidths[i];
@@ -401,7 +405,7 @@ class ExportController {
       logger.info('PDF export generated', {
         filename,
         records: transformedData.length,
-        user_id: req.user?.id
+        user_id: req.user?.id,
       });
     } catch (error) {
       logger.error('Export to PDF error', { error: error.message, stack: error.stack });
@@ -470,14 +474,14 @@ class ExportController {
       }
 
       // Format data for CSV
-      const csvData = attendance.map(record => {
+      const csvData = attendance.map((record) => {
         return {
           tanggal: formatDateID(record.tanggal),
           id: record.nip, // Rename nip to id
           nama: record.nama,
           jam_masuk: formatTimeFixed(record.jam_masuk),
           jam_keluar: formatTimeFixed(record.jam_keluar),
-          status: record.status
+          status: record.status,
         };
       });
 
@@ -485,15 +489,15 @@ class ExportController {
       const headers = Object.keys(csvData[0]);
       const csvRows = [
         headers.join(','), // Header row
-        ...csvData.map(row =>
+        ...csvData.map((row) =>
           headers
-            .map(header => {
+            .map((header) => {
               const value = row[header];
               // Escape commas and quotes
               return `"${String(value).replace(/"/g, '""')}"`;
             })
             .join(',')
-        )
+        ),
       ];
       const csvContent = csvRows.join('\n');
 
@@ -508,7 +512,7 @@ class ExportController {
       logger.info('CSV export generated', {
         filename,
         records: attendance.length,
-        user_id: req.user?.id
+        user_id: req.user?.id,
       });
 
       return res.send(BOM + csvContent);

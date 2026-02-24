@@ -20,7 +20,7 @@ class AppError extends Error {
       success: false,
       message: this.message,
       statusCode: this.statusCode,
-      timestamp: this.timestamp
+      timestamp: this.timestamp,
     };
   }
 }
@@ -41,7 +41,7 @@ class ValidationError extends AppError {
       success: false,
       message: this.message,
       errors: this.errors,
-      statusCode: this.statusCode
+      statusCode: this.statusCode,
     };
   }
 }
@@ -121,5 +121,5 @@ module.exports = {
   NotFoundError,
   ConflictError,
   RateLimitError,
-  DatabaseError
+  DatabaseError,
 };

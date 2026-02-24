@@ -18,9 +18,9 @@ const prismaOptions = {
   log: [
     { level: 'query', emit: 'event' },
     { level: 'error', emit: 'stdout' },
-    { level: 'warn', emit: 'stdout' }
+    { level: 'warn', emit: 'stdout' },
   ],
-  errorFormat: 'minimal'
+  errorFormat: 'minimal',
 };
 
 /**
@@ -45,7 +45,7 @@ if (process.env.NODE_ENV === 'production') {
  * Log slow queries for performance monitoring
  */
 if (process.env.NODE_ENV !== 'production') {
-  prisma.$on('query', e => {
+  prisma.$on('query', (e) => {
     if (e.duration > 100) {
       // Log queries slower than 100ms
       logger.warn(`Slow Query (${e.duration}ms): ${e.query}`);

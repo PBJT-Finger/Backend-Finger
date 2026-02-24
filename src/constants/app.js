@@ -12,26 +12,26 @@ module.exports = {
     CONFLICT: 409,
     UNPROCESSABLE_ENTITY: 422,
     TOO_MANY_REQUESTS: 429,
-    INTERNAL_SERVER_ERROR: 500
+    INTERNAL_SERVER_ERROR: 500,
   },
 
   // User Roles
   USER_ROLES: {
     SUPER_ADMIN: 'SUPER_ADMIN',
     ADMIN: 'ADMIN',
-    OPERATOR: 'OPERATOR'
+    OPERATOR: 'OPERATOR',
   },
 
   // Employee Positions
   JABATAN: {
     DOSEN: 'DOSEN',
-    KARYAWAN: 'KARYAWAN'
+    KARYAWAN: 'KARYAWAN',
   },
 
   // Attendance Types
   TIPE_ABSENSI: {
     MASUK: 'MASUK',
-    PULANG: 'PULANG'
+    PULANG: 'PULANG',
   },
 
   // Employee Status
@@ -39,7 +39,7 @@ module.exports = {
     AKTIF: 'AKTIF',
     CUTI: 'CUTI',
     RESIGN: 'RESIGN',
-    NON_AKTIF: 'NON_AKTIF'
+    NON_AKTIF: 'NON_AKTIF',
   },
 
   // Validation Constraints
@@ -51,13 +51,13 @@ module.exports = {
     DEFAULT_PAGE_SIZE: 50,
     MAX_PAGE_SIZE: 100,
     MIN_NIP_LENGTH: 10,
-    MAX_NIP_LENGTH: 50
+    MAX_NIP_LENGTH: 50,
   },
 
   // Token Settings
   TOKEN: {
     ACCESS_TOKEN_EXPIRY: '15m',
-    REFRESH_TOKEN_EXPIRY: '7d'
+    REFRESH_TOKEN_EXPIRY: '7d',
   },
 
   // Time Formats
@@ -65,7 +65,7 @@ module.exports = {
     DATE: 'YYYY-MM-DD',
     TIME: 'HH:mm:ss',
     DATETIME: 'YYYY-MM-DD HH:mm:ss',
-    ISO: 'YYYY-MM-DDTHH:mm:ss.sssZ'
+    ISO: 'YYYY-MM-DDTHH:mm:ss.sssZ',
   },
 
   // Days of Week
@@ -76,19 +76,19 @@ module.exports = {
     WEDNESDAY: 3,
     THURSDAY: 4,
     FRIDAY: 5,
-    SATURDAY: 6
+    SATURDAY: 6,
   },
 
   // Export Formats
   EXPORT_FORMAT: {
     EXCEL: 'excel',
     CSV: 'csv',
-    PDF: 'pdf'
+    PDF: 'pdf',
   },
 
   // Default Shift Times
   DEFAULT_SHIFTS: {
     MORNING: '08:00:00',
-    NIGHT: '16:00:00'
-  }
+    NIGHT: '16:00:00',
+  },
 };

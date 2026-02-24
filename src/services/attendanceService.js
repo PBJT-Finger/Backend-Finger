@@ -12,7 +12,7 @@ class AttendanceService {
       const { startDate, endDate, nip, jabatan } = filters;
 
       const whereClause = {
-        is_active: true
+        is_active: true,
       };
 
       if (nip) {
@@ -27,8 +27,8 @@ class AttendanceService {
       const employees = await prisma.employees.findMany({
         where: whereClause,
         include: {
-          shifts: true
-        }
+          shifts: true,
+        },
       });
 
       // Calculate working days (exclude weekends only)
@@ -39,7 +39,7 @@ class AttendanceService {
 
       // Get summary for each employee
       const summaries = await Promise.all(
-        employees.map(employee =>
+        employees.map((employee) =>
           this.getEmployeeSummary(
             employee,
             new Date(startDate),
@@ -49,7 +49,7 @@ class AttendanceService {
         )
       );
 
-      return summaries.filter(summary => summary !== null);
+      return summaries.filter((summary) => summary !== null);
     } catch (error) {
       logger.error('Error in getAttendanceSummary:', error);
       throw error;
@@ -67,13 +67,13 @@ class AttendanceService {
           nip: employee.nip,
           tanggal: {
             gte: startDate,
-            lte: endDate
+            lte: endDate,
           },
-          is_deleted: false
+          is_deleted: false,
         },
         orderBy: {
-          tanggal: 'asc'
-        }
+          tanggal: 'asc',
+        },
       });
 
       // Calculate statistics
@@ -85,10 +85,10 @@ class AttendanceService {
         total_working_days: totalWorkingDays,
         total_hadir: 0,
         total_terlambat: 0,
-        persentase_kehadiran: 0
+        persentase_kehadiran: 0,
       };
 
-      attendanceRecords.forEach(record => {
+      attendanceRecords.forEach((record) => {
         if (record.jam_masuk) {
           stats.total_hadir++;
         }
@@ -136,13 +136,13 @@ class AttendanceService {
           nip: nip,
           tanggal: {
             gte: new Date(startDate),
-            lte: new Date(endDate)
+            lte: new Date(endDate),
           },
-          is_deleted: false
+          is_deleted: false,
         },
         orderBy: {
-          tanggal: 'desc'
-        }
+          tanggal: 'desc',
+        },
       });
 
       return attendance;

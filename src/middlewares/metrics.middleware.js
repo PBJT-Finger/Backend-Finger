@@ -31,7 +31,7 @@ function metricsMiddleware(req, res, next) {
       {
         method: req.method,
         route: route,
-        status_code: statusCode
+        status_code: statusCode,
       },
       duration
     );
@@ -40,7 +40,7 @@ function metricsMiddleware(req, res, next) {
     httpRequestTotal.inc({
       method: req.method,
       route: route,
-      status_code: statusCode
+      status_code: statusCode,
     });
 
     // Decrement active requests

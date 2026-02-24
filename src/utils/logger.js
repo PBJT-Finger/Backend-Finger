@@ -9,7 +9,7 @@ const levels = {
   warn: 1,
   info: 2,
   http: 3,
-  debug: 4
+  debug: 4,
 };
 
 const colors = {
@@ -17,7 +17,7 @@ const colors = {
   warn: 'yellow',
   info: 'green',
   http: 'magenta',
-  debug: 'white'
+  debug: 'white',
 };
 
 winston.addColors(colors);
@@ -44,12 +44,12 @@ const transports = [
       winston.format.timestamp(),
       winston.format.errors({ stack: true }),
       winston.format.json()
-    )
+    ),
   }),
   new winston.transports.File({
     filename: path.join(logsDir, 'combined.log'),
-    format
-  })
+    format,
+  }),
 ];
 
 // Console transport untuk melihat detail error saat development
@@ -64,7 +64,7 @@ if (process.env.NODE_ENV !== 'production') {
           const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
           return `${timestamp} [${level}]: ${message}${metaStr}`;
         })
-      )
+      ),
     })
   );
 }
@@ -73,7 +73,7 @@ const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   levels,
   format,
-  transports
+  transports,
 });
 
 // Add audit method for audit trail logging
@@ -82,7 +82,7 @@ logger.audit = function (event, userId, metadata = {}) {
     event,
     userId,
     ...metadata,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 };
 

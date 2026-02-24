@@ -53,7 +53,7 @@ const validateSummary = [
     .optional()
     .isInt({ min: 1, max: 500 })
     .withMessage('limit must be between 1 and 500')
-    .toInt()
+    .toInt(),
 ];
 
 /**
@@ -77,15 +77,12 @@ const validateAttendanceFilters = [
     .isISO8601()
     .withMessage('start_date must be valid date (YYYY-MM-DD)'),
 
-  query('end_date')
-    .optional()
-    .isISO8601()
-    .withMessage('end_date must be valid date (YYYY-MM-DD)'),
+  query('end_date').optional().isISO8601().withMessage('end_date must be valid date (YYYY-MM-DD)'),
 
   query('tipe_absensi')
     .optional()
     .isIn(['MASUK', 'PULANG'])
-    .withMessage('tipe_absensi must be MASUK or PULANG')
+    .withMessage('tipe_absensi must be MASUK or PULANG'),
 ];
 
 /**
@@ -97,7 +94,7 @@ const validateAttendanceId = [
     .withMessage('Attendance ID is required')
     .isInt({ min: 1 })
     .withMessage('Attendance ID must be positive integer')
-    .toInt()
+    .toInt(),
 ];
 
 /**
@@ -116,7 +113,7 @@ const validateMonthlyParams = [
     .withMessage('tahun is required')
     .isInt({ min: 2020, max: 2100 })
     .withMessage('tahun must be between 2020 and 2100')
-    .toInt()
+    .toInt(),
 ];
 
 /**
@@ -131,7 +128,7 @@ const validateRekapRange = [
   query('end_date')
     .optional()
     .isISO8601()
-    .withMessage('end_date must be valid ISO date (YYYY-MM-DD)')
+    .withMessage('end_date must be valid ISO date (YYYY-MM-DD)'),
 ];
 
 /**
@@ -144,7 +141,7 @@ const validateImportFile = (req, res, next) => {
     return res.status(400).json({
       success: false,
       message: 'File tidak ditemukan',
-      errors: ['Silakan upload file Excel (.xlsx, .xls) atau CSV (.csv)']
+      errors: ['Silakan upload file Excel (.xlsx, .xls) atau CSV (.csv)'],
     });
   }
 
@@ -152,18 +149,20 @@ const validateImportFile = (req, res, next) => {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
     'application/vnd.ms-excel', // .xls
     'text/csv', // .csv
-    'application/csv'
+    'application/csv',
   ];
 
   const allowedExtensions = ['.xlsx', '.xls', '.csv'];
-  const fileExtension = req.file.originalname.toLowerCase().substring(req.file.originalname.lastIndexOf('.'));
+  const fileExtension = req.file.originalname
+    .toLowerCase()
+    .substring(req.file.originalname.lastIndexOf('.'));
 
   // Validate MIME type
   if (!allowedMimeTypes.includes(req.file.mimetype) && !allowedExtensions.includes(fileExtension)) {
     return res.status(400).json({
       success: false,
       message: 'Format file tidak valid',
-      errors: ['Hanya menerima file Excel (.xlsx, .xls) atau CSV (.csv)']
+      errors: ['Hanya menerima file Excel (.xlsx, .xls) atau CSV (.csv)'],
     });
   }
 
@@ -173,7 +172,7 @@ const validateImportFile = (req, res, next) => {
     return res.status(400).json({
       success: false,
       message: 'Ukuran file terlalu besar',
-      errors: ['Ukuran file maksimal 5MB']
+      errors: ['Ukuran file maksimal 5MB'],
     });
   }
 
@@ -186,5 +185,5 @@ module.exports = {
   validateAttendanceId,
   validateMonthlyParams,
   validateRekapRange,
-  validateImportFile
+  validateImportFile,
 };

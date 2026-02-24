@@ -14,8 +14,8 @@ const emailConfig = {
   secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD
-  }
+    pass: process.env.SMTP_PASSWORD,
+  },
 };
 
 const fromEmail = process.env.EMAIL_FROM || 'noreply@fingerattendance.com';
@@ -61,7 +61,7 @@ const sendEmail = async (to, subject, html, text = '') => {
     to,
     subject,
     html,
-    text: text || html.replace(/<[^>]*>/g, '') // Strip HTML tags for text version
+    text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML tags for text version
   };
 
   try {
@@ -70,7 +70,7 @@ const sendEmail = async (to, subject, html, text = '') => {
       logger.info('📧 EMAIL (Console Mode - SMTP not configured)', {
         to,
         subject,
-        preview: html.substring(0, 200)
+        preview: html.substring(0, 200),
       });
       console.log('\n=== EMAIL PREVIEW (SMTP belum dikonfigurasi) ===');
       console.log(`To: ${to}`);
@@ -85,7 +85,7 @@ const sendEmail = async (to, subject, html, text = '') => {
     logger.info('Email sent successfully', {
       to,
       subject,
-      messageId: info.messageId
+      messageId: info.messageId,
     });
 
     return { success: true, messageId: info.messageId };
@@ -93,7 +93,7 @@ const sendEmail = async (to, subject, html, text = '') => {
     logger.error('Failed to send email', {
       to,
       subject,
-      error: error.message
+      error: error.message,
     });
     throw new Error('Gagal mengirim email. Silakan coba lagi.');
   }
@@ -294,5 +294,5 @@ module.exports = {
   sendEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,
-  sendPasswordResetConfirmation
+  sendPasswordResetConfirmation,
 };

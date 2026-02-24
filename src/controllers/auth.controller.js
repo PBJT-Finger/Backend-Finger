@@ -11,12 +11,12 @@ const {
   registerResponse,
   passwordResetResponse,
   successResponse,
-  errorResponse
+  errorResponse,
 } = require('../utils/responseFormatter');
 const {
   sendPasswordResetEmail,
   sendWelcomeEmail,
-  sendPasswordResetConfirmation
+  sendPasswordResetConfirmation,
 } = require('../services/emailService');
 
 class AuthController {
@@ -33,7 +33,7 @@ class AuthController {
         if (!errors.isEmpty()) {
           logger.warn('Login validation failed', {
             ip: req.ip,
-            errors: errors.array()
+            errors: errors.array(),
           });
           return errorResponse(res, errors.array()[0].msg, 400);
         }
@@ -42,7 +42,7 @@ class AuthController {
 
         // Find admin by email
         const admin = await prisma.admins.findFirst({
-          where: { email, is_active: true }
+          where: { email, is_active: true },
         });
 
         if (!admin) {
@@ -62,13 +62,13 @@ class AuthController {
         // Update last login
         await prisma.admins.update({
           where: { id: admin.id },
-          data: { last_login: new Date() }
+          data: { last_login: new Date() },
         });
 
         logger.audit('LOGIN_SUCCESS', admin.id, {
           username: admin.username,
           ip: req.ip,
-          userAgent: req.get('User-Agent')
+          userAgent: req.get('User-Agent'),
         });
 
         return loginResponse(res, admin, accessToken, refreshToken);
@@ -76,7 +76,7 @@ class AuthController {
         logger.error('Login error', { error: error.message, stack: error.stack, ip: req.ip });
         return errorResponse(res, 'Internal server error', 500);
       }
-    }
+    },
   ];
 
   static register = [
@@ -105,7 +105,7 @@ class AuthController {
         // Check if username exists
         const existingUsername = await prisma.admins.findFirst({
           where: { username },
-          select: { id: true }
+          select: { id: true },
         });
         if (existingUsername) {
           return errorResponse(res, 'Username sudah digunakan', 400);
@@ -114,7 +114,7 @@ class AuthController {
         // Check if email exists
         const existing = await prisma.admins.findFirst({
           where: { email },
-          select: { id: true }
+          select: { id: true },
         });
         if (existing) {
           return errorResponse(res, 'Email sudah terdaftar', 400);
@@ -131,15 +131,15 @@ class AuthController {
             role: 'admin',
             is_active: true,
             created_at: new Date(),
-            updated_at: new Date()
+            updated_at: new Date(),
           },
           select: {
             id: true,
             username: true,
             email: true,
             role: true,
-            is_active: true
-          }
+            is_active: true,
+          },
         });
 
         try {
@@ -155,7 +155,7 @@ class AuthController {
         logger.error('Register error', { error: error.message, stack: error.stack, ip: req.ip });
         return errorResponse(res, 'Gagal mendaftar. Silakan coba lagi.', 500);
       }
-    }
+    },
   ];
 
   /**
@@ -174,7 +174,7 @@ class AuthController {
         const { email } = req.body;
 
         const admin = await prisma.admins.findFirst({
-          where: { email, is_active: true }
+          where: { email, is_active: true },
         });
 
         if (!admin) {
@@ -187,7 +187,7 @@ class AuthController {
 
         // Delete old unused reset requests
         await prisma.password_resets.deleteMany({
-          where: { admin_id: admin.id, used_at: null }
+          where: { admin_id: admin.id, used_at: null },
         });
 
         // Create new reset request
@@ -197,8 +197,8 @@ class AuthController {
             email: admin.email,
             code,
             expires_at: expiresAt,
-            created_at: new Date()
-          }
+            created_at: new Date(),
+          },
         });
 
         try {
@@ -215,11 +215,11 @@ class AuthController {
         logger.error('Forgot password error', {
           error: error.message,
           stack: error.stack,
-          ip: req.ip
+          ip: req.ip,
         });
         return errorResponse(res, 'Terjadi kesalahan. Silakan coba lagi.', 500);
       }
-    }
+    },
   ];
 
   /**
@@ -245,7 +245,7 @@ class AuthController {
 
         const resetEntry = await prisma.password_resets.findFirst({
           where: { email, code, used_at: null },
-          include: { admins: { select: { is_active: true } } }
+          include: { admins: { select: { is_active: true } } },
         });
 
         if (!resetEntry || !resetEntry.admins?.is_active) {
@@ -262,7 +262,7 @@ class AuthController {
 
         await prisma.password_resets.update({
           where: { id: resetEntry.id },
-          data: { reset_token: resetToken }
+          data: { reset_token: resetToken },
         });
 
         logger.audit('RESET_CODE_VERIFIED', resetEntry.admin_id, { email, ip: req.ip });
@@ -272,7 +272,7 @@ class AuthController {
         logger.error('Verify code error', { error: error.message, stack: error.stack, ip: req.ip });
         return errorResponse(res, 'Terjadi kesalahan. Silakan coba lagi.', 500);
       }
-    }
+    },
   ];
 
   /**
@@ -297,7 +297,7 @@ class AuthController {
 
         const resetEntry = await prisma.password_resets.findFirst({
           where: { reset_token: resetToken, used_at: null },
-          include: { admins: { select: { is_active: true, username: true } } }
+          include: { admins: { select: { is_active: true, username: true } } },
         });
 
         if (!resetEntry || !resetEntry.admins?.is_active) {
@@ -316,12 +316,12 @@ class AuthController {
         await prisma.$transaction([
           prisma.admins.update({
             where: { id: resetEntry.admin_id },
-            data: { password_hash: hashedPassword, updated_at: new Date() }
+            data: { password_hash: hashedPassword, updated_at: new Date() },
           }),
           prisma.password_resets.update({
             where: { id: resetEntry.id },
-            data: { used_at: new Date() }
-          })
+            data: { used_at: new Date() },
+          }),
         ]);
 
         try {
@@ -329,13 +329,13 @@ class AuthController {
         } catch (emailError) {
           logger.warn('Failed to send password reset confirmation email', {
             email: resetEntry.email,
-            error: emailError.message
+            error: emailError.message,
           });
         }
 
         logger.audit('PASSWORD_RESET_COMPLETED', resetEntry.admin_id, {
           email: resetEntry.email,
-          ip: req.ip
+          ip: req.ip,
         });
 
         return passwordResetResponse(res, null, 'Password berhasil direset');
@@ -343,11 +343,11 @@ class AuthController {
         logger.error('Reset password error', {
           error: error.message,
           stack: error.stack,
-          ip: req.ip
+          ip: req.ip,
         });
         return errorResponse(res, 'Gagal mereset password. Silakan coba lagi.', 500);
       }
-    }
+    },
   ];
 
   /**
@@ -370,7 +370,7 @@ class AuthController {
       const decoded = verifyRefreshToken(refresh_token);
 
       const admin = await prisma.admins.findUnique({
-        where: { id: decoded.id }
+        where: { id: decoded.id },
       });
 
       if (!admin || !admin.is_active) {
@@ -392,8 +392,8 @@ class AuthController {
             access_token: accessToken,
             refresh_token: newRefreshToken,
             token_type: 'Bearer',
-            expires_in: 15 * 60
-          }
+            expires_in: 15 * 60,
+          },
         },
         'Tokens refreshed successfully'
       );
@@ -426,7 +426,7 @@ class AuthController {
       logger.audit('LOGOUT', req.user.id, {
         username: req.user.username,
         ip: req.ip,
-        tokensBlacklisted
+        tokensBlacklisted,
       });
 
       return successResponse(
@@ -442,4 +442,3 @@ class AuthController {
 }
 
 module.exports = AuthController;
-

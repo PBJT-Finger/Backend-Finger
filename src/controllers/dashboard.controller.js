@@ -21,36 +21,36 @@ class DashboardController {
         where: {
           tanggal: {
             gte: today,
-            lt: tomorrow
+            lt: tomorrow,
           },
-          is_deleted: false
-        }
+          is_deleted: false,
+        },
       });
 
       // Calculate statistics
       const stats = {
         today: {
           total_attendance: todayAttendance.length,
-          unique_employees: new Set(todayAttendance.map(a => a.nip)).size,
-          hadir: todayAttendance.filter(a => a.jam_masuk !== null).length,
-          terlambat: todayAttendance.filter(a => a.status === 'TERLAMBAT').length,
-          dosen: todayAttendance.filter(a => a.jabatan === 'DOSEN').length,
-          karyawan: todayAttendance.filter(a => a.jabatan === 'KARYAWAN').length
-        }
+          unique_employees: new Set(todayAttendance.map((a) => a.nip)).size,
+          hadir: todayAttendance.filter((a) => a.jam_masuk !== null).length,
+          terlambat: todayAttendance.filter((a) => a.status === 'TERLAMBAT').length,
+          dosen: todayAttendance.filter((a) => a.jabatan === 'DOSEN').length,
+          karyawan: todayAttendance.filter((a) => a.jabatan === 'KARYAWAN').length,
+        },
       };
 
       // Get total employees
       const [dosenCount, karyawanCount, deviceCount] = await Promise.all([
         prisma.employees.count({ where: { jabatan: 'DOSEN', is_active: true } }),
         prisma.employees.count({ where: { jabatan: 'KARYAWAN', is_active: true } }),
-        prisma.devices.count({ where: { is_active: true } })
+        prisma.devices.count({ where: { is_active: true } }),
       ]);
 
       stats.total = {
         employees: dosenCount + karyawanCount,
         dosen: dosenCount,
         karyawan: karyawanCount,
-        devices: deviceCount
+        devices: deviceCount,
       };
 
       // Calculate attendance percentage
@@ -67,23 +67,23 @@ class DashboardController {
         where: {
           tanggal: {
             gte: firstDayOfMonth,
-            lt: firstDayOfNextMonth
+            lt: firstDayOfNextMonth,
           },
-          is_deleted: false
-        }
+          is_deleted: false,
+        },
       });
 
       stats.monthly = {
         total_attendance: monthlyCount,
         month: today.getMonth() + 1,
-        year: today.getFullYear()
+        year: today.getFullYear(),
       };
 
       // Recent attendance (last 10)
       const recentAttendance = await prisma.attendance.findMany({
         where: { is_deleted: false },
         orderBy: { created_at: 'desc' },
-        take: 10
+        take: 10,
       });
 
       return successResponse(
@@ -91,7 +91,7 @@ class DashboardController {
         {
           statistics: stats,
           recent_attendance: recentAttendance,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
         'Dashboard statistics retrieved successfully'
       );
@@ -116,15 +116,15 @@ class DashboardController {
       const attendance = await prisma.attendance.findMany({
         where: {
           tanggal: { gte: startDate },
-          is_deleted: false
+          is_deleted: false,
         },
-        orderBy: { tanggal: 'asc' }
+        orderBy: { tanggal: 'asc' },
       });
 
       // Group by date
       const dailyStats = {};
 
-      attendance.forEach(record => {
+      attendance.forEach((record) => {
         const day = record.tanggal.toISOString().split('T')[0];
         if (!dailyStats[day]) {
           dailyStats[day] = {
@@ -133,7 +133,7 @@ class DashboardController {
             hadir: 0,
             terlambat: 0,
             dosen: 0,
-            karyawan: 0
+            karyawan: 0,
           };
         }
 
@@ -153,8 +153,8 @@ class DashboardController {
           period: {
             start_date: startDate.toISOString().split('T')[0],
             end_date: new Date().toISOString().split('T')[0],
-            days: parseInt(days)
-          }
+            days: parseInt(days),
+          },
         },
         'Attendance trends retrieved successfully'
       );

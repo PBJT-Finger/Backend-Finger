@@ -14,11 +14,11 @@ class DeviceController {
           device_id: true,
           location: true,
           is_active: true,
-          created_at: true
+          created_at: true,
         },
         orderBy: {
-          created_at: 'desc'
-        }
+          created_at: 'desc',
+        },
       });
 
       return successResponse(res, devices, 'Devices retrieved successfully');

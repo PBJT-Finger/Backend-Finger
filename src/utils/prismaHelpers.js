@@ -37,7 +37,7 @@ async function getDatabaseStats() {
       prisma.attendance.count(),
       prisma.devices.count(),
       prisma.shifts.count(),
-      prisma.admins.count()
+      prisma.admins.count(),
     ]);
 
     return {
@@ -46,7 +46,7 @@ async function getDatabaseStats() {
       devices,
       shifts,
       admins,
-      total: employees + attendance + devices + shifts + admins
+      total: employees + attendance + devices + shifts + admins,
     };
   } catch (error) {
     logger.error('Error getting database stats:', error);
@@ -120,5 +120,5 @@ module.exports = {
   disconnect,
   executeRawQuery,
   formatTime,
-  formatDate
+  formatDate,
 };

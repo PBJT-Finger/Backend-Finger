@@ -27,7 +27,7 @@ const errorHandler = (err, req, res, next) => {
       path: req.path,
       method: req.method,
       ip: req.ip,
-      userId: req.user?.id
+      userId: req.user?.id,
     });
   } else {
     // Programming errors (unexpected)
@@ -39,7 +39,7 @@ const errorHandler = (err, req, res, next) => {
       path: req.path,
       method: req.method,
       ip: req.ip,
-      userId: req.user?.id
+      userId: req.user?.id,
     });
   }
 
@@ -48,7 +48,7 @@ const errorHandler = (err, req, res, next) => {
   const response = {
     success: false,
     message: error.message,
-    statusCode: error.statusCode
+    statusCode: error.statusCode,
   };
 
   // Include errors array for validation errors
@@ -73,12 +73,12 @@ const notFoundHandler = (req, res, next) => {
   logger.warn('Route not found', {
     path: req.path,
     method: req.method,
-    ip: req.ip
+    ip: req.ip,
   });
 
   res.status(HTTP_STATUS.NOT_FOUND).json({
     success: false,
-    message: `Route ${req.method} ${req.path} not found`
+    message: `Route ${req.method} ${req.path} not found`,
   });
 };
 
@@ -86,7 +86,7 @@ const notFoundHandler = (req, res, next) => {
  * Async handler wrapper
  * Wraps async route handlers to catch errors
  */
-const asyncHandler = fn => {
+const asyncHandler = (fn) => {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
@@ -95,5 +95,5 @@ const asyncHandler = fn => {
 module.exports = {
   errorHandler,
   notFoundHandler,
-  asyncHandler
+  asyncHandler,
 };

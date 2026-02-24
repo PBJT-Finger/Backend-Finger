@@ -31,7 +31,7 @@ const initializeApp = async () => {
   } catch (error) {
     logger.error('Failed to initialize application', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     process.exit(1);
   }
@@ -54,16 +54,16 @@ const startServer = async () => {
       logger.info(`📖 Dokumentasi Lengkap tersedia di: http://localhost:${PORT}/finger-api/docs/`);
     });
 
-    server.on('error', error => {
+    server.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
         logger.error(`❌ Port ${PORT} sudah digunakan!`);
-        logger.error('💡 Solusi: Matikan aplikasi lain di port 3333 atau gunakan port berbeda');
+        logger.error(`💡 Solusi: Matikan aplikasi lain di port ${PORT} atau gunakan port berbeda`);
         logger.error(`   Coba: PORT=3001 npm run dev`);
         process.exit(1);
       } else {
         logger.error('Server error:', {
           error: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
         process.exit(1);
       }
@@ -71,14 +71,14 @@ const startServer = async () => {
   } catch (error) {
     logger.error('Failed to start server', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     process.exit(1);
   }
 };
 
 // Graceful shutdown handler
-const gracefulShutdown = async signal => {
+const gracefulShutdown = async (signal) => {
   logger.info(`${signal} received. Starting graceful shutdown...`);
 
   if (server) {
@@ -98,7 +98,7 @@ const gracefulShutdown = async signal => {
         process.exit(0);
       } catch (error) {
         logger.error('Error during graceful shutdown', {
-          error: error.message
+          error: error.message,
         });
         process.exit(1);
       }
@@ -119,10 +119,10 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions
-process.on('uncaughtException', error => {
+process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception', {
     error: error.message,
-    stack: error.stack
+    stack: error.stack,
   });
   gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
@@ -131,11 +131,10 @@ process.on('uncaughtException', error => {
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection', {
     reason: reason,
-    promise: promise
+    promise: promise,
   });
   gracefulShutdown('UNHANDLED_REJECTION');
 });
 
 // Start the server
 startServer();
-

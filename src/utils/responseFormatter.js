@@ -13,7 +13,7 @@
 const successResponse = (res, data = null, message = 'Success', statusCode = 200) => {
   const response = {
     success: true,
-    message
+    message,
   };
 
   if (data !== null) {
@@ -32,7 +32,7 @@ const successResponse = (res, data = null, message = 'Success', statusCode = 200
 const errorResponse = (res, message = 'An error occurred', statusCode = 400) => {
   return res.status(statusCode).json({
     success: false,
-    message
+    message,
   });
 };
 
@@ -54,15 +54,15 @@ const loginResponse = (res, user, token, refreshToken = null, message = 'Login b
         email: user.email,
         username: user.username,
         role: user.role,
-        name: user.username // Using username as name for now
+        name: user.username, // Using username as name for now
       },
       tokens: {
         access_token: token,
         refresh_token: refreshToken,
         token_type: 'Bearer',
-        expires_in: 15 * 60 // 15 minutes in seconds
-      }
-    }
+        expires_in: 15 * 60, // 15 minutes in seconds
+      },
+    },
   };
 
   return res.status(200).json(response);
@@ -84,8 +84,8 @@ const paginatedResponse = (res, data, pagination, message = 'Data retrieved succ
       page: pagination.page,
       limit: pagination.limit,
       total: pagination.total,
-      totalPages: pagination.totalPages
-    }
+      totalPages: pagination.totalPages,
+    },
   });
 };
 
@@ -102,8 +102,8 @@ const registerResponse = (res, user, message = 'Registrasi berhasil. Silakan log
     user: {
       id: user.id,
       email: user.email,
-      username: user.username
-    }
+      username: user.username,
+    },
   });
 };
 
@@ -120,7 +120,7 @@ const passwordResetResponse = (
 ) => {
   const response = {
     success: true,
-    message
+    message,
   };
 
   if (data) {
@@ -136,5 +136,5 @@ module.exports = {
   loginResponse,
   paginatedResponse,
   registerResponse,
-  passwordResetResponse
+  passwordResetResponse,
 };

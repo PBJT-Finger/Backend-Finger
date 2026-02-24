@@ -22,7 +22,7 @@ class ADMSController {
         waktu_absensi,
         tipe_absensi,
         verifikasi = 'SIDIK_JARI',
-        api_key
+        api_key,
       } = req.body;
 
       // Validate required fields (jabatan is no longer required - will be auto-detected)
@@ -34,12 +34,12 @@ class ADMSController {
       const employee = await prisma.employees.findFirst({
         where: {
           nip: nip,
-          is_active: true
+          is_active: true,
         },
         select: {
           jabatan: true,
-          nama: true
-        }
+          nama: true,
+        },
       });
 
       if (!employee) {
@@ -57,8 +57,8 @@ class ADMSController {
         where: {
           nip: nip,
           tanggal: attendanceDate,
-          is_deleted: false
-        }
+          is_deleted: false,
+        },
       });
 
       let recordId;
@@ -69,14 +69,14 @@ class ADMSController {
           // Update jam_masuk if not set
           const updated = await prisma.attendance.update({
             where: { id: existingRecord.id },
-            data: { jam_masuk: waktu_absensi }
+            data: { jam_masuk: waktu_absensi },
           });
           recordId = updated.id;
         } else if (tipe_absensi === 'PULANG' && !existingRecord.jam_keluar) {
           // Update jam_keluar if not set
           const updated = await prisma.attendance.update({
             where: { id: existingRecord.id },
-            data: { jam_keluar: waktu_absensi }
+            data: { jam_keluar: waktu_absensi },
           });
           recordId = updated.id;
         } else {
@@ -100,7 +100,7 @@ class ADMSController {
           cloud_id: cloud_id || null, // Cloud system identifier
           verification_method: verifikasi || 'SIDIK_JARI', // Verification method
           status: 'HADIR',
-          is_deleted: false
+          is_deleted: false,
         };
 
         // Set jam_masuk or jam_keluar based on tipe
@@ -113,7 +113,7 @@ class ADMSController {
         }
 
         const result = await prisma.attendance.create({
-          data: insertData
+          data: insertData,
         });
 
         recordId = result.id;
@@ -123,7 +123,7 @@ class ADMSController {
         nip,
         device_id,
         tipe_absensi,
-        tanggal: tanggal_absensi
+        tanggal: tanggal_absensi,
       });
 
       return successResponse(
@@ -132,7 +132,7 @@ class ADMSController {
           id: recordId,
           nip,
           tanggal: tanggal_absensi,
-          tipe: tipe_absensi
+          tipe: tipe_absensi,
         },
         'Attendance recorded successfully',
         201
@@ -140,7 +140,7 @@ class ADMSController {
     } catch (error) {
       logger.error('ADMS push attendance error', {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
       return errorResponse(res, 'Failed to record attendance', 500);
     }
@@ -157,7 +157,7 @@ class ADMSController {
         {
           service: 'ADMS Fingerprint Integration',
           timestamp: new Date().toISOString(),
-          status: 'operational'
+          status: 'operational',
         },
         'ADMS service is healthy'
       );

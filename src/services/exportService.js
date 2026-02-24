@@ -1,8 +1,6 @@
 // src/services/exportService.js
-
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
-const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const fs = require('fs');
 const path = require('path');
 
@@ -43,24 +41,28 @@ const exportSummaryData = async (data, format, filename) => {
 };
 
 const exportToExcel = async (data, filePath) => {
-  // Transform data for Excel format
-  const excelData = data.map(record => ({
-    'Cloud ID': record.cloud_id,
-    'Device ID': record.device_id,
-    'User ID': record.user_id,
-    Nama: record.nama,
-    'Tanggal Absensi': record.tanggal_absensi,
-    'Waktu Absensi': record.waktu_absensi,
-    Verifikasi: record.verifikasi,
-    'Tipe Absensi': record.tipe_absensi,
-    'Tanggal Upload': record.tanggal_upload,
-    'Kategori User': record.kategori_user
-  }));
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Attendance Data');
 
-  const ws = XLSX.utils.json_to_sheet(excelData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Attendance Data');
-  XLSX.writeFile(wb, filePath);
+  sheet.columns = [
+    { header: 'Cloud ID', key: 'cloud_id', width: 15 },
+    { header: 'Device ID', key: 'device_id', width: 15 },
+    { header: 'User ID', key: 'user_id', width: 15 },
+    { header: 'Nama', key: 'nama', width: 25 },
+    { header: 'Tanggal Absensi', key: 'tanggal_absensi', width: 18 },
+    { header: 'Waktu Absensi', key: 'waktu_absensi', width: 15 },
+    { header: 'Verifikasi', key: 'verifikasi', width: 15 },
+    { header: 'Tipe Absensi', key: 'tipe_absensi', width: 15 },
+    { header: 'Tanggal Upload', key: 'tanggal_upload', width: 18 },
+    { header: 'Kategori User', key: 'kategori_user', width: 15 },
+  ];
+
+  // Bold header row
+  sheet.getRow(1).font = { bold: true };
+
+  data.forEach((record) => sheet.addRow(record));
+
+  await workbook.xlsx.writeFile(filePath);
   return filePath;
 };
 
@@ -73,7 +75,6 @@ const exportToPDF = async (data, filePath) => {
   doc.fontSize(12).text(`Total Records: ${data.length}`, { align: 'left' });
   doc.moveDown();
 
-  // Table headers
   const headers = ['No', 'Nama', 'User ID', 'Tanggal', 'Waktu', 'Tipe'];
   let yPosition = doc.y + 20;
 
@@ -83,10 +84,8 @@ const exportToPDF = async (data, filePath) => {
 
   doc.moveDown();
 
-  // Table data
   data.forEach((record, index) => {
     if (yPosition > 700) {
-      // New page if needed
       doc.addPage();
       yPosition = 50;
     }
@@ -97,7 +96,7 @@ const exportToPDF = async (data, filePath) => {
       record.user_id,
       record.tanggal_absensi,
       record.waktu_absensi,
-      record.tipe_absensi
+      record.tipe_absensi,
     ];
 
     rowData.forEach((cell, cellIndex) => {
@@ -108,49 +107,69 @@ const exportToPDF = async (data, filePath) => {
   });
 
   doc.end();
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     doc.on('end', () => resolve(filePath));
   });
 };
 
 const exportToCSV = async (data, filePath) => {
-  const csvWriter = createCsvWriter({
-    path: filePath,
-    header: [
-      { id: 'cloud_id', title: 'Cloud ID' },
-      { id: 'device_id', title: 'Device ID' },
-      { id: 'user_id', title: 'User ID' },
-      { id: 'nama', title: 'Nama' },
-      { id: 'tanggal_absensi', title: 'Tanggal Absensi' },
-      { id: 'waktu_absensi', title: 'Waktu Absensi' },
-      { id: 'verifikasi', title: 'Verifikasi' },
-      { id: 'tipe_absensi', title: 'Tipe Absensi' },
-      { id: 'tanggal_upload', title: 'Tanggal Upload' },
-      { id: 'kategori_user', title: 'Kategori User' }
-    ]
+  const headers = [
+    'cloud_id',
+    'device_id',
+    'user_id',
+    'nama',
+    'tanggal_absensi',
+    'waktu_absensi',
+    'verifikasi',
+    'tipe_absensi',
+    'tanggal_upload',
+    'kategori_user',
+  ];
+  const headerLabels = [
+    'Cloud ID',
+    'Device ID',
+    'User ID',
+    'Nama',
+    'Tanggal Absensi',
+    'Waktu Absensi',
+    'Verifikasi',
+    'Tipe Absensi',
+    'Tanggal Upload',
+    'Kategori User',
+  ];
+
+  const rows = [headerLabels.join(',')];
+  data.forEach((record) => {
+    const row = headers.map((h) => `"${String(record[h] ?? '').replace(/"/g, '""')}"`);
+    rows.push(row.join(','));
   });
-  await csvWriter.writeRecords(data);
+
+  fs.writeFileSync(filePath, '\uFEFF' + rows.join('\n'), 'utf8');
   return filePath;
 };
 
 const exportSummaryToExcel = async (data, filePath) => {
-  const excelData = data.map(record => ({
-    No: record.no,
-    Nama: record.nama,
-    ID: record.nip,
-    Jabatan: record.jabatan,
-    Hadir: record.hadir,
-    'Total Hari Kerja': record.total_hari_kerja,
-    Terlambat: record.terlambat,
-    Persentase: record.persentase,
-    'Check In Terakhir': record.check_in_terakhir,
-    'Check Out Terakhir': record.check_out_terakhir
-  }));
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Rekap Data');
 
-  const ws = XLSX.utils.json_to_sheet(excelData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Rekap Data');
-  XLSX.writeFile(wb, filePath);
+  sheet.columns = [
+    { header: 'No', key: 'no', width: 6 },
+    { header: 'Nama', key: 'nama', width: 25 },
+    { header: 'ID', key: 'nip', width: 15 },
+    { header: 'Jabatan', key: 'jabatan', width: 12 },
+    { header: 'Hadir', key: 'hadir', width: 8 },
+    { header: 'Total Hari Kerja', key: 'total_hari_kerja', width: 16 },
+    { header: 'Terlambat', key: 'terlambat', width: 10 },
+    { header: 'Persentase', key: 'persentase', width: 12 },
+    { header: 'Check In Terakhir', key: 'check_in_terakhir', width: 18 },
+    { header: 'Check Out Terakhir', key: 'check_out_terakhir', width: 18 },
+  ];
+
+  sheet.getRow(1).font = { bold: true };
+
+  data.forEach((record) => sheet.addRow(record));
+
+  await workbook.xlsx.writeFile(filePath);
   return filePath;
 };
 
@@ -161,7 +180,7 @@ const exportSummaryToPDF = async (data, filePath) => {
   doc.fontSize(16).text('Rekap Absensi', { align: 'center' });
   doc.moveDown();
 
-  data.forEach((record, index) => {
+  data.forEach((record) => {
     doc.fontSize(12).text(`No: ${record.no}`);
     doc.text(`Nama: ${record.nama}`);
     doc.text(`ID: ${record.nip}`);
@@ -180,22 +199,38 @@ const exportSummaryToPDF = async (data, filePath) => {
 };
 
 const exportSummaryToCSV = async (data, filePath) => {
-  const csvWriter = createCsvWriter({
-    path: filePath,
-    header: [
-      { id: 'no', title: 'No' },
-      { id: 'nama', title: 'Nama' },
-      { id: 'nip', title: 'ID' },
-      { id: 'jabatan', title: 'Jabatan' },
-      { id: 'hadir', title: 'Hadir' },
-      { id: 'total_hari_kerja', title: 'Total Hari Kerja' },
-      { id: 'terlambat', title: 'Terlambat' },
-      { id: 'persentase', title: 'Persentase' },
-      { id: 'check_in_terakhir', title: 'Check In Terakhir' },
-      { id: 'check_out_terakhir', title: 'Check Out Terakhir' }
-    ]
+  const headers = [
+    'no',
+    'nama',
+    'nip',
+    'jabatan',
+    'hadir',
+    'total_hari_kerja',
+    'terlambat',
+    'persentase',
+    'check_in_terakhir',
+    'check_out_terakhir',
+  ];
+  const headerLabels = [
+    'No',
+    'Nama',
+    'ID',
+    'Jabatan',
+    'Hadir',
+    'Total Hari Kerja',
+    'Terlambat',
+    'Persentase',
+    'Check In Terakhir',
+    'Check Out Terakhir',
+  ];
+
+  const rows = [headerLabels.join(',')];
+  data.forEach((record) => {
+    const row = headers.map((h) => `"${String(record[h] ?? '').replace(/"/g, '""')}"`);
+    rows.push(row.join(','));
   });
-  await csvWriter.writeRecords(data);
+
+  fs.writeFileSync(filePath, '\uFEFF' + rows.join('\n'), 'utf8');
   return filePath;
 };
 
@@ -207,5 +242,5 @@ module.exports = {
   exportToCSV,
   exportSummaryToExcel,
   exportSummaryToPDF,
-  exportSummaryToCSV
+  exportSummaryToCSV,
 };

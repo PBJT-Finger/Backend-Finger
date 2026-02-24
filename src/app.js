@@ -66,14 +66,14 @@ app.use(
           "'unsafe-inline'",
           'cdn.jsdelivr.net',
           'cdnjs.cloudflare.com',
-          'fonts.googleapis.com'
+          'fonts.googleapis.com',
         ],
         scriptSrc: [
           "'self'",
           "'unsafe-inline'",
           'cdn.jsdelivr.net',
           'cdnjs.cloudflare.com',
-          'unpkg.com'
+          'unpkg.com',
         ],
         imgSrc: ["'self'", 'data:', 'https:'],
         connectSrc: ["'self'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com'],
@@ -82,33 +82,33 @@ app.use(
           'fonts.googleapis.com',
           'fonts.gstatic.com',
           'cdnjs.cloudflare.com',
-          'data:'
+          'data:',
         ],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
-        frameSrc: ["'self'"] // Allow iframes for API reference embedding
-      }
+        frameSrc: ["'self'"], // Allow iframes for API reference embedding
+      },
     },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     hsts: {
       maxAge: 31536000, // 1 year
       includeSubDomains: true,
-      preload: true
+      preload: true,
     },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     permissionsPolicy: {
       camera: [],
       microphone: [],
-      geolocation: []
-    }
+      geolocation: [],
+    },
   })
 );
 
 // Konfigurasi CORS dengan multi-origin support
 const allowedOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000', 'http://localhost:3333'];
+  ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
+  : ['http://localhost:5555', 'http://localhost:3000', 'http://localhost:3333'];
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
@@ -135,7 +135,7 @@ app.use(
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
-    maxAge: 600 // 10 minutes preflight cache
+    maxAge: 600, // 10 minutes preflight cache
   })
 );
 
@@ -183,7 +183,7 @@ app.get('/ready', async (req, res) => {
       success: true,
       status: 'ready',
       timestamp: new Date().toISOString(),
-      database: 'mysql-ready'
+      database: 'mysql-ready',
     });
   } catch (error) {
     logger.error('Readiness check failed', { error: error.message });
@@ -192,7 +192,7 @@ app.get('/ready', async (req, res) => {
       status: 'not ready',
       timestamp: new Date().toISOString(),
       database: 'disconnected',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 });
@@ -214,7 +214,7 @@ const renderDocsPage = (page, title, options = {}) => {
       showSidebar: options.showSidebar !== false,
       prismTheme: options.prismTheme !== false,
       prismScripts: options.prismScripts !== false,
-      body: '' // Will be filled by layout
+      body: '', // Will be filled by layout
     });
   };
 };
@@ -241,7 +241,7 @@ app.get('/api-docs', (req, res) => {
 const {
   translateTags,
   translateDescription,
-  getTranslation
+  getTranslation,
 } = require('./config/i18n.translations');
 
 app.get('/finger-api/docs-json', (req, res) => {

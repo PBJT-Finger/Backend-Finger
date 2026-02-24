@@ -49,7 +49,7 @@ function enhancedCorrelation(req, res, next) {
     method: req.method,
     path: req.path,
     ip: req.ip,
-    userAgent: req.get('User-Agent')
+    userAgent: req.get('User-Agent'),
   };
 
   // Add user info if authenticated
@@ -81,5 +81,5 @@ function validateCorrelationId(id) {
 module.exports = {
   requestCorrelation,
   enhancedCorrelation,
-  validateCorrelationId
+  validateCorrelationId,
 };
