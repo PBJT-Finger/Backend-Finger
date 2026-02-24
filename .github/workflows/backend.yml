@@ -123,7 +123,14 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          # Check if the key is base64 encoded (starts with 'LS0tLS1CRUdJTi')
+          if echo "${{ secrets.SSH_PRIVATE_KEY }}" | grep -q '^LS0tLS1CRUdJTi'; then
+            echo "🔑 Decoding base64 SSH key..."
+            echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/deploy_key
+          else
+            echo "🔑 Using plain PEM SSH key..."
+            printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          fi
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
             && echo "✅ Key valid: $(ssh-keygen -l -f ~/.ssh/deploy_key | awk '{print $2}')" \
