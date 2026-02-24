@@ -12,81 +12,66 @@ const options = {
 
 API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan import data absensi dan analitik tingkat lanjut.
 
-**Base URL:** http://localhost:${process.env.PORT || 3333}/api
+**Base URL:** http://localhost:${process.env.PORT}/api
 
 **Authentication:** Bearer Token (JWT)
 
 **Untuk memulai:** Login menggunakan endpoint /auth/login untuk mendapatkan access token, lalu gunakan token tersebut di header Authorization untuk mengakses endpoint lainnya.`,
       contact: {
         name: 'Tim Pengembangan Backend',
-        email: 'admin@kampus.edu'
+        email: 'admin@kampus.edu',
       },
       license: {
         name: 'Lisensi MIT',
-        url: 'https://opensource.org/licenses/MIT'
-      }
+        url: 'https://opensource.org/licenses/MIT',
+      },
     },
     servers: [
       {
-        url: `http://localhost:${process.env.PORT || 3333}`,
-        description: 'Development Server (dynamic port from env)'
+        url: `http://localhost:${process.env.PORT}`,
+        description: 'Development Server (dynamic port from env)',
       },
       {
-        url: `http://localhost:${process.env.PORT || 3333}/api`,
-        description: 'API Base URL'
+        url: `http://localhost:${process.env.PORT}/api`,
+        description: 'API Base URL',
       },
       {
         url: 'https://api.kampus.edu',
-        description: 'Production server (example)'
-      }
+        description: 'Production server (example)',
+      },
     ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-          description: 'Enter your JWT token in the format: Bearer {token}'
-        }
-      }
-    },
-    security: [
-      {
-        bearerAuth: []
-      }
-    ],
+
     tags: [
       {
         name: 'Authentication',
         description:
-          'Operasi login pengguna, refresh token, dan logout. Autentikasi berbasis JWT dengan Bearer token.'
+          'Operasi login pengguna, refresh token, dan logout. Autentikasi berbasis JWT dengan Bearer token.',
       },
       {
         name: 'Import',
-        description: 'Upload dan import data absensi manual dari file Excel/CSV'
+        description: 'Upload dan import data absensi manual dari file Excel/CSV',
       },
       {
         name: 'Attendance',
-        description:
-          'Operasi absensi - check in/out, lihat rekaman, dan rekapitulasi'
+        description: 'Operasi absensi - check in/out, lihat rekaman, dan rekapitulasi',
       },
       {
         name: 'Export',
-        description: 'Ekspor data absensi dalam berbagai format (Excel, CSV, PDF)'
+        description: 'Ekspor data absensi dalam berbagai format (Excel, CSV, PDF)',
       },
       {
         name: 'Dashboard',
-        description: 'Statistik dashboard, tren, dan metrik kinerja utama'
+        description: 'Statistik dashboard, tren, dan metrik kinerja utama',
       },
       {
         name: 'Report',
         description:
-          'Analitik absensi, statistik, dan laporan ringkasan dengan perhitungan persentase'
+          'Analitik absensi, statistik, dan laporan ringkasan dengan perhitungan persentase',
       },
       {
         name: 'Admin',
-        description: 'Manajemen akun admin - CRUD operasi untuk user management sistem'
-      }
+        description: 'Manajemen akun admin - CRUD operasi untuk user management sistem',
+      },
     ],
     components: {
       securitySchemes: {
@@ -94,11 +79,10 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Masukkan token JWT Anda yang diperoleh dari endpoint login'
-        }
+          description: 'Masukkan token JWT Anda yang diperoleh dari endpoint login',
+        },
       },
       schemas: {
-
         // ==================== ATTENDANCE ====================
         // Berdasarkan tabel `attendance` di database (via Prisma schema)
         Attendance: {
@@ -107,77 +91,77 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             id: {
               type: 'integer',
               description: 'Auto-increment primary key',
-              example: 1234
+              example: 1234,
             },
             user_id: {
               type: 'string',
               description: 'ID pengguna (sama dengan NIP)',
-              example: '198805121234561001'
+              example: '198805121234561001',
             },
             nip: {
               type: 'string',
               description: 'Nomor Induk Pegawai',
-              example: '198805121234561001'
+              example: '198805121234561001',
             },
             nama: {
               type: 'string',
               description: 'Nama karyawan/dosen',
-              example: 'Dr. Budi Santoso, M.Kom'
+              example: 'Dr. Budi Santoso, M.Kom',
             },
             jabatan: {
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
               description: 'Jabatan karyawan',
-              example: 'KARYAWAN'
+              example: 'KARYAWAN',
             },
             tanggal: {
               type: 'string',
               format: 'date',
               description: 'Tanggal absensi (YYYY-MM-DD)',
-              example: '2026-01-14'
+              example: '2026-01-14',
             },
             jam_masuk: {
               type: 'string',
               format: 'time',
               nullable: true,
               description: 'Waktu check-in (HH:mm:ss)',
-              example: '08:15:00'
+              example: '08:15:00',
             },
             jam_keluar: {
               type: 'string',
               format: 'time',
               nullable: true,
               description: 'Waktu check-out (HH:mm:ss)',
-              example: '16:30:00'
+              example: '16:30:00',
             },
             device_id: {
               type: 'string',
               nullable: true,
               description: 'ID perangkat absensi',
-              example: 'FP-GEDUNG-A-001'
+              example: 'FP-GEDUNG-A-001',
             },
             cloud_id: {
               type: 'string',
               nullable: true,
               description: 'ID cloud sistem',
-              example: 'CLOUD-001'
+              example: 'CLOUD-001',
             },
             verification_method: {
               type: 'string',
               description: 'Metode verifikasi absensi',
-              example: 'SIDIK_JARI'
+              example: 'SIDIK_JARI',
             },
             status: {
               type: 'string',
               description: 'Status kehadiran',
-              example: 'HADIR'
+              example: 'HADIR',
             },
             is_deleted: {
               type: 'boolean',
               description: 'Soft delete flag',
-              example: false
-            }
-          }
+              example: false,
+            },
+          },
         },
 
         // ==================== ATTENDANCE SUMMARY ====================
@@ -188,52 +172,52 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             id: {
               type: 'string',
               description: 'NIP / User ID',
-              example: '198805121234561001'
+              example: '198805121234561001',
             },
             no: {
               type: 'integer',
               description: 'Nomor urut',
-              example: 1
+              example: 1,
             },
             nama: {
               type: 'string',
               description: 'Nama karyawan/dosen',
-              example: 'Dr. Budi Santoso, M.Kom'
+              example: 'Dr. Budi Santoso, M.Kom',
             },
             jabatan: {
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
               description: 'Jabatan karyawan',
-              example: 'KARYAWAN'
+              example: 'KARYAWAN',
             },
             totalHadir: {
               type: 'integer',
               description: 'Jumlah hari hadir (berdasarkan check-in)',
-              example: 18
+              example: 18,
             },
             totalHariKerja: {
               type: 'integer',
               description: 'Total hari kerja dalam periode',
-              example: 18
+              example: 18,
             },
             attendanceDates: {
               type: 'string',
               description: 'Rentang tanggal kehadiran (format Indonesia)',
-              example: '3 Januari 2026 - 4 Februari 2026'
+              example: '3 Januari 2026 - 4 Februari 2026',
             },
             lastCheckIn: {
               type: 'string',
               nullable: true,
               description: 'Waktu check-in terakhir (HH:mm)',
-              example: '08:10'
+              example: '08:10',
             },
             lastCheckOut: {
               type: 'string',
               nullable: true,
               description: 'Waktu check-out terakhir (HH:mm)',
-              example: '16:30'
-            }
-          }
+              example: '16:30',
+            },
+          },
         },
 
         // ==================== PAGINATION ====================
@@ -243,29 +227,29 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             page: {
               type: 'integer',
               description: 'Current page number',
-              example: 1
+              example: 1,
             },
             limit: {
               type: 'integer',
               description: 'Records per page',
-              example: 50
+              example: 50,
             },
             total: {
               type: 'integer',
               description: 'Total number of records',
-              example: 150
+              example: 150,
             },
             totalPages: {
               type: 'integer',
               description: 'Total number of pages',
-              example: 3
+              example: 3,
             },
             totalWorkingDays: {
               type: 'integer',
               description: 'Total working days in the period (for summary endpoints)',
-              example: 22
-            }
-          }
+              example: 22,
+            },
+          },
         },
 
         // ==================== AUTH ====================
@@ -277,15 +261,15 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
               type: 'string',
               format: 'email',
               description: 'Admin email (used for login)',
-              example: 'admin@kampus.edu'
+              example: 'admin@kampus.edu',
             },
             password: {
               type: 'string',
               format: 'password',
               description: 'Admin password',
-              example: 'admin123'
-            }
-          }
+              example: 'admin123',
+            },
+          },
         },
 
         LoginResponse: {
@@ -293,11 +277,11 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           properties: {
             success: {
               type: 'boolean',
-              example: true
+              example: true,
             },
             message: {
               type: 'string',
-              example: 'Login successful'
+              example: 'Login successful',
             },
             data: {
               type: 'object',
@@ -307,47 +291,47 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
                   properties: {
                     id: {
                       type: 'integer',
-                      example: 1
+                      example: 1,
                     },
                     username: {
                       type: 'string',
-                      example: 'admin'
+                      example: 'admin',
                     },
                     email: {
                       type: 'string',
-                      example: 'admin@kampus.edu'
+                      example: 'admin@kampus.edu',
                     },
                     role: {
                       type: 'string',
-                      example: 'ADMIN'
-                    }
-                  }
+                      example: 'ADMIN',
+                    },
+                  },
                 },
                 tokens: {
                   type: 'object',
                   properties: {
                     access_token: {
                       type: 'string',
-                      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+                      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
                     },
                     refresh_token: {
                       type: 'string',
-                      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+                      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
                     },
                     token_type: {
                       type: 'string',
-                      example: 'Bearer'
+                      example: 'Bearer',
                     },
                     expires_in: {
                       type: 'integer',
                       description: 'Access token expiry in seconds',
-                      example: 900
-                    }
-                  }
-                }
-              }
-            }
-          }
+                      example: 900,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
 
         // ==================== ERROR RESPONSES ====================
@@ -356,11 +340,11 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           properties: {
             success: {
               type: 'boolean',
-              example: false
+              example: false,
             },
             message: {
               type: 'string',
-              example: 'Validation error'
+              example: 'Validation error',
             },
             errors: {
               type: 'array',
@@ -369,16 +353,16 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
                 properties: {
                   field: {
                     type: 'string',
-                    example: 'startDate'
+                    example: 'startDate',
                   },
                   message: {
                     type: 'string',
-                    example: 'startDate is required'
-                  }
-                }
-              }
-            }
-          }
+                    example: 'startDate is required',
+                  },
+                },
+              },
+            },
+          },
         },
 
         ValidationError: {
@@ -386,19 +370,19 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           properties: {
             success: {
               type: 'boolean',
-              example: false
+              example: false,
             },
             message: {
               type: 'string',
-              example: 'Input validation failed'
+              example: 'Input validation failed',
             },
             errors: {
               type: 'array',
               items: {
-                type: 'object'
-              }
-            }
-          }
+                type: 'object',
+              },
+            },
+          },
         },
 
         UnauthorizedError: {
@@ -406,13 +390,13 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           properties: {
             success: {
               type: 'boolean',
-              example: false
+              example: false,
             },
             message: {
               type: 'string',
-              example: 'Unauthorized - Invalid or missing token'
-            }
-          }
+              example: 'Unauthorized - Invalid or missing token',
+            },
+          },
         },
 
         NotFoundError: {
@@ -420,13 +404,13 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           properties: {
             success: {
               type: 'boolean',
-              example: false
+              example: false,
             },
             message: {
               type: 'string',
-              example: 'Resource not found'
-            }
-          }
+              example: 'Resource not found',
+            },
+          },
         },
 
         RateLimitError: {
@@ -434,14 +418,14 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           properties: {
             success: {
               type: 'boolean',
-              example: false
+              example: false,
             },
             message: {
               type: 'string',
-              example: 'Too many requests from this IP, please try again later'
-            }
-          }
-        }
+              example: 'Too many requests from this IP, please try again later',
+            },
+          },
+        },
       },
 
       // ==================== COMMON RESPONSES ====================
@@ -451,40 +435,40 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/UnauthorizedError'
-              }
-            }
-          }
+                $ref: '#/components/schemas/UnauthorizedError',
+              },
+            },
+          },
         },
         ValidationError: {
           description: 'Validation error - Invalid input data',
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/ValidationError'
-              }
-            }
-          }
+                $ref: '#/components/schemas/ValidationError',
+              },
+            },
+          },
         },
         NotFound: {
           description: 'Resource not found',
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/NotFoundError'
-              }
-            }
-          }
+                $ref: '#/components/schemas/NotFoundError',
+              },
+            },
+          },
         },
         RateLimitExceeded: {
           description: 'Rate limit exceeded',
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/RateLimitError'
-              }
-            }
-          }
+                $ref: '#/components/schemas/RateLimitError',
+              },
+            },
+          },
         },
         InternalServerError: {
           description: 'Internal server error',
@@ -495,26 +479,26 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
                 properties: {
                   success: {
                     type: 'boolean',
-                    example: false
+                    example: false,
                   },
                   message: {
                     type: 'string',
-                    example: 'Internal server error'
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                    example: 'Internal server error',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
     security: [
       {
-        bearerAuth: []
-      }
-    ]
+        bearerAuth: [],
+      },
+    ],
   },
-  apis: ['./src/routes/*.js'] // Path to the API docs
+  apis: ['./src/routes/*.js'], // Path to the API docs
 };
 
 const specs = swaggerJsdoc(options);
@@ -534,7 +518,7 @@ const swaggerOptions = {
     showCommonExtensions: true,
     syntaxHighlight: {
       activate: true,
-      theme: 'nord' // Modern dark theme
+      theme: 'nord', // Modern dark theme
     },
     tryItOutEnabled: true,
     requestSnippetsEnabled: true,
@@ -546,12 +530,12 @@ const swaggerOptions = {
     // Custom layout
     layout: 'BaseLayout',
     deepLinking: true,
-    showMutatedRequest: true
-  }
+    showMutatedRequest: true,
+  },
 };
 
 module.exports = {
   swaggerUi,
   specs,
-  swaggerOptions
+  swaggerOptions,
 };

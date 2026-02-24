@@ -1,11 +1,27 @@
+# Dependencies
 node_modules/
+
+# Environment
 .env
+.env.*
+!.env.example
+
+# App artifacts
 exports/
 *.log
+
+# OS/Editor
 .DS_Store
 .vscode/
 .idea/
-/src/generated/prisma
-Backend-Finger/
-fix-git.bat
 
+# Prisma generated
+src/generated/prisma/
+node_modules/.prisma/
+
+# Docker
+.env.docker
+
+# Build scripts
+fix-git.bat
+Backend-Finger/
