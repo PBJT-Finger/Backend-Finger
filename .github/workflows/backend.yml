@@ -119,41 +119,13 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Wait for Tailscale routing
-        run: sleep 5
-
-      - name: "[DEBUG] Verify network connectivity"
-        run: |
-          echo "=== Tailscale Status ==="
-          tailscale status || echo "tailscale CLI not found"
-          echo "=== Ping server ==="
-          ping -c 3 "${{ secrets.SSH_HOST }}" || echo "ping failed"
-          echo "=== Test port 22 ==="
-          nc -zv "${{ secrets.SSH_HOST }}" 22 && echo "Port 22 OPEN" || echo "Port 22 CLOSED/UNREACHABLE"
-          echo "=== SSH Keyscan ==="
-          ssh-keyscan -v -H "${{ secrets.SSH_HOST }}" 2>&1 | head -20 || echo "keyscan failed"
+        run: sleep 3
 
       - name: Add SSH known host
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-
-      # ── Native SSH Debug ──────────────────────────────────────
-      - name: "[DEBUG] Test SSH natively"
-        run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/debug_key
-          chmod 600 /tmp/debug_key
-          echo "=== Key info ==="
-          ssh-keygen -l -f /tmp/debug_key || echo "Key parse failed!"
-          echo "=== SSH verbose test ==="
-          ssh -vvv \
-            -i /tmp/debug_key \
-            -o StrictHostKeyChecking=no \
-            -o ConnectTimeout=10 \
-            -p 22 \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "echo 'SSH connection SUCCESS'" 2>&1 || true
-          rm -f /tmp/debug_key
 
       # ── Preflight ──────────────────────────────────────────
       - name: Preflight checks
@@ -165,7 +137,6 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          debug: true
           envs: DEPLOY_PATH
           script: |
             set -e
