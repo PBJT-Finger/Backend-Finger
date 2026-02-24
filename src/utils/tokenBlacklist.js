@@ -3,10 +3,10 @@ const logger = require('./logger');
 // DISABLED Redis for development - mock implementation
 const redis = {
   status: 'disabled',
-  on: () => { },
-  connect: async () => { },
-  quit: async () => { },
-  setex: async () => { },
+  on: () => {},
+  connect: async () => {},
+  quit: async () => {},
+  setex: async () => {},
   exists: async () => 0,
   keys: async () => [],
   info: async () => 'memory:0',
