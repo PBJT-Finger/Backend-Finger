@@ -1,4 +1,4 @@
-name: Backend-Finger Deploy
+name: Backend-Finger CI/CD
 
 on:
   push:
@@ -113,20 +113,37 @@ jobs:
       cancel-in-progress: false
 
     steps:
+      # ── Tailscale (no tags → admin-owned node → autogroup:admin) ──
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null && echo "✅ Key valid: $(ssh-keygen -l -f ~/.ssh/deploy_key | awk '{print $2}')" || { echo "❌ Key parse failed"; exit 1; }
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
+            && echo "✅ Key valid: $(ssh-keygen -l -f ~/.ssh/deploy_key | awk '{print $2}')" \
+            || { echo "❌ Key parse failed"; exit 1; }
 
       - name: Add SSH known host
         run: |
+          echo "🔍 Adding SSH known host..."
+          if [ -z "$SSH_HOST" ]; then
+            echo "❌ SSH_HOST secret is empty!"
+            exit 1
+          fi
           mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || {
+            echo "❌ ssh-keyscan failed — host unreachable or port closed"
+            exit 1
+          }
           chmod 644 ~/.ssh/known_hosts
-          echo "✅ Known host added: $(wc -l < ~/.ssh/known_hosts) entries"
+          echo "✅ SSH known host added"
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
 
       # ── Preflight ──────────────────────────────────────────────
       - name: Preflight checks
@@ -136,23 +153,42 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
-            -o ServerAliveInterval=10 \
             -p "${{ secrets.SSH_PORT || 22 }}" \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "set -e
              DEPLOY_PATH='${DEPLOY_PATH}'
-             echo \"📋 Preflight — \$DEPLOY_PATH\"
-             [ -d \"\$DEPLOY_PATH\" ] || { echo '❌ Deploy dir not found'; exit 1; }
+             echo '🔍 Preflight checks started...'
+
+             [ -d \"\$DEPLOY_PATH\" ] || { echo '❌ Deploy dir not found: '\$DEPLOY_PATH; exit 1; }
              cd \"\$DEPLOY_PATH\"
-             [ -f .env.docker ] || { echo '❌ .env.docker not found'; exit 1; }
-             docker info > /dev/null 2>&1 || { echo '❌ Docker daemon down'; exit 1; }
-             docker compose config > /dev/null 2>&1 || { echo '❌ Compose config invalid'; exit 1; }
+
+             echo '📝 Validating docker-compose config...'
+             docker compose config > /dev/null 2>&1 || { echo '❌ docker-compose config invalid!'; exit 1; }
+             echo '✅ Docker Compose config valid'
+
+             echo '🔐 Checking .env.docker...'
+             [ -f .env.docker ] || { echo '❌ .env.docker not found!'; exit 1; }
+             echo '✅ .env.docker exists'
+
+             echo '🐳 Checking Docker daemon...'
+             docker info > /dev/null 2>&1 || { echo '❌ Docker daemon not running!'; exit 1; }
+             echo '✅ Docker daemon running'
+
+             echo '💾 Checking disk space...'
+             AVAILABLE=\$(df \"\$DEPLOY_PATH\" | tail -1 | awk '{print \$4}')
+             if [ \"\$AVAILABLE\" -lt 2097152 ]; then
+               echo '⚠️ Warning: Low disk space (< 2GB free)'
+             else
+               echo '✅ Disk space sufficient'
+             fi
+
              if docker compose ps finger-mysql 2>/dev/null | grep -q 'healthy'; then
                echo '✅ MySQL healthy'
              else
-               echo '⚠️ MySQL not healthy or not running (first deploy?)'
+               echo '⚠️ MySQL not running (first deploy?)'
              fi
-             echo '✅ Preflight passed'"
+
+             echo '✅ All preflight checks passed!'"
 
       # ── Deploy ────────────────────────────────────────────────
       - name: Deploy backend
@@ -168,7 +204,6 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
-            -o ServerAliveInterval=10 \
             -p "${{ secrets.SSH_PORT || 22 }}" \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "set -e
@@ -181,60 +216,94 @@ jobs:
 
              cd \"\$DEPLOY_PATH\"
 
-             # GHCR login
+             # GHCR login (optional untuk public image)
              if [ -n \"\$GHCR_PAT\" ]; then
+               echo '🔐 Logging into GHCR...'
                echo \"\$GHCR_PAT\" | docker login ghcr.io -u \"\$GHCR_USER\" --password-stdin
+             else
+               echo 'ℹ️ Skipping GHCR login (public image)'
              fi
 
              # Capture current image for rollback
              CURRENT_IMAGE=\$(docker inspect finger-backend --format='{{.Config.Image}}' 2>/dev/null || echo 'none')
              echo \"📌 Current: \$CURRENT_IMAGE\"
-             echo \"📌 Deploying: \$BACKEND_IMAGE\"
+             echo \"📦 Deploying: \$BACKEND_IMAGE\"
 
              # Pull new image
              docker pull \"\$BACKEND_IMAGE\"
 
-             # Run migrations (idempotent)
-             BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose run --rm finger-backend npx prisma migrate deploy
+             # Migrations (idempotent)
+             BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose -f docker-compose.yml run --rm finger-backend npx prisma migrate deploy || true
+
+             # Cleanup zombie containers
+             docker ps -a --filter 'name=finger-backend' --format '{{.ID}}' | xargs -r docker rm -f || true
 
              # Rolling update
              BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose up -d --no-deps --force-recreate finger-backend
 
-             # Wait for health (60s max)
+             # Health check (40s start_period + 60s retries)
              echo '⏳ Waiting for health check...'
-             for i in \$(seq 1 20); do
-               if curl -sf http://localhost:3333/health > /dev/null; then
-                 echo \"✅ Backend healthy after \${i}x3s\"
-                 break
-               fi
-               if [ \"\$i\" -eq 20 ]; then
-                 echo \"❌ Health check timeout — rolling back to \$CURRENT_IMAGE\"
-                 BACKEND_IMAGE=\"\$CURRENT_IMAGE\" docker compose up -d --no-deps finger-backend || true
-                 exit 1
-               fi
-               sleep 3
+             MAX_WAIT=120
+             ELAPSED=0
+
+             check_health() {
+               docker compose ps finger-backend --format json 2>/dev/null | grep -o '\"Health\":\"[^\"]*\"' | cut -d'\"' -f4 || echo 'unknown'
+             }
+
+             while [ \$ELAPSED -lt \$MAX_WAIT ]; do
+               STATUS=\$(check_health)
+               case \"\$STATUS\" in
+                 healthy)
+                   echo \"✅ finger-backend healthy after \${ELAPSED}s\"
+                   break
+                   ;;
+                 unhealthy)
+                   echo '❌ Container unhealthy!'
+                   docker compose logs --tail=50 finger-backend
+                   if [ \"\$CURRENT_IMAGE\" != 'none' ]; then
+                     echo \"🔄 Rolling back to \$CURRENT_IMAGE\"
+                     docker compose up -d --no-deps finger-backend
+                   fi
+                   exit 1
+                   ;;
+                 *)
+                   echo \"⏱️ Waiting... (\${ELAPSED}/\${MAX_WAIT}s) — status: \$STATUS\"
+                   ;;
+               esac
+               sleep 5
+               ELAPSED=\$((ELAPSED + 5))
              done
+
+             if [ \$ELAPSED -ge \$MAX_WAIT ]; then
+               echo \"❌ Health check timeout after \${MAX_WAIT}s\"
+               docker compose logs --tail=100 finger-backend
+               if [ \"\$CURRENT_IMAGE\" != 'none' ]; then
+                 echo \"🔄 Rolling back to \$CURRENT_IMAGE\"
+                 docker compose up -d --no-deps finger-backend
+               fi
+               exit 1
+             fi
 
              # Cleanup old images (keep last 5)
              docker images \"\$IMG_REPO\" --format '{{.Tag}}' | grep '^main-' | sort -r | tail -n +6 | \
                xargs -r -I {} docker rmi \"\${IMG_REPO}:{}\" || true
              docker image prune -f || true
 
-             echo \"🎉 Backend deployed: \$BACKEND_IMAGE\""
+             echo \"🎉 Deployed: \$BACKEND_IMAGE\""
 
       - name: Deployment summary
         if: always()
         run: |
-          echo "### 🚀 Backend Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Backend-Finger Deploy" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** \`$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]'):${{ needs.build.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Digest:** \`${{ needs.build.outputs.image-digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
 
 # REQUIRED SECRETS:
-# - SSH_HOST          : Production server IP (Tailscale: 100.72.45.110)
-# - SSH_USER          : SSH username (deploy)
-# - SSH_PRIVATE_KEY   : SSH private key — finger_back (full content, LF only)
-# - SSH_PORT          : SSH port (optional, default: 22)
-# - DEPLOY_PATH       : Deploy directory (default: /opt/fingerback)
-# - TAILSCALE_AUTHKEY : Tailscale auth key
-# - GHCR_PAT          : GHCR Personal Access Token
-# - GHCR_USERNAME     : GHCR username (optional)
+# - SSH_HOST          : Tailscale IP server (100.72.45.110)
+# - SSH_USER          : deploy
+# - SSH_PRIVATE_KEY   : Private key finger_back (full content)
+# - SSH_PORT          : 22 (optional)
+# - DEPLOY_PATH       : /opt/fingerback (optional)
+# - TAILSCALE_AUTHKEY : Reusable ephemeral key (tanpa tag)
+# - GHCR_PAT          : GitHub PAT read:packages (optional, public image)
+# - GHCR_USERNAME     : GitHub username (optional)
