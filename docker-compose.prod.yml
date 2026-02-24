@@ -1,0 +1,89 @@
+# ============================================================
+# docker-compose.yml — Backend Production Deploy
+# Path: /opt/fingerback/docker-compose.yml
+# Usage: BACKEND_IMAGE=ghcr.io/... docker compose up -d
+# ============================================================
+
+services:
+  # ─── Database ───────────────────────────────────────────
+  finger-mysql:
+    image: mysql:8.0
+    container_name: finger-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-finger_db}
+      MYSQL_USER: ${DB_USERNAME:-finger_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:${DB_PORT_EXPOSE:-3306}:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - finger-net
+
+  # ─── Cache ──────────────────────────────────────────────
+  finger-redis:
+    image: redis:7-alpine
+    container_name: finger-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:${REDIS_PORT_EXPOSE:-6379}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - finger-net
+
+  # ─── Backend API ─────────────────────────────────────────
+  finger-backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/pbjt-finger/finger-backend:latest}
+    container_name: finger-backend
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      DB_HOST: finger-mysql
+      REDIS_HOST: finger-redis
+    ports:
+      - "${BACKEND_PORT:-3333}:3333"
+    depends_on:
+      finger-mysql:
+        condition: service_healthy
+      finger-redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3333/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - backend_exports:/app/exports
+    networks:
+      - finger-net
+
+# ─── Volumes ─────────────────────────────────────────────
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_exports:
+    driver: local
+
+# ─── Networks ─────────────────────────────────────────────
+networks:
+  finger-net:
+    driver: bridge
+    name: finger-net

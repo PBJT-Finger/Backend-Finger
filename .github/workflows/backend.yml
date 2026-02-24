@@ -131,7 +131,7 @@ jobs:
       - name: Preflight checks
         uses: appleboy/ssh-action@v1.2.0
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/finger-app' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -146,14 +146,18 @@ jobs:
             [ -f .env.docker ] || { echo "❌ .env.docker not found"; exit 1; }
             docker info > /dev/null 2>&1 || { echo "❌ Docker daemon down"; exit 1; }
             docker compose config > /dev/null 2>&1 || { echo "❌ Compose config invalid"; exit 1; }
-            docker compose ps finger-mysql | grep -q "healthy" || { echo "❌ MySQL not healthy"; exit 1; }
+            if docker compose ps finger-mysql 2>/dev/null | grep -q "healthy"; then
+              echo "✅ MySQL healthy"
+            else
+              echo "⚠️ MySQL not healthy or not running (first deploy?)"
+            fi
             echo "✅ Preflight passed"
 
       # ── Deploy ────────────────────────────────────────────
       - name: Deploy backend
         uses: appleboy/ssh-action@v1.2.0
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/finger-app' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
           REGISTRY: ${{ env.REGISTRY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
