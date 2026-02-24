@@ -138,6 +138,23 @@ jobs:
           ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
+      # ── Native SSH Debug ──────────────────────────────────────
+      - name: "[DEBUG] Test SSH natively"
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/debug_key
+          chmod 600 /tmp/debug_key
+          echo "=== Key info ==="
+          ssh-keygen -l -f /tmp/debug_key || echo "Key parse failed!"
+          echo "=== SSH verbose test ==="
+          ssh -vvv \
+            -i /tmp/debug_key \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -p 22 \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "echo 'SSH connection SUCCESS'" 2>&1 || true
+          rm -f /tmp/debug_key
+
       # ── Preflight ──────────────────────────────────────────
       - name: Preflight checks
         uses: appleboy/ssh-action@v1.2.0
