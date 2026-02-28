@@ -31,6 +31,9 @@ const { specs } = require('./config/swagger');
 // Import logger
 const logger = require('./utils/logger');
 
+// Import Prisma for readiness check
+const prisma = require('./config/prisma');
+
 // Initialize Express app
 const app = express();
 
@@ -172,18 +175,17 @@ app.use(healthRoutes);
 // Metrics endpoint (no auth required, for Prometheus scraper)
 app.use(metricsRoutes);
 
-// Readiness check (database connectivity)
+// Readiness check (database connectivity via Prisma)
 app.get('/ready', async (req, res) => {
   try {
-    // DISABLED: Sequelize check (we're using raw MySQL)
-    // const { sequelize } = require('./models');
-    // await sequelize.authenticate();
+    // Verify active DB connection with a minimal query
+    await prisma.$queryRaw`SELECT 1`;
 
     res.json({
       success: true,
       status: 'ready',
       timestamp: new Date().toISOString(),
-      database: 'mysql-ready',
+      database: 'mysql-connected',
     });
   } catch (error) {
     logger.error('Readiness check failed', { error: error.message });

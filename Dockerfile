@@ -49,6 +49,7 @@ EXPOSE 3333
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD wget -qO- http://localhost:3333/health || exit 1
 
-# Entrypoint: run migrations then start server
-# prisma migrate deploy is idempotent — safe to run on every start
-CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
+# Entrypoint: start server directly
+# NOTE: prisma migrate deploy is now run ONCE in CI (backend.yml deploy step)
+# before the container is recreated — keeping startup fast and predictable.
+CMD ["node", "src/server.js"]

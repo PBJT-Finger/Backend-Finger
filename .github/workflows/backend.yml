@@ -240,13 +240,19 @@ jobs:
              # Pull new image
              docker pull \"\$BACKEND_IMAGE\"
 
-             # Migrations (idempotent)
-             BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose -f docker-compose.yml run --rm finger-backend npx prisma migrate deploy || true
+             # Run migrations ONCE here (not in Dockerfile CMD) using
+             # the exact image being deployed — idempotent, safe.
+             echo '🗄️ Running database migrations...'
+             BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose -f docker-compose.yml run --rm \
+               -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
+               finger-backend npx prisma migrate deploy \
+               && echo '✅ Migrations complete' \
+               || { echo '❌ Migration failed!'; exit 1; }
 
              # Cleanup zombie containers
              docker ps -a --filter 'name=finger-backend' --format '{{.ID}}' | xargs -r docker rm -f || true
 
-             # Rolling update
+             # Rolling update — container starts fast (no migrate in CMD)
              BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose up -d --no-deps --force-recreate finger-backend
 
              # Health check (40s start_period + 60s retries)
