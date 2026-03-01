@@ -1,5 +1,5 @@
 // src/services/attendance.import.service.js - Import Service for Manual Attendance Data
-const ExcelJS = require('exceljs');
+const xlsx = require('xlsx');
 const prisma = require('../config/prisma');
 const logger = require('../utils/logger');
 
@@ -12,53 +12,46 @@ class AttendanceImportService {
    */
   static async parseImportFile(buffer, filename) {
     try {
-      // Read workbook from buffer using ExcelJS
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(buffer);
+      // Read workbook from buffer using xlsx (SheetJS)
+      // Supports .xls (Biff8), .xlsx, .csv, .tsv, and HTML tables
+      const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
 
       // Get first sheet
-      const worksheet = workbook.worksheets[0];
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
       if (!worksheet) {
         throw new Error('File tidak memiliki sheet yang valid');
       }
 
-      // Extract header row (row 1)
-      const headers = [];
-      worksheet.getRow(1).eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        headers[colNumber] = cell.text ? cell.text.trim() : `col_${colNumber}`;
-      });
-
-      // Extract data rows (row 2+)
+      // Convert sheet to json array
+      const rawData = xlsx.utils.sheet_to_json(worksheet, { defval: null });
       const data = [];
-      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-        if (rowNumber === 1) return; // Skip header
+
+      for (const row of rawData) {
         const rowObj = {};
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const header = headers[colNumber];
-          if (!header) return;
-          // Convert all values to string, handle Date objects from ExcelJS
-          let val = cell.value;
-          if (val === null || val === undefined) {
-            val = null;
-          } else if (val instanceof Date) {
+        for (const [key, val] of Object.entries(row)) {
+          let strVal = val;
+          if (strVal === null || strVal === undefined) {
+            strVal = null;
+          } else if (strVal instanceof Date) {
             // Format date as YYYY-MM-DD
-            const y = val.getFullYear();
-            const m = String(val.getMonth() + 1).padStart(2, '0');
-            const d = String(val.getDate()).padStart(2, '0');
-            val = `${y}-${m}-${d}`;
-          } else if (typeof val === 'object' && val.result !== undefined) {
-            // Formula cell — use computed result
-            val = String(val.result);
+            const y = strVal.getFullYear();
+            const m = String(strVal.getMonth() + 1).padStart(2, '0');
+            const d = String(strVal.getDate()).padStart(2, '0');
+            strVal = `${y}-${m}-${d}`;
           } else {
-            val = String(val);
+            strVal = String(strVal);
           }
-          rowObj[header] = val;
-        });
+          // The key might have leading/trailing spaces
+          const cleanKey = key.trim();
+          rowObj[cleanKey] = strVal;
+        }
+
         // Only push rows that have at least one value
         if (Object.values(rowObj).some((v) => v !== null && v !== '')) {
           data.push(rowObj);
         }
-      });
+      }
 
       logger.info(`Parsed ${data.length} rows from ${filename}`);
       return data;
