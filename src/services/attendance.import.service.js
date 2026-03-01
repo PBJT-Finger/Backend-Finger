@@ -721,7 +721,11 @@ class AttendanceImportService {
     const { total, imported, skipped, duplicates } = results;
 
     if (imported === 0) {
-      return `Import selesai: ${total} baris diproses, tidak ada data yang berhasil diimport`;
+      let msg = `Import selesai: ${total} baris diproses, tidak ada data baru yang berhasil diimport`;
+      if (duplicates > 0) {
+        msg += ` (${duplicates} data duplikat dilewati)`;
+      }
+      return msg;
     }
 
     let message = `Import berhasil: ${imported} dari ${total} baris diimport`;
@@ -729,7 +733,7 @@ class AttendanceImportService {
       message += `, ${duplicates} duplikat dilewati`;
     }
     if (skipped - duplicates > 0) {
-      message += `, ${skipped - duplicates} error`;
+      message += `, ${skipped - duplicates} dilewati karena error/warning`;
     }
 
     return message;

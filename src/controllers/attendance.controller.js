@@ -639,9 +639,10 @@ class AttendanceController {
       }
 
       // Success response with detailed report
-      const statusCode = result.imported > 0 ? 200 : 400;
+      const hasFatalErrors = result.errors && result.errors.length === result.total && result.total > 0;
+      const statusCode = hasFatalErrors ? 400 : 200;
       return res.status(statusCode).json({
-        success: result.imported > 0,
+        success: !hasFatalErrors,
         message: result.message,
         data: {
           summary: {
@@ -653,6 +654,7 @@ class AttendanceController {
           },
           errors: result.errors.length > 0 ? result.errors : undefined,
           duplicateDetails: result.duplicateDetails,
+          warnings: result.warnings,
         },
       });
     } catch (error) {
