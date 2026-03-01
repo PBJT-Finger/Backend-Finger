@@ -56,7 +56,7 @@ services:
       DB_HOST: finger-mysql
       REDIS_HOST: finger-redis
     ports:
-      - "${BACKEND_PORT:-3333}:3333"
+      - "127.0.0.1:${BACKEND_PORT:-3333}:3333"
     depends_on:
       finger-mysql:
         condition: service_healthy
