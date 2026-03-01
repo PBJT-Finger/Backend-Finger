@@ -275,7 +275,7 @@ jobs:
              ELAPSED=0
 
              check_health() {
-               docker compose -f docker-compose.yml ps finger-backend --format json 2>/dev/null | grep -o '"Health":"[^"]*"' | cut -d'"' -f4 || echo 'unknown'
+               docker inspect finger-backend --format='{{.State.Health.Status}}' 2>/dev/null || echo 'unknown'
              }
 
              while [ \$ELAPSED -lt \$MAX_WAIT ]; do
