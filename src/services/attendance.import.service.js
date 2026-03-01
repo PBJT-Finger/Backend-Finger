@@ -192,8 +192,7 @@ class AttendanceImportService {
           nip: row.nip,
           nama: row.nama,
           tanggal: row.tanggal,
-          jam_masuk: null,
-          jam_keluar: null,
+          times: [],
           verification_method: row.verifikasi,
           status: 'HADIR',
         };
@@ -212,23 +211,23 @@ class AttendanceImportService {
         return dateTime;
       };
 
-      // Set check-in or check-out time
-      if (row.isCheckIn) {
-        // Use earliest check-in time
-        const checkInTime = combineDateTime(row.tanggal, row.waktu);
-        if (!grouped[key].jam_masuk || checkInTime < grouped[key].jam_masuk) {
-          grouped[key].jam_masuk = checkInTime;
-        }
-      } else {
-        // Use latest check-out time
-        const checkOutTime = combineDateTime(row.tanggal, row.waktu);
-        if (!grouped[key].jam_keluar || checkOutTime > grouped[key].jam_keluar) {
-          grouped[key].jam_keluar = checkOutTime;
-        }
-      }
+      const scanTime = combineDateTime(row.tanggal, row.waktu);
+      grouped[key].times.push(scanTime);
     });
 
-    return Object.values(grouped);
+    return Object.values(grouped).map((group) => {
+      // Sort ascending
+      group.times.sort((a, b) => a - b);
+      return {
+        nip: group.nip,
+        nama: group.nama,
+        tanggal: group.tanggal,
+        jam_masuk: group.times[0] || null,
+        jam_keluar: group.times.length > 1 ? group.times[group.times.length - 1] : null,
+        verification_method: group.verification_method,
+        status: group.status,
+      };
+    });
   }
 
   /**
