@@ -639,7 +639,8 @@ class AttendanceController {
       }
 
       // Success response with detailed report
-      const hasFatalErrors = result.errors && result.errors.length === result.total && result.total > 0;
+      const hasFatalErrors =
+        result.errors && result.errors.length === result.total && result.total > 0;
       const statusCode = hasFatalErrors ? 400 : 200;
       return res.status(statusCode).json({
         success: !hasFatalErrors,
