@@ -238,28 +238,31 @@ class AttendanceController {
         const dateStr = record.tanggal.toISOString().split('T')[0];
         employeeStats[key].attendanceDates.add(dateStr);
 
-        // Track latest check-in time (combine date + time)
-        if (record.jam_masuk) {
-          const checkInDateTime = new Date(record.jam_masuk);
-          if (
-            !employeeStats[key].last_check_in ||
-            checkInDateTime > new Date(employeeStats[key].last_check_in)
-          ) {
-            employeeStats[key].last_check_in = checkInDateTime;
-            employeeStats[key].last_check_in_date = record.tanggal; // Store associated date
+        // Track check-in/out from the MOST RECENT attendance date only.
+        // Records are ORDER BY tanggal DESC, so the FIRST record seen for each
+        // NIP is guaranteed to be from the most recent date. We must NOT compare
+        // raw jam_masuk Date values across different dates, because Prisma returns
+        // MySQL TIME columns as "1970-01-01THH:MM:SSZ", making 23:16 always win
+        // over 08:00 even when 08:00 belongs to a newer date (→ the 23:16 bug).
+        if (!employeeStats[key].last_attendance_date) {
+          // First encounter for this NIP = most recent date
+          employeeStats[key].last_attendance_date = record.tanggal;
+          employeeStats[key].last_check_in = record.jam_masuk || null;
+          employeeStats[key].last_check_out = record.jam_keluar || null;
+        } else {
+          // Same most-recent date: only fill missing values (edge case)
+          const sameDate =
+            record.tanggal.toISOString().split('T')[0] ===
+            employeeStats[key].last_attendance_date.toISOString().split('T')[0];
+          if (sameDate) {
+            if (!employeeStats[key].last_check_in && record.jam_masuk) {
+              employeeStats[key].last_check_in = record.jam_masuk;
+            }
+            if (record.jam_keluar) {
+              employeeStats[key].last_check_out = record.jam_keluar;
+            }
           }
-        }
-
-        // Track latest check-out time (combine date + time)
-        if (record.jam_keluar) {
-          const checkOutDateTime = new Date(record.jam_keluar);
-          if (
-            !employeeStats[key].last_check_out ||
-            checkOutDateTime > new Date(employeeStats[key].last_check_out)
-          ) {
-            employeeStats[key].last_check_out = checkOutDateTime;
-            employeeStats[key].last_check_out_date = record.tanggal; // Store associated date
-          }
+          // Older dates: intentionally ignored for lastCheckIn/lastCheckOut
         }
 
         // Count late attendance

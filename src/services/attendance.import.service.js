@@ -379,10 +379,16 @@ class AttendanceImportService {
   }
 
   /**
-   * Check if attendance record already exists
+   * Check if attendance record is an exact duplicate.
+   *
+   * A record is a DUPLICATE only when nip + tanggal + jam_masuk are ALL identical.
+   * Same NIP + same date with a DIFFERENT jam_masuk → NOT a duplicate.
+   * This allows an employee to have multiple attendance entries per day
+   * (e.g., different shift sessions) as long as the check-in times differ.
+   *
    * @param {string} nip
-   * @param {Date} tanggal
-   * @param {string} jamMasuk
+   * @param {Date}   tanggal
+   * @param {Date}   jamMasuk  - the combined DateTime jam_masuk stored in DB
    * @returns {Promise<boolean>}
    */
   static async isDuplicate(nip, tanggal, jamMasuk) {
@@ -391,7 +397,7 @@ class AttendanceImportService {
         where: {
           nip,
           tanggal,
-          jam_masuk: jamMasuk,
+          jam_masuk: jamMasuk, // exact time match required → same NIP+date+time = true duplicate
           is_deleted: false,
         },
       });
@@ -402,6 +408,7 @@ class AttendanceImportService {
       return false; // If error, assume not duplicate to allow insert attempt
     }
   }
+
 
   /**
    * Process Fingerspot import file
