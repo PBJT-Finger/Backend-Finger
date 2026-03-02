@@ -454,24 +454,38 @@ class AttendanceImportService {
       for (let i = 0; i < grouped.length; i++) {
         const record = grouped[i];
 
-        // Check employee exists
+        // Check employee exists — auto-create if missing (upsert by NIP from file data)
         let employee;
         try {
           employee = await prisma.employees.findUnique({
             where: { nip: record.nip },
           });
+
+          if (!employee) {
+            // Auto-upsert: create employee from import data so attendance can be linked
+            logger.info(`Auto-creating employee NIP ${record.nip} from import data`);
+            employee = await prisma.employees.upsert({
+              where: { nip: record.nip },
+              update: {}, // do not overwrite existing data
+              create: {
+                nip: record.nip,
+                nama: record.nama || `Karyawan ${record.nip}`,
+                jabatan: 'KARYAWAN', // default jabatan; admin can update later
+                status: 'AKTIF',
+                is_active: true,
+              },
+            });
+            results.warnings.push(
+              `NIP ${record.nip} (${employee.nama}) dibuat otomatis sebagai KARYAWAN - perbarui jabatan via menu Pegawai`
+            );
+          }
         } catch (error) {
-          logger.error('Error looking up employee:', { nip: record.nip, error: error.message });
+          logger.error('Error looking up/creating employee:', { nip: record.nip, error: error.message });
           results.errors.push(`NIP ${record.nip}: Error database - ${error.message}`);
           results.skipped++;
           continue;
         }
 
-        if (!employee) {
-          results.warnings.push(`NIP ${record.nip} tidak ditemukan di database - dilewati`);
-          results.skipped++;
-          continue;
-        }
 
         // Auto-fill nama and jabatan from employee if missing
         if (!record.nama) {
