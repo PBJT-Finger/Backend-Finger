@@ -409,7 +409,6 @@ class AttendanceImportService {
     }
   }
 
-
   /**
    * Process Fingerspot import file
    * @param {Array} rows - Parsed rows
