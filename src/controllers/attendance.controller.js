@@ -212,7 +212,13 @@ class AttendanceController {
 
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'desc' }],
+        orderBy: [
+          { tanggal: 'desc' },
+          // jam_keluar DESC ensures records with a clock-out surface before null ones
+          // on the same date — required for the first-non-null lastCheckOut search below.
+          { jam_keluar: 'desc' },
+          { jam_masuk: 'desc' },
+        ],
       });
 
       // Group by employee
@@ -238,31 +244,28 @@ class AttendanceController {
         const dateStr = record.tanggal.toISOString().split('T')[0];
         employeeStats[key].attendanceDates.add(dateStr);
 
-        // Track check-in/out from the MOST RECENT attendance date only.
-        // Records are ORDER BY tanggal DESC, so the FIRST record seen for each
-        // NIP is guaranteed to be from the most recent date. We must NOT compare
-        // raw jam_masuk Date values across different dates, because Prisma returns
-        // MySQL TIME columns as "1970-01-01THH:MM:SSZ", making 23:16 always win
-        // over 08:00 even when 08:00 belongs to a newer date (→ the 23:16 bug).
-        if (!employeeStats[key].last_attendance_date) {
-          // First encounter for this NIP = most recent date
-          employeeStats[key].last_attendance_date = record.tanggal;
-          employeeStats[key].last_check_in = record.jam_masuk || null;
-          employeeStats[key].last_check_out = record.jam_keluar || null;
-        } else {
-          // Same most-recent date: only fill missing values (edge case)
-          const sameDate =
-            record.tanggal.toISOString().split('T')[0] ===
-            employeeStats[key].last_attendance_date.toISOString().split('T')[0];
-          if (sameDate) {
-            if (!employeeStats[key].last_check_in && record.jam_masuk) {
-              employeeStats[key].last_check_in = record.jam_masuk;
-            }
-            if (record.jam_keluar) {
-              employeeStats[key].last_check_out = record.jam_keluar;
-            }
-          }
-          // Older dates: intentionally ignored for lastCheckIn/lastCheckOut
+        // Track lastCheckIn and lastCheckOut INDEPENDENTLY.
+        //
+        // Strategy: iterate records in ORDER (tanggal DESC, jam_keluar DESC, jam_masuk DESC).
+        // For each field, take the FIRST non-null value encountered — that is the value
+        // from the most recent date that has a populated field.
+        //
+        // This correctly handles cases like:
+        //   • Most recent date: jam_masuk=07:25, jam_keluar=null
+        //     → lastCheckIn=07:25 (from today), lastCheckOut from a previous date
+        //   • Most recent date has only a pulang scan: jam_masuk=null, jam_keluar=06:53
+        //     → lastCheckOut=06:53 (today), lastCheckIn from a previous date
+        //
+        // Do NOT compare raw jam_masuk Date values across records: Prisma stores MySQL TIME
+        // columns as "1970-01-01THH:MM:SS" objects. Comparing them would pick 23:16 over
+        // 08:00 even when 23:16 belongs to an older date.
+
+        if (!employeeStats[key].last_check_in && record.jam_masuk) {
+          employeeStats[key].last_check_in = record.jam_masuk;
+        }
+
+        if (!employeeStats[key].last_check_out && record.jam_keluar) {
+          employeeStats[key].last_check_out = record.jam_keluar;
         }
 
         // Count late attendance

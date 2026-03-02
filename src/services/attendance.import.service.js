@@ -153,10 +153,14 @@ class AttendanceImportService {
         waktu += ':00';
       }
 
-      // Determine if check-in or check-out
+      // Determine if check-in or check-out.
+      // IMPORTANT: use explicit ! to avoid JS operator-precedence bug.
+      // Old code: includes('masuk') || includes('pulang') === false
+      //   → parsed as: includes('masuk') || (includes('pulang') === false)
+      //   → always true unless string is exactly 'pulang' (no other words).
+      // Correct: isCheckIn only when 'masuk' present OR 'pulang' NOT present.
       const tipeNormalized = tipeAbsen.toLowerCase();
-      const isCheckIn =
-        tipeNormalized.includes('masuk') || tipeNormalized.includes('pulang') === false;
+      const isCheckIn = tipeNormalized.includes('masuk') || !tipeNormalized.includes('pulang');
 
       return {
         nip,
@@ -173,16 +177,18 @@ class AttendanceImportService {
   }
 
   /**
-   * Group Fingerspot data by NIP and date
-   * Merge check-in and check-out into single record
-   * @param {Array} parsedRows - Parsed Fingerspot rows
-   * @returns {Array} Grouped attendance records
+   * Group Fingerspot data by NIP and date.
+   * Rules:
+   *  - Multi-scan (≥2): sort by time → earliest = jam_masuk, latest = jam_keluar.
+   *    Tipe Absensi is ignored here — pure time ordering is more reliable.
+   *  - Single-scan: use isCheckIn flag to decide which field to populate.
+   *    A lone "Absensi Pulang" scan (e.g. 06:53) must become jam_keluar, NOT jam_masuk.
    */
   static groupFingerspotData(parsedRows) {
     const grouped = {};
 
     parsedRows.forEach((row) => {
-      if (!row) return; // Skip null rows
+      if (!row) return;
 
       const dateStr = row.tanggal.toISOString().split('T')[0];
       const key = `${row.nip}_${dateStr}`;
@@ -192,38 +198,60 @@ class AttendanceImportService {
           nip: row.nip,
           nama: row.nama,
           tanggal: row.tanggal,
-          times: [],
+          entries: [], // stores { waktu: Date, isCheckIn: bool }
           verification_method: row.verifikasi,
           status: 'HADIR',
         };
       }
 
-      // Update name if empty (use most recent)
       if (!grouped[key].nama && row.nama) {
         grouped[key].nama = row.nama;
       }
 
-      // Helper to combine date + time into DateTime
       const combineDateTime = (date, timeStr) => {
         const [hours, minutes, seconds] = timeStr.split(':');
-        const dateTime = new Date(date);
-        dateTime.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds || 0), 0);
-        return dateTime;
+        const dt = new Date(date);
+        dt.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds || 0), 0);
+        return dt;
       };
 
-      const scanTime = combineDateTime(row.tanggal, row.waktu);
-      grouped[key].times.push(scanTime);
+      grouped[key].entries.push({
+        waktu: combineDateTime(row.tanggal, row.waktu),
+        isCheckIn: row.isCheckIn,
+      });
     });
 
     return Object.values(grouped).map((group) => {
-      // Sort ascending
-      group.times.sort((a, b) => a - b);
+      // Sort entries ascending by time
+      group.entries.sort((a, b) => a.waktu - b.waktu);
+
+      let jam_masuk = null;
+      let jam_keluar = null;
+
+      if (group.entries.length === 1) {
+        const [single] = group.entries;
+        if (single.isCheckIn) {
+          // Only clocked in — no clock-out recorded
+          jam_masuk = single.waktu;
+          jam_keluar = null;
+        } else {
+          // Only clocked out (e.g. early-morning departure for night shift)
+          // Do NOT force this into jam_masuk.
+          jam_masuk = null;
+          jam_keluar = single.waktu;
+        }
+      } else {
+        // ≥2 scans: min = jam_masuk, max = jam_keluar (ignore Tipe Absensi — more reliable)
+        jam_masuk = group.entries[0].waktu;
+        jam_keluar = group.entries[group.entries.length - 1].waktu;
+      }
+
       return {
         nip: group.nip,
         nama: group.nama,
         tanggal: group.tanggal,
-        jam_masuk: group.times[0] || null,
-        jam_keluar: group.times.length > 1 ? group.times[group.times.length - 1] : null,
+        jam_masuk,
+        jam_keluar,
         verification_method: group.verification_method,
         status: group.status,
       };
