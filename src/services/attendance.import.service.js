@@ -480,12 +480,14 @@ class AttendanceImportService {
             );
           }
         } catch (error) {
-          logger.error('Error looking up/creating employee:', { nip: record.nip, error: error.message });
+          logger.error('Error looking up/creating employee:', {
+            nip: record.nip,
+            error: error.message,
+          });
           results.errors.push(`NIP ${record.nip}: Error database - ${error.message}`);
           results.skipped++;
           continue;
         }
-
 
         // Auto-fill nama and jabatan from employee if missing
         if (!record.nama) {
