@@ -3,6 +3,22 @@ const prisma = require('../config/prisma');
 const { successResponse, errorResponse } = require('../utils/responseFormatter');
 const logger = require('../utils/logger');
 
+/**
+ * Parse a YYYY-MM-DD string as a LOCAL date (not UTC).
+ * Using new Date('YYYY-MM-DD') interprets the string as UTC midnight,
+ * which causes a timezone shift of -7 hours in WIB (UTC+7) servers,
+ * resulting in the wrong date (H-1). This helper avoids that issue.
+ * @param {string|null} d - Date string in YYYY-MM-DD format
+ * @returns {Date|null} Local-time Date object
+ */
+function parseLocalDate(d) {
+  if (!d) return null;
+  const str = typeof d === 'string' ? d.split('T')[0] : String(d);
+  const [y, m, day] = str.split('-').map(Number);
+  if (!y || !m || !day) return null;
+  return new Date(y, m - 1, day); // local midnight, no UTC shift
+}
+
 class AttendanceController {
   /**
    * Get lecturer (dosen) attendance
@@ -19,8 +35,8 @@ class AttendanceController {
 
       if (start_date && end_date) {
         whereClause.tanggal = {
-          gte: new Date(start_date),
-          lte: new Date(end_date),
+          gte: parseLocalDate(start_date),
+          lte: parseLocalDate(end_date),
         };
       }
 
@@ -65,8 +81,8 @@ class AttendanceController {
 
       if (start_date && end_date) {
         whereClause.tanggal = {
-          gte: new Date(start_date),
-          lte: new Date(end_date),
+          gte: parseLocalDate(start_date),
+          lte: parseLocalDate(end_date),
         };
       }
 
@@ -109,8 +125,8 @@ class AttendanceController {
 
       if (start_date && end_date) {
         whereClause.tanggal = {
-          gte: new Date(start_date),
-          lte: new Date(end_date),
+          gte: parseLocalDate(start_date),
+          lte: parseLocalDate(end_date),
         };
       }
 
@@ -196,8 +212,8 @@ class AttendanceController {
 
       const whereClause = {
         tanggal: {
-          gte: new Date(startDate),
-          lte: new Date(endDate),
+          gte: parseLocalDate(startDate),
+          lte: parseLocalDate(endDate),
         },
         is_deleted: false,
       };
@@ -240,8 +256,13 @@ class AttendanceController {
           };
         }
 
-        // Add unique date (convert to date string)
-        const dateStr = record.tanggal.toISOString().split('T')[0];
+        // Add unique date — use local date methods to avoid UTC timezone shift.
+        // toISOString() would shift WIB dates back by 7 hours (e.g. 2026-02-04 WIB → '2026-02-03'),
+        // causing the Set to contain wrong/extra dates and inflate totalHadir.
+        const t = record.tanggal;
+        const dateStr = typeof t === 'string'
+          ? t.split('T')[0]
+          : `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
         employeeStats[key].attendanceDates.add(dateStr);
 
         // Track lastCheckIn and lastCheckOut INDEPENDENTLY.

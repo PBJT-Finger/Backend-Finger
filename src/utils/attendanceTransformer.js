@@ -101,8 +101,18 @@ function calculateWorkingDays(startDate, endDate) {
     return 0;
   }
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  // Parse YYYY-MM-DD string as LOCAL date to avoid UTC midnight shift.
+  // new Date('YYYY-MM-DD') is interpreted as UTC midnight → in WIB (UTC+7) it becomes
+  // the previous day at 17:00, causing the loop to start 1 day too early and overcount.
+  const parseLocal = (d) => {
+    if (!d) return null;
+    const str = typeof d === 'string' ? d.split('T')[0] : String(d);
+    const [y, m, day] = str.split('-').map(Number);
+    return new Date(y, m - 1, day); // local midnight — no UTC shift
+  };
+
+  const start = parseLocal(startDate);
+  const end = parseLocal(endDate);
   let count = 0;
   const current = new Date(start);
 
