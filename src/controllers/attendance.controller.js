@@ -260,9 +260,10 @@ class AttendanceController {
         // toISOString() would shift WIB dates back by 7 hours (e.g. 2026-02-04 WIB → '2026-02-03'),
         // causing the Set to contain wrong/extra dates and inflate totalHadir.
         const t = record.tanggal;
-        const dateStr = typeof t === 'string'
-          ? t.split('T')[0]
-          : `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        const dateStr =
+          typeof t === 'string'
+            ? t.split('T')[0]
+            : `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
         employeeStats[key].attendanceDates.add(dateStr);
 
         // Track lastCheckIn and lastCheckOut INDEPENDENTLY.
