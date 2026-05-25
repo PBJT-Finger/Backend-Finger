@@ -21,10 +21,163 @@ const formatTimeFixed = (timeVal: string | Date | null): string => {
 
 export class ExportController {
   /**
-   * Export attendance to Excel
+   * Export attendance summary to Excel
    * GET /api/export/excel?start_date=X&end_date=Y&jabatan=Z&user_id=W
    */
   public static async exportToExcel(req: Request, res: Response): Promise<Response | void> {
+    try {
+      const { start_date, end_date, bulan, tahun, jabatan, user_id, id } = req.query;
+
+      let startDate = typeof start_date === 'string' ? start_date : '';
+      let endDate = typeof end_date === 'string' ? end_date : '';
+
+      // Handle month/year to date range conversion
+      if (bulan && tahun) {
+        const month = parseInt(bulan as string);
+        const year = parseInt(tahun as string);
+
+        const start = new Date(year, month - 1, 1);
+        startDate = start.toISOString().split('T')[0] as string;
+
+        const end = new Date(year, month, 0);
+        endDate = end.toISOString().split('T')[0] as string;
+      }
+
+      if (!startDate || !endDate) {
+        return errorResponse(res, 'Start date/end date OR month/year are required', 400);
+      }
+
+      // Get attendance data — deduplicate: one row per employee per date
+      let sql = `
+        SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
+               MIN(a.jam_masuk) AS jam_masuk,
+               MAX(a.jam_keluar) AS jam_keluar,
+               MAX(a.status) AS status
+        FROM attendance a
+        WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
+      `;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const params: any[] = [startDate, endDate];
+
+      if (jabatan) {
+        sql += ' AND a.jabatan = ?';
+        params.push(jabatan);
+      }
+
+      if (id || user_id) {
+        sql += ' AND a.user_id = ?';
+        params.push(id || user_id);
+      }
+
+      sql += ' GROUP BY a.tanggal, a.user_id, a.nama, a.jabatan';
+      sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
+
+      const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
+
+      if (attendance.length === 0) {
+        return errorResponse(res, 'No data found for export', 404);
+      }
+
+      // Transform to aggregated data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let transformedData: any[];
+      if (jabatan === 'DOSEN') {
+        transformedData = transformDosenAttendance(attendance, startDate, endDate);
+      } else {
+        transformedData = transformKaryawanAttendance(attendance, startDate, endDate);
+      }
+
+      // Create workbook with ExcelJS
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Rekap Absensi');
+
+      // Set columns based on jabatan
+      if (jabatan === 'KARYAWAN') {
+        worksheet.columns = [
+          { header: 'No', key: 'no', width: 6 },
+          { header: 'Nama', key: 'nama', width: 25 },
+          { header: 'Hadir', key: 'hadir', width: 8 },
+          { header: 'Terlambat', key: 'terlambat', width: 12 },
+          { header: 'Total Hari Kerja', key: 'total_hari_kerja', width: 18 },
+          { header: 'Waktu Kehadiran', key: 'waktu_kehadiran', width: 25 },
+          { header: 'Check In Terakhir', key: 'check_in_terakhir', width: 18 },
+          { header: 'Check Out Terakhir', key: 'check_out_terakhir', width: 18 },
+        ];
+
+        transformedData.forEach((record, index) => {
+          worksheet.addRow({
+            no: index + 1,
+            nama: record.nama || '-',
+            hadir: record.totalHadir || 0,
+            terlambat: record.totalTerlambat || 0,
+            total_hari_kerja: record.totalHariKerja || 0,
+            waktu_kehadiran: record.attendanceDates || 'Belum ada data',
+            check_in_terakhir: record.lastCheckIn || 'Belum ada data',
+            check_out_terakhir: record.lastCheckOut || 'Belum ada data',
+          });
+        });
+      } else {
+        // For DOSEN or all
+        worksheet.columns = [
+          { header: 'No', key: 'no', width: 6 },
+          { header: 'Nama', key: 'nama', width: 25 },
+          { header: 'ID', key: 'user_id', width: 15 },
+          { header: 'Hadir', key: 'hadir', width: 8 },
+          { header: 'Total Hari Kerja', key: 'total_hari_kerja', width: 18 },
+          { header: 'Waktu Kehadiran', key: 'waktu_kehadiran', width: 25 },
+          { header: 'Check In Terakhir', key: 'check_in_terakhir', width: 18 },
+          { header: 'Check Out Terakhir', key: 'check_out_terakhir', width: 18 },
+        ];
+
+        transformedData.forEach((record, index) => {
+          worksheet.addRow({
+            no: index + 1,
+            nama: record.nama || '-',
+            user_id: record.id || record.user_id || '-',
+            hadir: record.totalHadir || 0,
+            total_hari_kerja: record.totalHariKerja || 0,
+            waktu_kehadiran: record.attendanceDates || 'Belum ada data',
+            check_in_terakhir: record.lastCheckIn || 'Belum ada data',
+            check_out_terakhir: record.lastCheckOut || 'Belum ada data',
+          });
+        });
+      }
+
+      // Bold header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+
+      // Generate buffer in memory
+      const buffer = await workbook.xlsx.writeBuffer() as unknown as Buffer;
+
+      // Set headers for file download
+      const filename = `rekap-absensi-summary-${String(jabatan || 'all')}-${startDate}-to-${endDate}.xlsx`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+
+      const actorId = req.user?.id ?? 0;
+      logger.info('Excel summary export generated', {
+        filename,
+        records: transformedData.length,
+        user_id: actorId,
+      });
+
+      res.send(buffer);
+      return;
+    } catch (error) {
+      logger.error('Export to Excel summary error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      return errorResponse(res, 'Failed to export to Excel summary', 500);
+    }
+  }
+
+  /**
+   * Export detailed daily attendance to Excel
+   * GET /api/export/excel-detail?start_date=X&end_date=Y&jabatan=Z&user_id=W
+   */
+  public static async exportToExcelDetail(req: Request, res: Response): Promise<Response | void> {
     try {
       const { start_date, end_date, bulan, tahun, jabatan, user_id, id } = req.query;
 
@@ -92,7 +245,7 @@ export class ExportController {
 
       // Create workbook with ExcelJS
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Rekap Absensi');
+      const worksheet = workbook.addWorksheet('Detail Absensi');
 
       // Set columns with headers and widths
       worksheet.columns = [
@@ -115,7 +268,7 @@ export class ExportController {
       const buffer = await workbook.xlsx.writeBuffer() as unknown as Buffer;
 
       // Set headers for file download
-      const filename = `rekap-absensi-${String(jabatan || 'all')}-${startDate}-to-${endDate}.xlsx`;
+      const filename = `detail-absensi-${String(jabatan || 'all')}-${startDate}-to-${endDate}.xlsx`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader(
         'Content-Type',
@@ -123,7 +276,7 @@ export class ExportController {
       );
 
       const actorId = req.user?.id ?? 0;
-      logger.info('Excel export generated', {
+      logger.info('Excel detailed export generated', {
         filename,
         records: attendance.length,
         user_id: actorId,
@@ -132,8 +285,8 @@ export class ExportController {
       res.send(buffer);
       return;
     } catch (error) {
-      logger.error('Export to Excel error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
-      return errorResponse(res, 'Failed to export to Excel', 500);
+      logger.error('Export to Excel detailed error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      return errorResponse(res, 'Failed to export to Excel detailed', 500);
     }
   }
 

@@ -43,6 +43,7 @@ router.use(authenticateToken);
  *               format: binary
  */
 router.get('/excel', ExportController.exportToExcel);
+router.get('/excel-detail', ExportController.exportToExcelDetail);
 
 /**
  * @swagger
