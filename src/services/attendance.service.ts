@@ -24,7 +24,9 @@ export class AttendanceService {
    * Get attendance summary for employees
    * Main API for frontend rekap absensi
    */
-  public static async getAttendanceSummary(filters: AttendanceSummaryFilters = {}): Promise<EmployeeSummary[]> {
+  public static async getAttendanceSummary(
+    filters: AttendanceSummaryFilters = {}
+  ): Promise<EmployeeSummary[]> {
     try {
       const { startDate, endDate, user_id, jabatan } = filters;
 
@@ -72,7 +74,9 @@ export class AttendanceService {
 
       return summaries.filter((summary): summary is EmployeeSummary => summary !== null);
     } catch (error) {
-      logger.error('Error in getAttendanceSummary:', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Error in getAttendanceSummary:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -81,7 +85,12 @@ export class AttendanceService {
    * Get summary for one employee
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public static async getEmployeeSummary(employee: any, startDate: Date, endDate: Date, totalWorkingDays: number): Promise<EmployeeSummary | null> {
+  public static async getEmployeeSummary(
+    employee: any,
+    startDate: Date,
+    endDate: Date,
+    totalWorkingDays: number
+  ): Promise<EmployeeSummary | null> {
     try {
       // Get attendance records for this employee in date range
       const attendanceRecords = await prisma.attendance.findMany({
@@ -127,7 +136,9 @@ export class AttendanceService {
 
       return stats;
     } catch (error) {
-      logger.error(`Error getting summary for employee ${String(employee.user_id)}:`, { error: error instanceof Error ? error.message : String(error) });
+      logger.error(`Error getting summary for employee ${String(employee.user_id)}:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }
@@ -136,7 +147,11 @@ export class AttendanceService {
    * Check if attendance time is late
    * Note: This is simplified - actual late logic now in database via status field
    */
-  public static isLate(waktuAbsensi: string | null, shiftTime: string | null, toleransiMenit = 0): boolean {
+  public static isLate(
+    waktuAbsensi: string | null,
+    shiftTime: string | null,
+    toleransiMenit = 0
+  ): boolean {
     if (!waktuAbsensi || !shiftTime) return false;
 
     const waktu = new Date(`1970-01-01T${waktuAbsensi}`);
@@ -152,7 +167,11 @@ export class AttendanceService {
    * Get detailed attendance for one employee
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public static async getEmployeeAttendanceDetail(user_id: string, startDate: string, endDate: string): Promise<any[]> {
+  public static async getEmployeeAttendanceDetail(
+    user_id: string,
+    startDate: string,
+    endDate: string
+  ): Promise<any[]> {
     try {
       const attendance = await prisma.attendance.findMany({
         where: {
@@ -170,7 +189,9 @@ export class AttendanceService {
 
       return attendance;
     } catch (error) {
-      logger.error(`Error getting attendance detail for user ID ${user_id}:`, { error: error instanceof Error ? error.message : String(error) });
+      logger.error(`Error getting attendance detail for user ID ${user_id}:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }

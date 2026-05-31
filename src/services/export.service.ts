@@ -11,7 +11,11 @@ if (!fs.existsSync(exportsDir)) {
 
 export type ExportFormatType = 'excel' | 'pdf' | 'csv';
 
-export async function exportData(data: Record<string, unknown>[], format: ExportFormatType, filename: string): Promise<string> {
+export async function exportData(
+  data: Record<string, unknown>[],
+  format: ExportFormatType,
+  filename: string
+): Promise<string> {
   const filePath = path.join(exportsDir, `${filename}.${format === 'excel' ? 'xlsx' : format}`);
 
   switch (format) {
@@ -26,7 +30,11 @@ export async function exportData(data: Record<string, unknown>[], format: Export
   }
 }
 
-export async function exportSummaryData(data: Record<string, unknown>[], format: ExportFormatType, filename: string): Promise<string> {
+export async function exportSummaryData(
+  data: Record<string, unknown>[],
+  format: ExportFormatType,
+  filename: string
+): Promise<string> {
   const filePath = path.join(exportsDir, `${filename}.${format === 'excel' ? 'xlsx' : format}`);
 
   switch (format) {
@@ -41,7 +49,10 @@ export async function exportSummaryData(data: Record<string, unknown>[], format:
   }
 }
 
-export async function exportToExcel(data: Record<string, unknown>[], filePath: string): Promise<string> {
+export async function exportToExcel(
+  data: Record<string, unknown>[],
+  filePath: string
+): Promise<string> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Attendance Data');
 
@@ -68,7 +79,10 @@ export async function exportToExcel(data: Record<string, unknown>[], filePath: s
   return filePath;
 }
 
-export async function exportToPDF(data: Record<string, unknown>[], filePath: string): Promise<string> {
+export async function exportToPDF(
+  data: Record<string, unknown>[],
+  filePath: string
+): Promise<string> {
   const doc = new PDFDocument();
   doc.pipe(fs.createWriteStream(filePath));
 
@@ -114,7 +128,10 @@ export async function exportToPDF(data: Record<string, unknown>[], filePath: str
   });
 }
 
-export async function exportToCSV(data: Record<string, unknown>[], filePath: string): Promise<string> {
+export async function exportToCSV(
+  data: Record<string, unknown>[],
+  filePath: string
+): Promise<string> {
   const headers = [
     'cloud_id',
     'device_id',
@@ -150,7 +167,10 @@ export async function exportToCSV(data: Record<string, unknown>[], filePath: str
   return filePath;
 }
 
-export async function exportSummaryToExcel(data: Record<string, unknown>[], filePath: string): Promise<string> {
+export async function exportSummaryToExcel(
+  data: Record<string, unknown>[],
+  filePath: string
+): Promise<string> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Rekap Data');
 
@@ -176,7 +196,10 @@ export async function exportSummaryToExcel(data: Record<string, unknown>[], file
   return filePath;
 }
 
-export async function exportSummaryToPDF(data: Record<string, unknown>[], filePath: string): Promise<string> {
+export async function exportSummaryToPDF(
+  data: Record<string, unknown>[],
+  filePath: string
+): Promise<string> {
   const doc = new PDFDocument();
   doc.pipe(fs.createWriteStream(filePath));
 
@@ -201,7 +224,10 @@ export async function exportSummaryToPDF(data: Record<string, unknown>[], filePa
   return filePath;
 }
 
-export async function exportSummaryToCSV(data: Record<string, unknown>[], filePath: string): Promise<string> {
+export async function exportSummaryToCSV(
+  data: Record<string, unknown>[],
+  filePath: string
+): Promise<string> {
   const headers = [
     'no',
     'nama',

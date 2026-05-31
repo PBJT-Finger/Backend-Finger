@@ -39,7 +39,7 @@ export const errorHandler = (
   err: unknown,
   req: Request,
   res: Response,
-  _next: NextFunction,
+  _next: NextFunction
 ): void => {
   // Normalize to AppError
   let appError: AppError;
@@ -51,14 +51,14 @@ export const errorHandler = (
       err.message || 'Internal server error',
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
       false,
-      'INTERNAL_ERROR',
+      'INTERNAL_ERROR'
     );
   } else {
     appError = new AppError(
       'An unexpected error occurred',
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
       false,
-      'INTERNAL_ERROR',
+      'INTERNAL_ERROR'
     );
   }
 
@@ -140,9 +140,8 @@ export const notFoundHandler = (req: Request, res: Response, _next: NextFunction
  *
  * Without this, unhandled promise rejections silently fail or crash the process.
  */
-export const asyncHandler = <T>(
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<T>,
-) =>
+export const asyncHandler =
+  <T>(fn: (req: Request, res: Response, next: NextFunction) => Promise<T>) =>
   (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };

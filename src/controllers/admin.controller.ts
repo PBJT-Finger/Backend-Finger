@@ -89,7 +89,10 @@ export class AdminController {
 
       return successResponse(res, newAdmin, 'Admin berhasil dibuat', 201);
     } catch (error) {
-      logger.error('Create admin error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Create admin error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Gagal membuat admin', 500);
     }
   }
@@ -178,7 +181,10 @@ export class AdminController {
 
       return successResponse(res, updatedAdmin, 'Admin berhasil diperbarui');
     } catch (error) {
-      logger.error('Update admin error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Update admin error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Gagal memperbarui admin', 500);
     }
   }
@@ -227,7 +233,10 @@ export class AdminController {
 
       return successResponse(res, null, 'Admin berhasil dihapus');
     } catch (error) {
-      logger.error('Delete admin error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Delete admin error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Gagal menghapus admin', 500);
     }
   }
@@ -291,8 +300,14 @@ export class AdminController {
 
       return successResponse(res, null, 'Password changed successfully');
     } catch (error) {
-      logger.error('Change password error', { error: error instanceof Error ? error.message : String(error) });
-      return errorResponse(res, `Failed to change password: ${error instanceof Error ? error.message : String(error)}`, 500);
+      logger.error('Change password error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return errorResponse(
+        res,
+        `Failed to change password: ${error instanceof Error ? error.message : String(error)}`,
+        500
+      );
     }
   }
 }

@@ -13,7 +13,10 @@ export const parseTimeToDate = (time: number): Date => {
   time = (time - month) / 12;
   const year = time + 2000;
 
-  return new Date(year, month, day, hour, minute, second);
+  // Use Date.UTC so the device's raw time values are preserved in the UTC slots
+  // of the Date object. This eliminates server-timezone dependency — consumers
+  // must use getUTC*() methods to read back the original device time.
+  return new Date(Date.UTC(year, month, day, hour, minute, second));
 };
 
 export const parseHexToTime = (hex: Buffer): Date => {
@@ -26,7 +29,7 @@ export const parseHexToTime = (hex: Buffer): Date => {
     second: hex.readUIntLE(5, 1),
   };
 
-  return new Date(2000 + time.year, time.month - 1, time.date, time.hour, time.minute, time.second);
+  return new Date(Date.UTC(2000 + time.year, time.month - 1, time.date, time.hour, time.minute, time.second));
 };
 
 export const createChkSum = (buf: Buffer): number => {
@@ -97,17 +100,14 @@ export const decodeUserData72 = (userData: Buffer): DecodedUser => {
   return {
     uid: userData.readUIntLE(0, 2),
     role: userData.readUIntLE(2, 1),
-    name: userData
-      .slice(11)
-      .toString('ascii')
-      .split('\0')
-      .shift() || '',
+    name: userData.slice(11).toString('ascii').split('\0').shift() || '',
     cardno: userData.readUIntLE(35, 4),
-    userId: userData
-      .slice(48, 48 + 9)
-      .toString('ascii')
-      .split('\0')
-      .shift() || '',
+    userId:
+      userData
+        .slice(48, 48 + 9)
+        .toString('ascii')
+        .split('\0')
+        .shift() || '',
   };
 };
 
@@ -115,17 +115,32 @@ export interface DecodedRecord {
   userSn: number;
   deviceUserId: string;
   recordTime: Date;
+  /**
+   * ZKTeco punch type from the device:
+   *   0 = Check-In (Masuk)
+   *   1 = Check-Out (Keluar / Pulang)
+   *   2 = Break-Out
+   *   3 = Break-In
+   *   4 = Overtime-In
+   *   5 = Overtime-Out
+   */
+  attendanceType: number;
 }
 
 export const decodeRecordData40 = (recordData: Buffer): DecodedRecord => {
   return {
     userSn: recordData.readUIntLE(0, 2),
-    deviceUserId: recordData
-      .slice(2, 2 + 9)
-      .toString('ascii')
-      .split('\0')
-      .shift() || '',
+    deviceUserId:
+      recordData
+        .slice(2, 2 + 9)
+        .toString('ascii')
+        .split('\0')
+        .shift() || '',
     recordTime: parseTimeToDate(recordData.readUInt32LE(27)),
+    // Byte 31: actual punch state from ZKTeco device
+    // 0 = Check-In (Masuk), 1 = Check-Out (Pulang/Keluar)
+    // Note: byte 26 equals userSn for small IDs — NOT the attendance type
+    attendanceType: recordData.readUIntLE(31, 1),
   };
 };
 

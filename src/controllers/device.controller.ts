@@ -25,7 +25,9 @@ export class DeviceController {
 
       return successResponse(res, devices, 'Devices retrieved successfully');
     } catch (error) {
-      logger.error('Get devices error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Get devices error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to retrieve devices', 500);
     }
   }
@@ -45,7 +47,7 @@ export class DeviceController {
           location: true,
           is_active: true,
           created_at: true,
-        }
+        },
       });
 
       if (!device || !device.is_active) {
@@ -54,7 +56,9 @@ export class DeviceController {
 
       return successResponse(res, device, 'Device retrieved successfully');
     } catch (error) {
-      logger.error('Get device error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Get device error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to retrieve device', 500);
     }
   }
@@ -84,13 +88,20 @@ export class DeviceController {
           ip_address,
           location,
           api_key_hash,
-          is_active: true
-        }
+          is_active: true,
+        },
       });
 
-      return successResponse(res, { id: device.id, device_name: device.device_name }, 'Device created successfully', 201);
+      return successResponse(
+        res,
+        { id: device.id, device_name: device.device_name },
+        'Device created successfully',
+        201
+      );
     } catch (error) {
-      logger.error('Create device error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Create device error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to create device', 500);
     }
   }
@@ -112,12 +123,18 @@ export class DeviceController {
           ip_address: ip_address !== undefined ? ip_address : device.ip_address,
           location: location !== undefined ? location : device.location,
           is_active: is_active !== undefined ? is_active : device.is_active,
-        }
+        },
       });
 
-      return successResponse(res, { id: updated.id, device_name: updated.device_name }, 'Device updated successfully');
+      return successResponse(
+        res,
+        { id: updated.id, device_name: updated.device_name },
+        'Device updated successfully'
+      );
     } catch (error) {
-      logger.error('Update device error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Update device error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to update device', 500);
     }
   }
@@ -132,12 +149,14 @@ export class DeviceController {
 
       await prisma.devices.update({
         where: { id: Number(id) },
-        data: { is_active: false }
+        data: { is_active: false },
       });
 
       return successResponse(res, null, 'Device deleted successfully');
     } catch (error) {
-      logger.error('Delete device error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Delete device error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to delete device', 500);
     }
   }
@@ -155,9 +174,15 @@ export class DeviceController {
       const zkClient = ZkDeviceClient.getInstance();
       await zkClient.start();
 
-      return successResponse(res, { status: zkClient.getStatus() }, 'Device sync triggered successfully');
+      return successResponse(
+        res,
+        { status: zkClient.getStatus() },
+        'Device sync triggered successfully'
+      );
     } catch (error) {
-      logger.error('Sync device error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Sync device error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to trigger device sync', 500);
     }
   }

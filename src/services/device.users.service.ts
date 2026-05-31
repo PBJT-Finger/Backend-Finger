@@ -159,7 +159,7 @@ export class DeviceUsersService {
         acc[u.registrationStatus]++;
         return acc;
       },
-      { registered: 0, unregistered: 0, partial: 0 },
+      { registered: 0, unregistered: 0, partial: 0 }
     );
 
     logger.info('[DeviceUsersService] Pull completed', {
@@ -190,7 +190,7 @@ export class DeviceUsersService {
     if (!deviceUser) {
       throw new Error(
         `Device user ID "${deviceUserId}" tidak ditemukan di cache. ` +
-          'Pastikan alat terhubung dan coba tarik data terlebih dahulu.',
+          'Pastikan alat terhubung dan coba tarik data terlebih dahulu.'
       );
     }
 
@@ -216,7 +216,12 @@ export class DeviceUsersService {
           },
         });
         action = 'created';
-        logger.info('[DeviceUsersService] Employee created', { user_id: deviceUserId, nama, jabatan, batchId });
+        logger.info('[DeviceUsersService] Employee created', {
+          user_id: deviceUserId,
+          nama,
+          jabatan,
+          batchId,
+        });
       } else {
         // Employee exists — just update
         await tx.employees.update({
@@ -225,7 +230,7 @@ export class DeviceUsersService {
             nama,
             jabatan,
             shift_id: shiftId,
-          }
+          },
         });
         action = 'mapping_added';
         logger.info('[DeviceUsersService] Employee updated', {
@@ -240,7 +245,7 @@ export class DeviceUsersService {
     const patchedAttendanceCount = await this.patchOrphanAttendanceRecords(
       deviceUserId,
       nama,
-      jabatan,
+      jabatan
     );
 
     logger.audit?.('DEVICE_USER_REGISTERED', 0, {
@@ -269,7 +274,7 @@ export class DeviceUsersService {
   private async patchOrphanAttendanceRecords(
     deviceUserId: string,
     nama: string,
-    jabatan: 'DOSEN' | 'KARYAWAN',
+    jabatan: 'DOSEN' | 'KARYAWAN'
   ): Promise<number> {
     try {
       const result = await prisma.attendance.updateMany({

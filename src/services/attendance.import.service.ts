@@ -54,7 +54,10 @@ export class AttendanceImportService {
    * @param filename - Original filename
    * @returns Array of row objects
    */
-  public static async parseImportFile(buffer: Buffer, filename: string): Promise<Record<string, string | null>[]> {
+  public static async parseImportFile(
+    buffer: Buffer,
+    filename: string
+  ): Promise<Record<string, string | null>[]> {
     try {
       // Read workbook from buffer using xlsx (SheetJS)
       const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
@@ -70,7 +73,9 @@ export class AttendanceImportService {
       }
 
       // Convert sheet to json array
-      const rawData = xlsx.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: null });
+      const rawData = xlsx.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+        defval: null,
+      });
       const data: Record<string, string | null>[] = [];
 
       for (const row of rawData) {
@@ -102,8 +107,12 @@ export class AttendanceImportService {
       logger.info(`Parsed ${data.length} rows from ${filename}`);
       return data;
     } catch (error) {
-      logger.error('File parsing error:', { error: error instanceof Error ? error.message : String(error) });
-      throw new Error(`Gagal membaca file: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error('File parsing error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new Error(
+        `Gagal membaca file: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -112,7 +121,9 @@ export class AttendanceImportService {
    * @param rows - Parsed rows from Excel
    * @returns 'FINGERSPOT' | 'TEMPLATE' | 'UNKNOWN'
    */
-  public static detectFileFormat(rows: Record<string, string | null>[]): 'FINGERSPOT' | 'TEMPLATE' | 'UNKNOWN' {
+  public static detectFileFormat(
+    rows: Record<string, string | null>[]
+  ): 'FINGERSPOT' | 'TEMPLATE' | 'UNKNOWN' {
     if (!rows || rows.length === 0) {
       return 'UNKNOWN';
     }
@@ -160,7 +171,10 @@ export class AttendanceImportService {
    * @param index - Row index
    * @returns Parsed data
    */
-  public static parseFingerspotRow(row: Record<string, string | null>, index: number): ParsedRow | null {
+  public static parseFingerspotRow(
+    row: Record<string, string | null>,
+    index: number
+  ): ParsedRow | null {
     try {
       const user_id = String(row['NIK'] || row['ID'] || '').trim();
       const nama = String(row['Nama'] || '').trim();
@@ -176,10 +190,13 @@ export class AttendanceImportService {
       // Parse date - handle various formats
       let tanggal: Date;
       try {
-        if (/^\d{4}-\d{2}-\d{2}/.test(tanggalStr)) {
-          tanggal = new Date(tanggalStr.split(' ')[0] as string);
+        const cleanDateStr = tanggalStr.split(' ')[0] || '';
+        if (/^\d{4}-\d{2}-\d{2}/.test(cleanDateStr)) {
+          const parts = cleanDateStr.split('-');
+          tanggal = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
         } else {
-          tanggal = new Date(tanggalStr);
+          const temp = new Date(tanggalStr);
+          tanggal = new Date(Date.UTC(temp.getFullYear(), temp.getMonth(), temp.getDate()));
         }
       } catch (_e) {
         logger.warn(`Invalid date at row ${index + 2}:`, { tanggalStr });
@@ -207,7 +224,9 @@ export class AttendanceImportService {
         verifikasi: verifikasi.toUpperCase().replace(' ', '_'),
       };
     } catch (error) {
-      logger.error(`Error parsing Fingerspot row ${index + 2}:`, { error: error instanceof Error ? error.message : String(error) });
+      logger.error(`Error parsing Fingerspot row ${index + 2}:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }
@@ -221,7 +240,10 @@ export class AttendanceImportService {
     parsedRows.forEach((row) => {
       if (!row) return;
 
-      const dateStr = row.tanggal.toISOString().split('T')[0] as string;
+      const y = row.tanggal.getUTCFullYear();
+      const m = String(row.tanggal.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(row.tanggal.getUTCDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
       const key = `${row.user_id}_${dateStr}`;
 
       if (!grouped[key]) {
@@ -241,9 +263,16 @@ export class AttendanceImportService {
 
       const combineDateTime = (date: Date, timeStr: string): Date => {
         const [hours, minutes, seconds] = timeStr.split(':');
-        const dt = new Date(date);
-        dt.setHours(parseInt(hours || '0'), parseInt(minutes || '0'), parseInt(seconds || '0'), 0);
-        return dt;
+        return new Date(
+          Date.UTC(
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            date.getUTCDate(),
+            parseInt(hours || '0'),
+            parseInt(minutes || '0'),
+            parseInt(seconds || '0')
+          )
+        );
       };
 
       grouped[key].entries.push({
@@ -298,7 +327,10 @@ export class AttendanceImportService {
    * @returns { valid: boolean, errors: Array, data: Object }
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public static async validateRow(row: Record<string, string | null>, index: number): Promise<{ valid: boolean; errors: string[]; data: any }> {
+  public static async validateRow(
+    row: Record<string, string | null>,
+    index: number
+  ): Promise<{ valid: boolean; errors: string[]; data: any }> {
     const errors: string[] = [];
     const rowNum = index + 2; // +2 because: 1-indexed + header row
 
@@ -318,8 +350,13 @@ export class AttendanceImportService {
         where: { user_id },
       });
     } catch (error) {
-      logger.error('Error looking up employee:', { user_id, error: error instanceof Error ? error.message : String(error) });
-      errors.push(`Baris ${rowNum}: Error database - ${error instanceof Error ? error.message : String(error)}`);
+      logger.error('Error looking up employee:', {
+        user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      errors.push(
+        `Baris ${rowNum}: Error database - ${error instanceof Error ? error.message : String(error)}`
+      );
       return { valid: false, errors, data: null };
     }
 
@@ -338,19 +375,28 @@ export class AttendanceImportService {
     let tanggal: Date;
     try {
       const tanggalStr = String(row['tanggal']).trim();
+      let y, m, day;
 
       if (/^\d{4}-\d{2}-\d{2}$/.test(tanggalStr)) {
-        tanggal = new Date(tanggalStr);
+        const parts = tanggalStr.split('-');
+        y = Number(parts[0]);
+        m = Number(parts[1]);
+        day = Number(parts[2]);
       } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(tanggalStr)) {
         const parts = tanggalStr.split('/');
-        tanggal = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        y = Number(parts[2]);
+        m = Number(parts[1]);
+        day = Number(parts[0]);
       } else {
-        tanggal = new Date(tanggalStr);
+        const temp = new Date(tanggalStr);
+        if (isNaN(temp.getTime())) {
+          throw new Error('Invalid date');
+        }
+        y = temp.getFullYear();
+        m = temp.getMonth() + 1;
+        day = temp.getDate();
       }
-
-      if (isNaN(tanggal.getTime())) {
-        throw new Error('Invalid date');
-      }
+      tanggal = new Date(Date.UTC(y, m - 1, day));
     } catch (_error) {
       errors.push(`Baris ${rowNum}: Format tanggal tidak valid (gunakan YYYY-MM-DD)`);
       return { valid: false, errors, data: null };
@@ -387,6 +433,18 @@ export class AttendanceImportService {
           : jamKeluarStr;
     }
 
+    const parseTimeToUtcDate = (timeStr: string | null): Date | null => {
+      if (!timeStr) return null;
+      const parts = timeStr.split(':');
+      const h = parseInt(parts[0] || '0');
+      const m = parseInt(parts[1] || '0');
+      const s = parseInt(parts[2] || '0');
+      return new Date(Date.UTC(1970, 0, 1, h, m, s));
+    };
+
+    const jamMasukDate = parseTimeToUtcDate(jamMasuk);
+    const jamKeluarDate = parseTimeToUtcDate(jamKeluar);
+
     // Optional: Jabatan
     let jabatan = employee.jabatan;
     if (row['jabatan'] && String(row['jabatan']).trim() !== '') {
@@ -419,8 +477,8 @@ export class AttendanceImportService {
         nama,
         jabatan,
         tanggal,
-        jam_masuk: jamMasuk,
-        jam_keluar: jamKeluar,
+        jam_masuk: jamMasukDate,
+        jam_keluar: jamKeluarDate,
         device_id: 'MANUAL_IMPORT',
         cloud_id: null,
         verification_method: verificationMethod,
@@ -433,22 +491,30 @@ export class AttendanceImportService {
   /**
    * Check if attendance record is an exact duplicate.
    */
-  public static async isDuplicate(user_id: string, tanggal: Date, jamMasuk: string): Promise<boolean> {
+  public static async isDuplicate(
+    user_id: string,
+    tanggal: Date,
+    jamMasuk: Date | string
+  ): Promise<boolean> {
     try {
+      const jamMasukDate = jamMasuk instanceof Date ? jamMasuk : new Date(jamMasuk);
       const existing = await prisma.attendance.findFirst({
         where: {
           user_id,
           tanggal,
-          // Extract time match logic from datetime
-          // In prisma, if jam_masuk is a DateTime field, we format and query accordingly
-          jam_masuk: new Date(jamMasuk),
+          jam_masuk: jamMasukDate,
           is_deleted: false,
         },
       });
 
       return existing !== null;
     } catch (error) {
-      logger.error('Error checking duplicate:', { user_id, tanggal, jamMasuk, error: error instanceof Error ? error.message : String(error) });
+      logger.error('Error checking duplicate:', {
+        user_id,
+        tanggal,
+        jamMasuk,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
   }
@@ -456,7 +522,10 @@ export class AttendanceImportService {
   /**
    * Process Fingerspot import file
    */
-  public static async processFingerspotImport(rows: Record<string, string | null>[], options: ImportOptions = {}): Promise<ImportResultReport> {
+  public static async processFingerspotImport(
+    rows: Record<string, string | null>[],
+    options: ImportOptions = {}
+  ): Promise<ImportResultReport> {
     const { skipDuplicates = true } = options;
 
     try {
@@ -531,19 +600,46 @@ export class AttendanceImportService {
             user_id: record.user_id,
             error: error instanceof Error ? error.message : String(error),
           });
-          results.errors.push(`User ID ${record.user_id}: Error database - ${error instanceof Error ? error.message : String(error)}`);
+          results.errors.push(
+            `User ID ${record.user_id}: Error database - ${error instanceof Error ? error.message : String(error)}`
+          );
           results.skipped++;
           continue;
         }
 
         const nama = record.nama || employee.nama;
+        const jamMasukUtc = record.jam_masuk
+          ? new Date(
+              Date.UTC(
+                1970,
+                0,
+                1,
+                record.jam_masuk.getUTCHours(),
+                record.jam_masuk.getUTCMinutes(),
+                record.jam_masuk.getUTCSeconds()
+              )
+            )
+          : null;
+        const jamKeluarUtc = record.jam_keluar
+          ? new Date(
+              Date.UTC(
+                1970,
+                0,
+                1,
+                record.jam_keluar.getUTCHours(),
+                record.jam_keluar.getUTCMinutes(),
+                record.jam_keluar.getUTCSeconds()
+              )
+            )
+          : null;
+
         const mappedRecord = {
           user_id: employee.user_id,
           nama,
           jabatan: employee.jabatan,
           tanggal: record.tanggal,
-          jam_masuk: record.jam_masuk,
-          jam_keluar: record.jam_keluar,
+          jam_masuk: jamMasukUtc,
+          jam_keluar: jamKeluarUtc,
           device_id: 'FINGERSPOT_IMPORT',
           cloud_id: null,
           is_deleted: false,
@@ -553,11 +649,10 @@ export class AttendanceImportService {
 
         // Check duplicate
         if (mappedRecord.jam_masuk) {
-          // Format Date to ISO string to pass to isDuplicate
           const isDupe = await this.isDuplicate(
             mappedRecord.user_id,
             mappedRecord.tanggal,
-            mappedRecord.jam_masuk.toISOString()
+            mappedRecord.jam_masuk
           );
           if (isDupe) {
             if (skipDuplicates) {
@@ -593,8 +688,12 @@ export class AttendanceImportService {
           results.imported = validRecords.length;
           logger.info(`Successfully imported ${validRecords.length} Fingerspot records`);
         } catch (error) {
-          logger.error('Database insert error:', { error: error instanceof Error ? error.message : String(error) });
-          throw new Error(`Gagal menyimpan data ke database: ${error instanceof Error ? error.message : String(error)}`);
+          logger.error('Database insert error:', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw new Error(
+            `Gagal menyimpan data ke database: ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       }
 
@@ -606,7 +705,9 @@ export class AttendanceImportService {
         warnings: results.warnings.length > 0 ? results.warnings.slice(0, 10) : undefined,
       };
     } catch (error) {
-      logger.error('Fingerspot import processing error:', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Fingerspot import processing error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         success: false,
         message: error instanceof Error ? error.message : String(error),
@@ -622,7 +723,11 @@ export class AttendanceImportService {
   /**
    * Process import file and save to database
    */
-  public static async processImport(fileBuffer: Buffer, filename: string, options: ImportOptions = {}): Promise<ImportResultReport> {
+  public static async processImport(
+    fileBuffer: Buffer,
+    filename: string,
+    options: ImportOptions = {}
+  ): Promise<ImportResultReport> {
     try {
       const rows = await this.parseImportFile(fileBuffer, filename);
 
@@ -648,7 +753,8 @@ export class AttendanceImportService {
       } else {
         return {
           success: false,
-          message: 'Format file tidak dikenali. Gunakan template import atau file export dari Fingerspot.',
+          message:
+            'Format file tidak dikenali. Gunakan template import atau file export dari Fingerspot.',
           total: rows.length,
           imported: 0,
           skipped: rows.length,
@@ -657,7 +763,9 @@ export class AttendanceImportService {
         };
       }
     } catch (error) {
-      logger.error('Import processing error:', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Import processing error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         success: false,
         message: error instanceof Error ? error.message : String(error),
@@ -673,7 +781,10 @@ export class AttendanceImportService {
   /**
    * Process template format import (original logic)
    */
-  public static async processTemplateImport(rows: Record<string, string | null>[], options: ImportOptions = {}): Promise<ImportResultReport> {
+  public static async processTemplateImport(
+    rows: Record<string, string | null>[],
+    options: ImportOptions = {}
+  ): Promise<ImportResultReport> {
     const { skipDuplicates = true } = options;
 
     try {
@@ -721,7 +832,9 @@ export class AttendanceImportService {
             results.skipped++;
             continue;
           } else {
-            results.errors.push(`Baris ${i + 2}: Data duplikat ditemukan (update belum diimplementasi)`);
+            results.errors.push(
+              `Baris ${i + 2}: Data duplikat ditemukan (update belum diimplementasi)`
+            );
             results.skipped++;
             continue;
           }
@@ -743,10 +856,16 @@ export class AttendanceImportService {
           });
 
           results.imported = validRecords.length;
-          logger.info(`Successfully imported ${validRecords.length} attendance records from template import`);
+          logger.info(
+            `Successfully imported ${validRecords.length} attendance records from template import`
+          );
         } catch (error) {
-          logger.error('Database insert error:', { error: error instanceof Error ? error.message : String(error) });
-          throw new Error(`Gagal menyimpan data ke database: ${error instanceof Error ? error.message : String(error)}`);
+          logger.error('Database insert error:', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw new Error(
+            `Gagal menyimpan data ke database: ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       }
 
@@ -757,7 +876,9 @@ export class AttendanceImportService {
         duplicateDetails: duplicateRecords.length > 0 ? duplicateRecords : undefined,
       };
     } catch (error) {
-      logger.error('Import processing error:', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Import processing error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         success: false,
         message: error instanceof Error ? error.message : String(error),
@@ -773,7 +894,12 @@ export class AttendanceImportService {
   /**
    * Generate import summary message
    */
-  public static generateImportMessage(results: { total: number; imported: number; skipped: number; duplicates: number }): string {
+  public static generateImportMessage(results: {
+    total: number;
+    imported: number;
+    skipped: number;
+    duplicates: number;
+  }): string {
     const { total, imported, skipped, duplicates } = results;
 
     if (imported === 0) {

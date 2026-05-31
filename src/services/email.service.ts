@@ -39,7 +39,9 @@ const initializeTransporter = (): nodemailer.Transporter | null => {
     logger.info('Email transporter initialized successfully');
     return transporter;
   } catch (error) {
-    logger.error('Failed to initialize email transporter', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to initialize email transporter', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 };
@@ -55,7 +57,7 @@ export const sendEmail = async (
   to: string,
   subject: string,
   html: string,
-  text = '',
+  text = ''
 ): Promise<{ success: boolean; messageId: string }> => {
   // Initialize transporter if not already done
   if (!transporter) {
@@ -114,7 +116,7 @@ export const sendEmail = async (
 export const sendPasswordResetEmail = async (
   email: string,
   code: string,
-  username: string,
+  username: string
 ): Promise<{ success: boolean; messageId: string }> => {
   const subject = 'Reset Password - Finger Attendance System';
 
@@ -185,7 +187,7 @@ Tim Finger Attendance System
  */
 export const sendWelcomeEmail = async (
   email: string,
-  username: string,
+  username: string
 ): Promise<{ success: boolean; messageId: string }> => {
   const subject = 'Selamat Datang - Finger Attendance System';
 
@@ -252,7 +254,7 @@ Tim Finger Attendance System
  */
 export const sendPasswordResetConfirmation = async (
   email: string,
-  username: string,
+  username: string
 ): Promise<{ success: boolean; messageId: string }> => {
   const subject = 'Password Berhasil Direset - Finger Attendance System';
 

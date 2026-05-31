@@ -66,6 +66,4 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
     standardHeaders: true,
     legacyHeaders: false,
   },
-
-
 } as const;

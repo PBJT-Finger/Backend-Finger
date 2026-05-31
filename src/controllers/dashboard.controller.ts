@@ -106,7 +106,10 @@ export class DashboardController {
         'Dashboard statistics retrieved successfully'
       );
     } catch (error) {
-      logger.error('Get dashboard summary error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Get dashboard summary error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Failed to retrieve dashboard statistics', 500);
     }
   }
@@ -174,7 +177,9 @@ export class DashboardController {
         'Attendance trends retrieved successfully'
       );
     } catch (error) {
-      logger.error('Get attendance trends error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Get attendance trends error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to retrieve attendance trends', 500);
     }
   }

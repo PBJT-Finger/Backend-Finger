@@ -10,7 +10,12 @@ export interface PaginationMeta {
 /**
  * Send success response
  */
-export const successResponse = (res: Response, data: unknown = null, message = 'Success', statusCode = 200): Response => {
+export const successResponse = (
+  res: Response,
+  data: unknown = null,
+  message = 'Success',
+  statusCode = 200
+): Response => {
   const response: Record<string, unknown> = {
     success: true,
     message,
@@ -26,7 +31,11 @@ export const successResponse = (res: Response, data: unknown = null, message = '
 /**
  * Send error response
  */
-export const errorResponse = (res: Response, message = 'An error occurred', statusCode = 400): Response => {
+export const errorResponse = (
+  res: Response,
+  message = 'An error occurred',
+  statusCode = 400
+): Response => {
   return res.status(statusCode).json({
     success: false,
     message,
@@ -37,7 +46,13 @@ export const errorResponse = (res: Response, message = 'An error occurred', stat
  * Send login/authentication response
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const loginResponse = (res: Response, user: any, token: string, refreshToken: string | null = null, message = 'Login berhasil'): Response => {
+export const loginResponse = (
+  res: Response,
+  user: any,
+  token: string,
+  refreshToken: string | null = null,
+  message = 'Login berhasil'
+): Response => {
   const response = {
     success: true,
     message,
@@ -64,7 +79,12 @@ export const loginResponse = (res: Response, user: any, token: string, refreshTo
 /**
  * Send paginated response
  */
-export const paginatedResponse = (res: Response, data: unknown[], pagination: PaginationMeta, message = 'Data retrieved successfully'): Response => {
+export const paginatedResponse = (
+  res: Response,
+  data: unknown[],
+  pagination: PaginationMeta,
+  message = 'Data retrieved successfully'
+): Response => {
   return res.status(200).json({
     success: true,
     message,
@@ -82,7 +102,11 @@ export const paginatedResponse = (res: Response, data: unknown[], pagination: Pa
  * Send registration response
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const registerResponse = (res: Response, user: any, message = 'Registrasi berhasil. Silakan login.'): Response => {
+export const registerResponse = (
+  res: Response,
+  user: any,
+  message = 'Registrasi berhasil. Silakan login.'
+): Response => {
   return res.status(201).json({
     success: true,
     message,

@@ -17,8 +17,7 @@ const prismaOptions: Prisma.PrismaClientOptions = {
 
 // We explicitly cast the client instantiation to listen to 'query' events
 export const prisma =
-  global.prisma ||
-  new PrismaClient<Prisma.PrismaClientOptions, 'query'>(prismaOptions);
+  global.prisma || new PrismaClient<Prisma.PrismaClientOptions, 'query'>(prismaOptions);
 
 if (process.env.NODE_ENV !== 'production') {
   global.prisma = prisma;

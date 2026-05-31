@@ -46,3 +46,7 @@ coverage/
 # ─── Prisma generated ─────────────────────────────────────────────────────────
 # Keep schema.prisma & migrations folder, skip generated client if any
 # prisma/client/ → generated at deploy time via `prisma generate`
+
+# Dev scratch files
+scratch/
+scratch_admin.ts

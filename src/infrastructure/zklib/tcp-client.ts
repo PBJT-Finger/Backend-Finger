@@ -31,7 +31,10 @@ export class ZkTcpClient {
     this.timeout = timeout;
   }
 
-  public createSocket(cbError?: (err: Error) => void, cbClose?: (type: string) => void): Promise<net.Socket> {
+  public createSocket(
+    cbError?: (err: Error) => void,
+    cbClose?: (type: string) => void
+  ): Promise<net.Socket> {
     return new Promise((resolve, reject) => {
       this.socket = new net.Socket();
 
@@ -107,10 +110,13 @@ export class ZkTcpClient {
             if (this.socket) this.socket.removeListener('data', handleData);
             reject(err);
           } else if (this.timeout) {
-            timer = setTimeout(() => {
-              if (this.socket) this.socket.removeListener('data', handleData);
-              reject(new Error('TIMEOUT_ON_WRITING_MESSAGE'));
-            }, connectMode ? 2000 : this.timeout);
+            timer = setTimeout(
+              () => {
+                if (this.socket) this.socket.removeListener('data', handleData);
+                reject(new Error('TIMEOUT_ON_WRITING_MESSAGE'));
+              },
+              connectMode ? 2000 : this.timeout
+            );
           }
         });
       } else {
@@ -185,7 +191,10 @@ export class ZkTcpClient {
       let reply = null;
 
       try {
-        reply = await this.writeMessage(buf, command === COMMANDS.CMD_CONNECT || command === COMMANDS.CMD_EXIT);
+        reply = await this.writeMessage(
+          buf,
+          command === COMMANDS.CMD_CONNECT || command === COMMANDS.CMD_EXIT
+        );
 
         const rReply = removeTcpHeader(reply);
         if (rReply && rReply.length >= 6) {
@@ -222,7 +231,12 @@ export class ZkTcpClient {
   ): Promise<{ data: Buffer; err: Error | null }> {
     return new Promise(async (resolve, reject) => {
       this.replyId++;
-      const buf = createTCPHeader(COMMANDS.CMD_DATA_WRRQ, this.sessionId ?? 0, this.replyId, reqData);
+      const buf = createTCPHeader(
+        COMMANDS.CMD_DATA_WRRQ,
+        this.sessionId ?? 0,
+        this.replyId,
+        reqData
+      );
       let reply = null;
 
       try {
@@ -413,7 +427,10 @@ export class ZkTcpClient {
   }
 
   public async disableDevice(): Promise<Buffer> {
-    return await this.executeCmd(COMMANDS.CMD_DISABLEDEVICE, REQUEST_DATA.DISABLE_DEVICE as unknown as Buffer);
+    return await this.executeCmd(
+      COMMANDS.CMD_DISABLEDEVICE,
+      REQUEST_DATA.DISABLE_DEVICE as unknown as Buffer
+    );
   }
 
   public async enableDevice(): Promise<Buffer> {

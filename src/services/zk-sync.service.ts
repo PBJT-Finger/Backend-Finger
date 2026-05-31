@@ -78,17 +78,13 @@ export class ZkSyncService {
    *   Each record is processed in a try/catch independently. One bad record
    *   does not abort the entire batch.
    */
-  private async persistAttendanceBatch(
-    records: AttendanceRecord[],
-  ): Promise<BatchResult> {
+  private async persistAttendanceBatch(records: AttendanceRecord[]): Promise<BatchResult> {
     const batchId = uuidv4();
     let created = 0;
     let updated = 0;
     let errors = 0;
 
-    console.log(
-      `[ZkSyncService] Processing batch ${batchId} — ${records.length} record(s)`,
-    );
+    console.log(`[ZkSyncService] Processing batch ${batchId} — ${records.length} record(s)`);
 
     for (const record of records) {
       try {
@@ -100,7 +96,7 @@ export class ZkSyncService {
         errors++;
         const msg = err instanceof Error ? err.message : String(err);
         console.error(
-          `[ZkSyncService] Failed to persist record for user=${record.deviceUserId} time=${record.recordTime.toISOString()} — ${msg}`,
+          `[ZkSyncService] Failed to persist record for user=${record.deviceUserId} time=${record.recordTime.toISOString()} — ${msg}`
         );
         // Do NOT rethrow — isolate this record's failure from the rest of the batch
       }
@@ -115,7 +111,7 @@ export class ZkSyncService {
     };
 
     console.log(
-      `[ZkSyncService] Batch ${batchId} complete — processed=${result.processed} created=${result.created} errors=${result.errors}`,
+      `[ZkSyncService] Batch ${batchId} complete — processed=${result.processed} created=${result.created} errors=${result.errors}`
     );
 
     return result;
@@ -133,12 +129,9 @@ export class ZkSyncService {
    */
   private async upsertAttendanceRecord(record: AttendanceRecord): Promise<void> {
     const t = new Date(record.recordTime);
-    // Use the local date portion of the scan so `tanggal` matches the device's local attendance day.
-    const tanggal = new Date(t.getFullYear(), t.getMonth(), t.getDate());
-
-    const scanTime = record.recordTime;
-    // For TIME field comparison, use UTC hours since Prisma stores TIME as UTC representation
-    const hour = scanTime.getUTCHours();
+    // recordTime is now UTC-aligned (parseTimeToDate uses Date.UTC).
+    // Use getUTC* to extract the original device time values.
+    const tanggal = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
 
     // 1. deviceUserId maps directly to user_id
     const user_id = record.deviceUserId;
@@ -154,43 +147,59 @@ export class ZkSyncService {
     const resolvedName = employee?.nama ?? deviceName ?? `Karyawan ${record.deviceUserId}`;
     const resolvedJabatan = employee?.jabatan === 'DOSEN' ? 'DOSEN' : 'KARYAWAN';
 
-    if (hour < 12) {
-      // ─── MORNING SCAN (Masuk) ───
-      const shiftStartHour = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCHours() : 8;
-      const shiftStartMinute = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCMinutes() : 0;
-      const scanMinutes = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
+    // Store time components — use getUTC* since recordTime is UTC-aligned
+    const timePart = new Date(
+      Date.UTC(1970, 0, 1, t.getUTCHours(), t.getUTCMinutes(), t.getUTCSeconds())
+    );
+
+    // ─── Determine masuk/keluar from device attendanceType ───────────────────
+    // ZKTeco punch type (byte 26 of 40-byte record):
+    //   0=Check-In, 1=Check-Out, 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out
+    // Type 1 and 5 are "keluar" variants; all others treated as masuk.
+    const isKeluar = record.attendanceType === 1 || record.attendanceType === 5;
+
+    if (!isKeluar) {
+      // ─── SCAN MASUK (Check-In) ───
+      const shiftStartHour = employee?.shifts
+        ? new Date(employee.shifts.jam_masuk).getUTCHours()
+        : 8;
+      const shiftStartMinute = employee?.shifts
+        ? new Date(employee.shifts.jam_masuk).getUTCMinutes()
+        : 0;
+      const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
       const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
       const toleranceMinutes = 15;
 
-      const morningStatus = scanMinutes > (shiftMinutes + toleranceMinutes) ? 'TERLAMBAT' : 'HADIR';
+      const morningStatus = scanMinutes > shiftMinutes + toleranceMinutes ? 'TERLAMBAT' : 'HADIR';
 
-      // Always create a new record for raw log history
       await prisma.attendance.create({
         data: {
           user_id: resolvedUserId,
           nama: resolvedName,
           jabatan: resolvedJabatan,
           tanggal: tanggal,
-          jam_masuk: scanTime,
+          jam_masuk: timePart,
           jam_keluar: null,
           device_id: record.ip,
           verification_method: 'SIDIK_JARI',
           status: morningStatus,
-          status_keluar: 'HADIR', // Default
+          status_keluar: 'HADIR',
         },
       });
     } else {
-      // ─── AFTERNOON SCAN (Keluar) ───
-      const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
-      const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
-      
-      const scanMinutes = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
-      // Use 16:30 (990 mins) if no shift is assigned, otherwise use the shift's end minutes
-      const targetMinutes = employee?.shifts ? (shiftEndHour * 60 + shiftEndMinute) : 990;
+      // ─── SCAN KELUAR / PULANG (Check-Out) ───
+      const shiftEndHour = employee?.shifts
+        ? new Date(employee.shifts.jam_keluar).getUTCHours()
+        : 16;
+      const shiftEndMinute = employee?.shifts
+        ? new Date(employee.shifts.jam_keluar).getUTCMinutes()
+        : 30;
+
+      const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
+      const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
 
       const afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
 
-      // Always create a new record for raw log history
       await prisma.attendance.create({
         data: {
           user_id: resolvedUserId,
@@ -198,10 +207,10 @@ export class ZkSyncService {
           jabatan: resolvedJabatan,
           tanggal: tanggal,
           jam_masuk: null,
-          jam_keluar: scanTime,
+          jam_keluar: timePart,
           device_id: record.ip,
           verification_method: 'SIDIK_JARI',
-          status: 'HADIR', // Morning status placeholder
+          status: 'HADIR',
           status_keluar: afternoonStatus,
         },
       });

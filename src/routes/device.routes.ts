@@ -45,8 +45,6 @@ router.get('/shifts', authenticateToken, async (req: Request, res: Response) => 
   }
 });
 
-
-
 // Apply authentication to all device routes
 router.use(authenticateToken);
 

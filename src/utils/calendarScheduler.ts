@@ -18,10 +18,10 @@ export const SHIFT_NAMES = {
 export type ShiftName = (typeof SHIFT_NAMES)[keyof typeof SHIFT_NAMES];
 
 export interface ShiftTimeWindow {
-  arrivalStart: string;    // HH:MM:SS format
-  arrivalEnd: string;      // HH:MM:SS format
-  departureStart: string;  // HH:MM:SS format
-  departureEnd: string;    // HH:MM:SS format
+  arrivalStart: string; // HH:MM:SS format
+  arrivalEnd: string; // HH:MM:SS format
+  departureStart: string; // HH:MM:SS format
+  departureEnd: string; // HH:MM:SS format
 }
 
 export const SHIFT_SCHEDULES: Record<ShiftName, ShiftTimeWindow> = {
@@ -41,7 +41,7 @@ export const SHIFT_SCHEDULES: Record<ShiftName, ShiftTimeWindow> = {
 
 export interface ShiftScheduleDay {
   dateString: string; // YYYY-MM-DD
-  dayOfWeek: number;   // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, ... 6 = Saturday
   dayName: string;
   isWorkingDay: boolean;
   shift: ShiftTimeWindow;
@@ -147,25 +147,17 @@ export function formatLocalDateString(date: Date): string {
 export function getLocalMonthBoundaries(year: number, month: number): { start: Date; end: Date } {
   // Start on 1st of the month at 00:00:00.000 local time
   const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
-  
+
   // Last day of the month is obtained by passing 0 as the day in the next month context
   const totalDays = getDaysInMonth(year, month);
   const end = new Date(year, month - 1, totalDays, 23, 59, 59, 999);
-  
+
   return { start, end };
 }
 
 // ─── SCHEDULE GENERATION & VERIFICATION ───────────────────────────────────────
 
-const DAY_NAMES = [
-  'Minggu',
-  'Senin',
-  'Selasa',
-  'Rabu',
-  'Kamis',
-  'Jumat',
-  'Sabtu',
-];
+const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
 export interface VerifyAttendanceInput {
   scanTime: Date;
@@ -183,13 +175,13 @@ export interface VerificationResult {
 
 /**
  * Generates a full month schedule grid.
- * Configured by default to exclude Sundays (0) as non-working days.
+ * Configured by default to exclude Sundays (0) and Saturdays (6) as non-working days.
  */
 export function generateMonthlySchedule(
   year: number,
   month: number,
   shiftName: ShiftName,
-  excludeDays: number[] = [0] // Default exclude Sunday (0)
+  excludeDays: number[] = [0, 6] // Default exclude Sunday (0) and Saturday (6)
 ): ShiftScheduleDay[] {
   const totalDays = getDaysInMonth(year, month);
   const schedule: ShiftScheduleDay[] = [];
@@ -229,7 +221,7 @@ export function verifyScanAgainstShift(
   const scanHours = scanTime.getHours();
   const scanMinutes = scanTime.getMinutes();
   const scanSeconds = scanTime.getSeconds();
-  
+
   const scanTotalSeconds = scanHours * 3600 + scanMinutes * 60 + scanSeconds;
 
   const parseToSeconds = (timeStr: string): number => {
@@ -254,14 +246,16 @@ export function verifyScanAgainstShift(
 
   if (isArrivalScan) {
     // Arrival window validation
-    isWithinArrivalWindow = scanTotalSeconds >= arrivalStartSec && scanTotalSeconds <= arrivalEndSec;
+    isWithinArrivalWindow =
+      scanTotalSeconds >= arrivalStartSec && scanTotalSeconds <= arrivalEndSec;
     if (scanTotalSeconds > arrivalEndSec) {
       isLate = true;
       minutesLate = Math.ceil((scanTotalSeconds - arrivalEndSec) / 60);
     }
   } else {
     // Departure window validation
-    isWithinDepartureWindow = scanTotalSeconds >= departureStartSec && scanTotalSeconds <= departureEndSec;
+    isWithinDepartureWindow =
+      scanTotalSeconds >= departureStartSec && scanTotalSeconds <= departureEndSec;
     if (scanTotalSeconds < departureStartSec) {
       isEarlyDeparture = true;
       minutesEarlyDeparture = Math.ceil((departureStartSec - scanTotalSeconds) / 60);

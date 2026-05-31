@@ -57,7 +57,7 @@ if (!fs.existsSync(logsDir)) {
 const jsonFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DDTHH:mm:ssZ' }),
   winston.format.errors({ stack: true }),
-  winston.format.json(),
+  winston.format.json()
 );
 
 const transports: winston.transport[] = [
@@ -81,9 +81,9 @@ if (env.NODE_ENV !== 'production') {
         winston.format.printf(({ timestamp, level, message, ...meta }) => {
           const metaStr = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : '';
           return `${String(timestamp)} [${String(level)}]: ${String(message)}${metaStr}`;
-        }),
+        })
       ),
-    }),
+    })
   );
 }
 
@@ -121,7 +121,7 @@ const createFacade = (winstonInst: winston.Logger) => ({
       auditTimestamp: new Date().toISOString(),
     });
   },
-  
+
   /**
    * Creates a child logger with bound contextual data.
    */

@@ -128,6 +128,16 @@ model shifts {
   @@index([is_active], map: "idx_is_active")
 }
 
+model holidays {
+  id         Int       @id @default(autoincrement())
+  tanggal    DateTime  @unique @db.Date
+  nama_libur String    @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([tanggal], map: "idx_tanggal")
+}
+
 enum employees_jabatan {
   DOSEN
   KARYAWAN

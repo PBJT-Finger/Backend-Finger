@@ -74,7 +74,11 @@ export class AuthController {
 
         return loginResponse(res, admin, accessToken, refreshToken);
       } catch (error) {
-        logger.error('Login error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, ip: req.ip });
+        logger.error('Login error', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          ip: req.ip,
+        });
         return errorResponse(res, 'Internal server error', 500);
       }
     },
@@ -147,14 +151,21 @@ export class AuthController {
         try {
           await sendWelcomeEmail(email, username);
         } catch (emailError) {
-          logger.warn('Failed to send welcome email', { email, error: emailError instanceof Error ? emailError.message : String(emailError) });
+          logger.warn('Failed to send welcome email', {
+            email,
+            error: emailError instanceof Error ? emailError.message : String(emailError),
+          });
         }
 
         logger.audit('ADMIN_REGISTERED', newAdmin.id, { username, email, ip: req.ip });
 
         return registerResponse(res, newAdmin);
       } catch (error) {
-        logger.error('Register error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, ip: req.ip });
+        logger.error('Register error', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          ip: req.ip,
+        });
         return errorResponse(res, 'Gagal mendaftar. Silakan coba lagi.', 500);
       }
     },
@@ -206,7 +217,10 @@ export class AuthController {
         try {
           await sendPasswordResetEmail(email, code, admin.username);
         } catch (emailError) {
-          logger.warn('Failed to send password reset email', { email, error: emailError instanceof Error ? emailError.message : String(emailError) });
+          logger.warn('Failed to send password reset email', {
+            email,
+            error: emailError instanceof Error ? emailError.message : String(emailError),
+          });
           logger.info('PASSWORD RESET CODE (Development)', { email, code });
         }
 
@@ -272,7 +286,11 @@ export class AuthController {
 
         return passwordResetResponse(res, { resetToken }, 'Kode valid');
       } catch (error) {
-        logger.error('Verify code error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, ip: req.ip });
+        logger.error('Verify code error', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          ip: req.ip,
+        });
         return errorResponse(res, 'Terjadi kesalahan. Silakan coba lagi.', 500);
       }
     },
@@ -402,7 +420,10 @@ export class AuthController {
         'Tokens refreshed successfully'
       );
     } catch (error) {
-      logger.error('Refresh token error', { error: error instanceof Error ? error.message : String(error), ip: req.ip });
+      logger.error('Refresh token error', {
+        error: error instanceof Error ? error.message : String(error),
+        ip: req.ip,
+      });
       return errorResponse(res, 'Invalid refresh token', 401);
     }
   };
@@ -442,7 +463,10 @@ export class AuthController {
         `Logout berhasil. ${tokensBlacklisted} token(s) invalidated.`
       );
     } catch (error) {
-      logger.error('Logout error', { error: error instanceof Error ? error.message : String(error), userId: req.user?.id });
+      logger.error('Logout error', {
+        error: error instanceof Error ? error.message : String(error),
+        userId: req.user?.id,
+      });
       return errorResponse(res, 'Internal server error', 500);
     }
   };

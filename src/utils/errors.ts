@@ -29,7 +29,7 @@ export class AppError extends Error {
     message: string,
     statusCode: HttpStatusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR,
     isOperational = true,
-    code = 'INTERNAL_ERROR',
+    code = 'INTERNAL_ERROR'
   ) {
     super(message);
     this.name = this.constructor.name;

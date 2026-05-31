@@ -11,6 +11,7 @@ import {
   transformDosenAttendance,
   transformKaryawanAttendance,
   RawAttendanceRecord,
+  calculateWorkingDays,
 } from '../utils/attendanceTransformer';
 
 // Helper wrapper to handle time formatting safely
@@ -78,77 +79,70 @@ export class ExportController {
         return errorResponse(res, 'No data found for export', 404);
       }
 
+      // Get holidays in the selected range
+      const holidayWhere: any = {};
+      const startLocalDate = startDate ? new Date(startDate) : null;
+      const endLocalDate = endDate ? new Date(endDate) : null;
+      if (startLocalDate || endLocalDate) {
+        holidayWhere.tanggal = {};
+        if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
+        if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
+      }
+      const holidays = await prisma.holidays.findMany({
+        where: holidayWhere,
+        select: { tanggal: true },
+      });
+      const holidaySet = new Set(
+        holidays.map((h) => {
+          const t = h.tanggal;
+          return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        })
+      );
+
+      const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
+
       // Transform to aggregated data
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
-        transformedData = transformDosenAttendance(attendance, startDate, endDate);
+        transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
       } else {
-        transformedData = transformKaryawanAttendance(attendance, startDate, endDate);
+        transformedData = transformKaryawanAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
       }
 
       // Create workbook with ExcelJS
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Rekap Absensi');
 
-      // Set columns based on jabatan
-      if (jabatan === 'KARYAWAN') {
-        worksheet.columns = [
-          { header: 'No', key: 'no', width: 6 },
-          { header: 'Nama', key: 'nama', width: 25 },
-          { header: 'Hadir', key: 'hadir', width: 8 },
-          { header: 'Terlambat', key: 'terlambat', width: 12 },
-          { header: 'Total Hari Kerja', key: 'total_hari_kerja', width: 18 },
-          { header: 'Waktu Kehadiran', key: 'waktu_kehadiran', width: 25 },
-          { header: 'Check In Terakhir', key: 'check_in_terakhir', width: 18 },
-          { header: 'Check Out Terakhir', key: 'check_out_terakhir', width: 18 },
-        ];
+      // Set columns
+      worksheet.columns = [
+        { header: 'No', key: 'no', width: 6 },
+        { header: 'Nama', key: 'nama', width: 28 },
+        { header: 'Hari Kerja Target', key: 'total_hari_kerja', width: 18 },
+        { header: 'Hadir', key: 'hadir', width: 10 },
+        { header: 'Terlambat', key: 'terlambat', width: 12 },
+        { header: 'Tidak Hadir', key: 'tidak_hadir', width: 12 },
+        { header: 'Persentase', key: 'persentase', width: 12 },
+      ];
 
-        transformedData.forEach((record, index) => {
-          worksheet.addRow({
-            no: index + 1,
-            nama: record.nama || '-',
-            hadir: record.totalHadir || 0,
-            terlambat: record.totalTerlambat || 0,
-            total_hari_kerja: record.totalHariKerja || 0,
-            waktu_kehadiran: record.attendanceDates || 'Belum ada data',
-            check_in_terakhir: record.lastCheckIn || 'Belum ada data',
-            check_out_terakhir: record.lastCheckOut || 'Belum ada data',
-          });
+      transformedData.forEach((record, index) => {
+        worksheet.addRow({
+          no: index + 1,
+          nama: record.nama || '-',
+          total_hari_kerja: record.totalHariKerja || 0,
+          hadir: record.totalHadir || 0,
+          terlambat: record.totalTerlambat || 0,
+          tidak_hadir: record.tidakHadir || 0,
+          persentase: `${record.persentase || 0}%`,
         });
-      } else {
-        // For DOSEN or all
-        worksheet.columns = [
-          { header: 'No', key: 'no', width: 6 },
-          { header: 'Nama', key: 'nama', width: 25 },
-          { header: 'ID', key: 'user_id', width: 15 },
-          { header: 'Hadir', key: 'hadir', width: 8 },
-          { header: 'Total Hari Kerja', key: 'total_hari_kerja', width: 18 },
-          { header: 'Waktu Kehadiran', key: 'waktu_kehadiran', width: 25 },
-          { header: 'Check In Terakhir', key: 'check_in_terakhir', width: 18 },
-          { header: 'Check Out Terakhir', key: 'check_out_terakhir', width: 18 },
-        ];
-
-        transformedData.forEach((record, index) => {
-          worksheet.addRow({
-            no: index + 1,
-            nama: record.nama || '-',
-            user_id: record.id || record.user_id || '-',
-            hadir: record.totalHadir || 0,
-            total_hari_kerja: record.totalHariKerja || 0,
-            waktu_kehadiran: record.attendanceDates || 'Belum ada data',
-            check_in_terakhir: record.lastCheckIn || 'Belum ada data',
-            check_out_terakhir: record.lastCheckOut || 'Belum ada data',
-          });
-        });
-      }
+      });
 
       // Bold header row
       const headerRow = worksheet.getRow(1);
       headerRow.font = { bold: true };
 
       // Generate buffer in memory
-      const buffer = await workbook.xlsx.writeBuffer() as unknown as Buffer;
+      const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
 
       // Set headers for file download
       const filename = `rekap-absensi-summary-${String(jabatan || 'all')}-${startDate}-to-${endDate}.xlsx`;
@@ -168,7 +162,10 @@ export class ExportController {
       res.send(buffer);
       return;
     } catch (error) {
-      logger.error('Export to Excel summary error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Export to Excel summary error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Failed to export to Excel summary', 500);
     }
   }
@@ -265,7 +262,7 @@ export class ExportController {
       excelData.forEach((row) => worksheet.addRow(row));
 
       // Generate buffer in memory
-      const buffer = await workbook.xlsx.writeBuffer() as unknown as Buffer;
+      const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
 
       // Set headers for file download
       const filename = `detail-absensi-${String(jabatan || 'all')}-${startDate}-to-${endDate}.xlsx`;
@@ -285,7 +282,10 @@ export class ExportController {
       res.send(buffer);
       return;
     } catch (error) {
-      logger.error('Export to Excel detailed error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Export to Excel detailed error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Failed to export to Excel detailed', 500);
     }
   }
@@ -350,13 +350,35 @@ export class ExportController {
         return errorResponse(res, 'No data found for export', 404);
       }
 
+      // Get holidays in the selected range
+      const holidayWhere: any = {};
+      const startLocalDate = startDate ? new Date(startDate) : null;
+      const endLocalDate = endDate ? new Date(endDate) : null;
+      if (startLocalDate || endLocalDate) {
+        holidayWhere.tanggal = {};
+        if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
+        if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
+      }
+      const holidays = await prisma.holidays.findMany({
+        where: holidayWhere,
+        select: { tanggal: true },
+      });
+      const holidaySet = new Set(
+        holidays.map((h) => {
+          const t = h.tanggal;
+          return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        })
+      );
+
+      const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
+
       // Transform to aggregated data
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
-        transformedData = transformDosenAttendance(attendance, startDate, endDate);
+        transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
       } else {
-        transformedData = transformKaryawanAttendance(attendance, startDate, endDate);
+        transformedData = transformKaryawanAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
       }
 
       // Create PDF document
@@ -370,78 +392,55 @@ export class ExportController {
       // Pipe PDF to response
       doc.pipe(res);
 
-      // Add header with better spacing
-      doc.fontSize(20).font('Helvetica-Bold').text('REKAP ABSENSI KAMPUS', { align: 'center' });
+      // Title & Header info
+      doc.moveDown(1.5);
+      doc.fontSize(18).fillColor('#1E293B').font('Helvetica-Bold').text('LAPORAN REKAPITULASI KEHADIRAN', { align: 'center' });
       doc.moveDown(0.2);
 
-      // Determine Jabatan label
       let jabatanLabel = 'SEMUA PEGAWAI';
-      if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN';
-      if (jabatan === 'KARYAWAN') jabatanLabel = 'KARYAWAN';
+      if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN / TENAGA PENDIDIK';
+      if (jabatan === 'KARYAWAN') jabatanLabel = 'KARYAWAN / STAFF';
 
-      doc.fontSize(14).font('Helvetica-Bold').text(jabatanLabel, { align: 'center' });
+      doc.fontSize(12).fillColor('#475569').font('Helvetica-Bold').text(jabatanLabel.toUpperCase(), { align: 'center' });
       doc.moveDown(0.2);
 
-      doc
-        .fontSize(12)
-        .font('Helvetica')
-        .text(`Periode: ${formatDateID(startDate)} s/d ${formatDateID(endDate)}`, {
-          align: 'center',
-        });
+      doc.fontSize(9).fillColor('#64748B').font('Helvetica-Oblique').text(`Periode: ${formatDateID(startDate)} s/d ${formatDateID(endDate)}`, { align: 'center' });
       doc.moveDown(1.5);
 
-      // Table header - different columns for DOSEN vs KARYAWAN
       const tableTop = doc.y;
-      const startX = 30; // Reduce left margin to maximize space
-      let colWidths: number[], headers: string[];
+      const startX = 31; // Center of Landscape A4 (841.89 - 780) / 2 = 30.94
+      
+      const colWidths = [40, 265, 110, 85, 90, 95, 95];
+      const headers = [
+        'No',
+        'Nama',
+        'Hari Kerja\nTarget',
+        'Hadir',
+        'Terlambat',
+        'Tidak Hadir',
+        'Persentase',
+      ];
 
-      // Adjusted widths for A4 Landscape
-      if (jabatan === 'KARYAWAN') {
-        colWidths = [35, 170, 60, 80, 165, 110, 110];
-        headers = [
-          'No',
-          'Nama',
-          'Hadir',
-          'Total Hari\nKerja',
-          'Waktu Kehadiran',
-          'Check In\nTerakhir',
-          'Check Out\nTerakhir',
-        ];
-      } else {
-        colWidths = [35, 140, 110, 60, 80, 165, 100, 100];
-        headers = [
-          'No',
-          'Nama',
-          'ID',
-          'Hadir',
-          'Total Hari\nKerja',
-          'Waktu Kehadiran',
-          'Check In\nTerakhir',
-          'Check Out\nTerakhir',
-        ];
-      }
+      const rowHeight = 25;
+      const headerHeight = 35;
 
-      const rowHeight = 30;
-      const headerHeight = 40;
-
-      // Helper function to draw table header with individual cell borders
       const drawTableHeader = (startY: number) => {
         let xPos = startX;
-
-        doc.fontSize(9).fillColor('black').font('Helvetica-Bold');
+        doc.fontSize(10).fillColor('#334155').font('Helvetica-Bold');
         const lineH = doc.currentLineHeight();
 
         headers.forEach((header, i) => {
-          // Draw cell border and background
           const w = colWidths[i] || 50;
-          doc.rect(xPos, startY, w, headerHeight).fillAndStroke('#f0f0f0', '#000000');
+          
+          // Draw header cell background (Light grey with grey border)
+          doc.rect(xPos, startY, w, headerHeight).fillAndStroke('#F1F5F9', '#CBD5E1');
 
-          // Count lines in header text for vertical centering
+          // Vertically center text
           const lines = header.split('\n');
           const textBlockHeight = lines.length * lineH;
           const textY = startY + (headerHeight - textBlockHeight) / 2;
 
-          doc.fillColor('black').text(header, xPos + 4, textY, {
+          doc.fillColor('#334155').text(header, xPos + 4, textY, {
             width: w - 8,
             align: 'center',
             lineBreak: true,
@@ -454,59 +453,58 @@ export class ExportController {
       drawTableHeader(tableTop);
 
       // Draw data rows
-      doc.font('Helvetica').fontSize(9);
+      doc.font('Helvetica').fontSize(10);
       const dataLineH = doc.currentLineHeight();
       let yPos = tableTop + headerHeight;
 
       transformedData.forEach((record, index) => {
         // Check if we need a new page
-        if (yPos + rowHeight > 550) {
+        if (yPos + rowHeight > 520) {
           doc.addPage();
+          doc.moveDown(1.5);
           const newTableTop = 50;
           drawTableHeader(newTableTop);
-          doc.font('Helvetica').fontSize(9);
+          doc.font('Helvetica').fontSize(10);
           yPos = newTableTop + headerHeight;
         }
 
         let xPos = startX;
-        let rowData: string[];
+        
+        const rowData = [
+          { text: String(index + 1) },
+          { text: record.nama || '-' },
+          { text: String(record.totalHariKerja || 0) },
+          { text: String(record.totalHadir || 0) },
+          { text: String(record.totalTerlambat || 0), isLate: (record.totalTerlambat || 0) > 0 },
+          { text: String(record.tidakHadir || 0) },
+          { text: `${record.persentase || 0}%` },
+        ];
 
-        if (jabatan === 'KARYAWAN') {
-          rowData = [
-            String(index + 1),
-            record.nama || '-',
-            String(record.totalHadir || 0),
-            String(record.totalHariKerja || 0),
-            record.attendanceDates || 'Belum ada data',
-            record.lastCheckIn || 'Belum ada data',
-            record.lastCheckOut || 'Belum ada data',
-          ];
-        } else {
-          rowData = [
-            String(index + 1),
-            record.nama || '-',
-            record.id || record.user_id || '-',
-            String(record.totalHadir || 0),
-            String(record.totalHariKerja || 0),
-            record.attendanceDates || 'Belum ada data',
-            record.lastCheckIn || 'Belum ada data',
-            record.lastCheckOut || 'Belum ada data',
-          ];
-        }
+        // Alternate background colors (Zebra Striping)
+        const rowBg = index % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
 
-        // Draw each cell with individual borders
-        rowData.forEach((data, i) => {
+        rowData.forEach((cell, i) => {
           const w = colWidths[i] || 50;
-          doc.rect(xPos, yPos, w, rowHeight).stroke('#000000');
+          
+          // Draw cell background and light grey border
+          doc.rect(xPos, yPos, w, rowHeight).fillAndStroke(rowBg, '#E2E8F0');
 
           const align = i === 1 ? 'left' : 'center';
           const textY = yPos + (rowHeight - dataLineH) / 2;
           const padding = 6;
 
+          let fillHex = '#334155';
+          let fontName = 'Helvetica';
+          if (cell.isLate) {
+            fillHex = '#EF4444';
+            fontName = 'Helvetica-Bold';
+          }
+
           doc
-            .fillColor('black')
-            .fontSize(9)
-            .text(data, xPos + padding, textY, {
+            .fillColor(fillHex)
+            .font(fontName)
+            .fontSize(10)
+            .text(cell.text, xPos + padding, textY, {
               width: w - padding * 2,
               align: align,
               lineBreak: false,
@@ -530,7 +528,10 @@ export class ExportController {
       });
       return;
     } catch (error) {
-      logger.error('Export to PDF error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Export to PDF error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Failed to export to PDF', 500);
     }
   }
@@ -596,16 +597,47 @@ export class ExportController {
       }
 
       // Format data for CSV
-      const csvData = attendance.map((record) => {
-        return {
-          tanggal: formatDateID(record.tanggal),
-          id: record.user_id || '',
-          nama: record.nama || '',
-          jam_masuk: formatTimeFixed(record.jam_masuk),
-          jam_keluar: formatTimeFixed(record.jam_keluar),
-          status: record.status || '',
-        };
+      // Get holidays in the selected range
+      const holidayWhere: any = {};
+      const startLocalDate = startDate ? new Date(startDate) : null;
+      const endLocalDate = endDate ? new Date(endDate) : null;
+      if (startLocalDate || endLocalDate) {
+        holidayWhere.tanggal = {};
+        if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
+        if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
+      }
+      const holidays = await prisma.holidays.findMany({
+        where: holidayWhere,
+        select: { tanggal: true },
       });
+      const holidaySet = new Set(
+        holidays.map((h) => {
+          const t = h.tanggal;
+          return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        })
+      );
+
+      const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
+
+      // Transform to aggregated data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let transformedData: any[];
+      if (jabatan === 'DOSEN') {
+        transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
+      } else {
+        transformedData = transformKaryawanAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
+      }
+
+      // Format data for CSV
+      const csvData = transformedData.map((record, index) => ({
+        'No': index + 1,
+        'Nama': record.nama || '-',
+        'Hari Kerja Target': record.totalHariKerja || 0,
+        'Hadir': record.totalHadir || 0,
+        'Terlambat': record.totalTerlambat || 0,
+        'Tidak Hadir': record.tidakHadir || 0,
+        'Persentase': `${record.persentase || 0}%`,
+      }));
 
       const firstRecord = csvData[0];
       if (!firstRecord) {
@@ -639,14 +671,17 @@ export class ExportController {
       const actorId = req.user?.id ?? 0;
       logger.info('CSV export generated', {
         filename,
-        records: attendance.length,
+        records: transformedData.length,
         user_id: actorId,
       });
 
       res.send(BOM + csvContent);
       return;
     } catch (error) {
-      logger.error('Export to CSV error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Export to CSV error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Failed to export to CSV', 500);
     }
   }

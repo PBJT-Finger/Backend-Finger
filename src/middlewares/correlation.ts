@@ -18,7 +18,8 @@ declare global {
  */
 export function requestCorrelation(req: Request, res: Response, next: NextFunction): void {
   const correlationIdHeader = req.headers['x-request-id'] || req.headers['x-correlation-id'];
-  const correlationId = (Array.isArray(correlationIdHeader) ? correlationIdHeader[0] : correlationIdHeader) || uuidv4();
+  const correlationId =
+    (Array.isArray(correlationIdHeader) ? correlationIdHeader[0] : correlationIdHeader) || uuidv4();
 
   req.correlationId = correlationId;
 
@@ -37,7 +38,8 @@ export function requestCorrelation(req: Request, res: Response, next: NextFuncti
  */
 export function enhancedCorrelation(req: Request, res: Response, next: NextFunction): void {
   const correlationIdHeader = req.headers['x-request-id'] || req.headers['x-correlation-id'];
-  const correlationId = (Array.isArray(correlationIdHeader) ? correlationIdHeader[0] : correlationIdHeader) || uuidv4();
+  const correlationId =
+    (Array.isArray(correlationIdHeader) ? correlationIdHeader[0] : correlationIdHeader) || uuidv4();
 
   req.correlationId = correlationId;
 

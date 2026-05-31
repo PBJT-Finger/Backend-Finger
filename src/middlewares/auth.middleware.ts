@@ -42,7 +42,7 @@ interface JwtPayload {
 export const authenticateToken = async (
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const authHeader = req.headers['authorization'];
@@ -149,7 +149,8 @@ export const authenticateToken = async (
  * Must be placed AFTER authenticateToken in the middleware chain.
  * Accepts a list of permitted roles — defaults to admin-only if none provided.
  */
-export const requireRole = (...allowedRoles: string[]) =>
+export const requireRole =
+  (...allowedRoles: string[]) =>
   (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({
@@ -159,9 +160,8 @@ export const requireRole = (...allowedRoles: string[]) =>
       return;
     }
 
-    const permitted = allowedRoles.length > 0
-      ? allowedRoles.map((r) => r.toUpperCase())
-      : ['ADMIN', 'SUPER_ADMIN'];
+    const permitted =
+      allowedRoles.length > 0 ? allowedRoles.map((r) => r.toUpperCase()) : ['ADMIN', 'SUPER_ADMIN'];
 
     if (!permitted.includes(req.user.role.toUpperCase())) {
       logger.warn('Authorization failed: insufficient role', {

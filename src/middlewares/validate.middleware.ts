@@ -11,21 +11,27 @@ interface ExtractedValidationError {
 /**
  * Middleware to handle validation errors from express-validator
  */
-export const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void | Response => {
+export const handleValidationErrors = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void | Response => {
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
-    const extractedErrors: ExtractedValidationError[] = errors.array().map((err: ValidationError) => {
-      // express-validator newer versions use 'path', older may use 'param'
-      // We safely check both by type casting
-      const rawErr = err as Record<string, unknown>;
-      const field = String(rawErr['path'] || rawErr['param'] || '');
-      return {
-        field,
-        message: err.msg,
-        value: rawErr['value'],
-      };
-    });
+    const extractedErrors: ExtractedValidationError[] = errors
+      .array()
+      .map((err: ValidationError) => {
+        // express-validator newer versions use 'path', older may use 'param'
+        // We safely check both by type casting
+        const rawErr = err as Record<string, unknown>;
+        const field = String(rawErr['path'] || rawErr['param'] || '');
+        return {
+          field,
+          message: err.msg,
+          value: rawErr['value'],
+        };
+      });
 
     logger.warn('Validation failed', {
       path: req.path,

@@ -18,7 +18,9 @@ router.get('/health/ready', async (_req: Request, res: Response): Promise<void> 
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error('Readiness check failed', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Readiness check failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(503).json({
       status: 'not_ready',
       error: error instanceof Error ? error.message : String(error),

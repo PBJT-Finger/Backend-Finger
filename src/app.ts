@@ -27,11 +27,7 @@ import { metricsMiddleware } from './middlewares/metrics.middleware';
 // Import Swagger & Scalar config
 import { specs } from './config/swagger';
 import { generateScalarHTML } from './config/scalar.config';
-import {
-  translateTags,
-  translateDescription,
-  getTranslation,
-} from './config/i18n.translations';
+import { translateTags, translateDescription, getTranslation } from './config/i18n.translations';
 
 // Import logger & prisma
 import logger from './utils/logger';
@@ -156,7 +152,7 @@ app.use(
       if (req.headers['accept'] === 'text/event-stream') return false;
       return compression.filter(req, res);
     },
-  }),
+  })
 );
 
 // Body parsing dengan batas ukuran

@@ -60,6 +60,30 @@ export class AttendanceController {
         orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }],
       });
 
+      // Get holidays in the selected range
+      const holidayWhere: any = {};
+      const startLocalDate = startDateStr ? parseLocalDate(startDateStr) : null;
+      const endLocalDate = endDateStr ? parseLocalDate(endDateStr) : null;
+      if (startLocalDate || endLocalDate) {
+        holidayWhere.tanggal = {};
+        if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
+        if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
+      }
+      const holidays = await prisma.holidays.findMany({
+        where: holidayWhere,
+        select: { tanggal: true },
+      });
+      const holidaySet = new Set(
+        holidays.map((h) => {
+          const t = h.tanggal;
+          return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+        })
+      );
+
+      const totalWorkingDays = startDateStr && endDateStr 
+        ? await calculateWorkingDays(startDateStr, endDateStr) 
+        : 0;
+
       // Transform to aggregated data
       const transformedData = transformDosenAttendance(
         attendance.map((a) => ({
@@ -72,7 +96,9 @@ export class AttendanceController {
           status: a.status,
         })),
         startDateStr || undefined,
-        endDateStr || undefined
+        endDateStr || undefined,
+        totalWorkingDays,
+        holidaySet
       );
 
       // Apply pagination
@@ -83,7 +109,10 @@ export class AttendanceController {
 
       return successResponse(res, paginatedData, 'Lecturer attendance retrieved successfully');
     } catch (error) {
-      logger.error('Get lecturer attendance error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Get lecturer attendance error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Failed to retrieve lecturer attendance', 500);
     }
   }
@@ -120,6 +149,30 @@ export class AttendanceController {
         orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }],
       });
 
+      // Get holidays in the selected range
+      const holidayWhere: any = {};
+      const startLocalDate = startDateStr ? parseLocalDate(startDateStr) : null;
+      const endLocalDate = endDateStr ? parseLocalDate(endDateStr) : null;
+      if (startLocalDate || endLocalDate) {
+        holidayWhere.tanggal = {};
+        if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
+        if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
+      }
+      const holidays = await prisma.holidays.findMany({
+        where: holidayWhere,
+        select: { tanggal: true },
+      });
+      const holidaySet = new Set(
+        holidays.map((h) => {
+          const t = h.tanggal;
+          return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+        })
+      );
+
+      const totalWorkingDays = startDateStr && endDateStr 
+        ? await calculateWorkingDays(startDateStr, endDateStr) 
+        : 0;
+
       // Transform to aggregated data
       const transformedData = transformKaryawanAttendance(
         attendance.map((a) => ({
@@ -132,7 +185,9 @@ export class AttendanceController {
           status: a.status,
         })),
         startDateStr || undefined,
-        endDateStr || undefined
+        endDateStr || undefined,
+        totalWorkingDays,
+        holidaySet
       );
 
       // Apply pagination
@@ -143,7 +198,10 @@ export class AttendanceController {
 
       return successResponse(res, paginatedData, 'Employee attendance retrieved successfully');
     } catch (error) {
-      logger.error('Get employee attendance error', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
+      logger.error('Get employee attendance error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return errorResponse(res, 'Failed to retrieve employee attendance', 500);
     }
   }
@@ -153,7 +211,16 @@ export class AttendanceController {
    */
   public static async getAttendance(req: Request, res: Response): Promise<Response> {
     try {
-      const { start_date, end_date, user_id, id, jabatan, status, page = 1, limit = 50 } = req.query;
+      const {
+        start_date,
+        end_date,
+        user_id,
+        id,
+        jabatan,
+        status,
+        page = 1,
+        limit = 50,
+      } = req.query;
 
       const whereClause: Record<string, unknown> = {
         is_deleted: false,
@@ -210,7 +277,9 @@ export class AttendanceController {
         'Attendance retrieved successfully'
       );
     } catch (error) {
-      logger.error('Get attendance error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Get attendance error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to retrieve attendance', 500);
     }
   }
@@ -276,7 +345,7 @@ export class AttendanceController {
       const allUsers = await prisma.attendance.findMany({
         where: baseFilter,
         distinct: ['user_id'],
-        select: { user_id: true, nama: true, jabatan: true }
+        select: { user_id: true, nama: true, jabatan: true },
       });
 
       // Initialize stats with all users
@@ -297,13 +366,30 @@ export class AttendanceController {
         };
       });
 
+      // Get holidays in the selected range to exclude from stats.attendanceDates
+      const holidayWhere: any = {};
+      const startLocalDate = parseLocalDate(startDate as string);
+      const endLocalDate = parseLocalDate(endDate as string);
+      if (startLocalDate || endLocalDate) {
+        holidayWhere.tanggal = {};
+        if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
+        if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
+      }
+
+      const holidays = await prisma.holidays.findMany({
+        where: holidayWhere,
+        select: { tanggal: true },
+      });
+      const holidaySet = new Set(
+        holidays.map((h) => {
+          const t = h.tanggal;
+          return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        })
+      );
+
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: [
-          { tanggal: 'desc' },
-          { jam_keluar: 'desc' },
-          { jam_masuk: 'desc' },
-        ],
+        orderBy: [{ tanggal: 'desc' }, { jam_keluar: 'desc' }, { jam_masuk: 'desc' }],
       });
 
       attendance.forEach((record) => {
@@ -329,10 +415,9 @@ export class AttendanceController {
           const dateStr =
             typeof (t as any) === 'string'
               ? (t as any).split('T')[0]
-              : `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+              : `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
 
-          const recordDate = new Date(dateStr || '');
-          if (recordDate.getDay() !== 0) {
+          if (dateStr) {
             stats.attendanceDates.add(dateStr);
           }
 
@@ -351,15 +436,15 @@ export class AttendanceController {
           if (record.jam_masuk) {
             let hour = -1;
             if (typeof record.jam_masuk === 'string') {
-               const match = (record.jam_masuk as string).match(/^(\d{2}):/);
-               if (match) hour = parseInt(match[1] || '0', 10);
+              const match = (record.jam_masuk as string).match(/^(\d{2}):/);
+              if (match) hour = parseInt(match[1] || '0', 10);
             } else {
-               // Prisma returns Time as Date (1970-01-01 UTC)
-               hour = new Date(record.jam_masuk).getUTCHours();
+              // Prisma returns Time as Date (1970-01-01 UTC)
+              hour = new Date(record.jam_masuk).getUTCHours();
             }
             if (hour >= 0) {
-               if (hour >= 6 && hour < 15) stats.hadir_pagi.add(dateStr);
-               else if (hour >= 15 && hour <= 22) stats.hadir_malam.add(dateStr);
+              if (hour >= 6 && hour < 15) stats.hadir_pagi.add(dateStr);
+              else if (hour >= 15 && hour <= 22) stats.hadir_malam.add(dateStr);
             }
           }
         }
@@ -380,8 +465,18 @@ export class AttendanceController {
         if (!dates || dates.length === 0) return null;
 
         const months = [
-          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+          'Januari',
+          'Februari',
+          'Maret',
+          'April',
+          'Mei',
+          'Juni',
+          'Juli',
+          'Agustus',
+          'September',
+          'Oktober',
+          'November',
+          'Desember',
         ];
 
         const firstVal = dates[0];
@@ -408,12 +503,13 @@ export class AttendanceController {
         return `${startDay} ${startMonth || ''} ${startYear} - ${endDay} ${endMonth || ''} ${endYear}`;
       };
 
-      const totalWorkingDaysInPeriod = calculateWorkingDays(startDate as string, endDate as string);
+      const totalWorkingDaysInPeriod = await calculateWorkingDays(startDate as string, endDate as string);
 
       const summary = Object.values(employeeStats).map((emp, index) => {
         const attendanceDatesArray = Array.from(emp.attendanceDates as Set<string>).sort();
         const totalHadir = attendanceDatesArray.length;
         const totalHariKerja = totalWorkingDaysInPeriod;
+        const tidakHadir = Math.max(0, totalHariKerja - totalHadir);
 
         return {
           id: emp.user_id,
@@ -421,24 +517,23 @@ export class AttendanceController {
           nama: emp.nama,
           jabatan: emp.jabatan,
           totalHadir: totalHadir,
+          tidakHadir: tidakHadir,
           hadirPagi: emp.hadir_pagi.size,
           hadirMalam: emp.hadir_malam.size,
           totalTerlambat: emp.terlambat_dates ? emp.terlambat_dates.size : 0,
           totalHariKerja: totalHariKerja,
-          persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
+          persentase: totalHariKerja > 0 ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100)) : (totalHadir > 0 ? 100 : 0),
           attendanceDates: formatDateRange(attendanceDatesArray),
           lastCheckIn: formatTimeOnly(emp.last_check_in),
           lastCheckOut: formatTimeOnly(emp.last_check_out),
         };
       });
 
-      return successResponse(
-        res,
-        summary,
-        'Attendance summary calculated successfully'
-      );
+      return successResponse(res, summary, 'Attendance summary calculated successfully');
     } catch (error) {
-      logger.error('Get attendance summary error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Get attendance summary error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to calculate attendance summary', 500);
     }
   }
@@ -477,7 +572,9 @@ export class AttendanceController {
 
       return successResponse(res, null, 'Attendance record deleted successfully');
     } catch (error) {
-      logger.error('Delete attendance error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Delete attendance error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to delete attendance record', 500);
     }
   }
@@ -516,7 +613,9 @@ export class AttendanceController {
 
       return successResponse(res, updated, 'Catatan admin berhasil diperbarui');
     } catch (error) {
-      logger.error('Update admin notes error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Update admin notes error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Gagal memperbarui catatan admin', 500);
     }
   }
@@ -528,7 +627,9 @@ export class AttendanceController {
     try {
       return AttendanceController.getAttendanceSummary(req, res);
     } catch (error) {
-      logger.error('Get summary error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Get summary error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to get attendance summary', 500);
     }
   }
@@ -565,11 +666,15 @@ export class AttendanceController {
       req.query['startDate'] = startDate;
       req.query['endDate'] = endDate;
 
-      logger.info(`Generating monthly report for ${String(bulan)}/${String(tahun)} (${startDate} to ${endDate})`);
+      logger.info(
+        `Generating monthly report for ${String(bulan)}/${String(tahun)} (${startDate} to ${endDate})`
+      );
 
       return AttendanceController.getAttendanceSummary(req, res);
     } catch (error) {
-      logger.error('Get monthly report error', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Get monthly report error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return errorResponse(res, 'Failed to get monthly report', 500);
     }
   }
@@ -593,8 +698,14 @@ export class AttendanceController {
         'Fingerprint sync triggered successfully'
       );
     } catch (error) {
-      logger.error('Fingerprint sync error:', { error: error instanceof Error ? error.message : String(error) });
-      return errorResponse(res, `Failed to sync fingerprint data: ${error instanceof Error ? error.message : String(error)}`, 500);
+      logger.error('Fingerprint sync error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return errorResponse(
+        res,
+        `Failed to sync fingerprint data: ${error instanceof Error ? error.message : String(error)}`,
+        500
+      );
     }
   }
 
@@ -613,13 +724,20 @@ export class AttendanceController {
           ip: env.FINGERPRINT_IP,
           port: env.FINGERPRINT_PORT,
           lastSyncCount: client.getLastSyncCount(),
-          message: status === 'online' ? 'Device is online and ready' : 'Device is offline or connecting',
+          message:
+            status === 'online' ? 'Device is online and ready' : 'Device is offline or connecting',
         },
         'Device status retrieved successfully'
       );
     } catch (error) {
-      logger.error('Device status check error:', { error: error instanceof Error ? error.message : String(error) });
-      return errorResponse(res, `Failed to check device status: ${error instanceof Error ? error.message : String(error)}`, 500);
+      logger.error('Device status check error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return errorResponse(
+        res,
+        `Failed to check device status: ${error instanceof Error ? error.message : String(error)}`,
+        500
+      );
     }
   }
 
@@ -679,8 +797,15 @@ export class AttendanceController {
         },
       });
     } catch (error) {
-      logger.error('Import attendance error:', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
-      return errorResponse(res, `Gagal memproses file import: ${error instanceof Error ? error.message : String(error)}`, 500);
+      logger.error('Import attendance error:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      return errorResponse(
+        res,
+        `Gagal memproses file import: ${error instanceof Error ? error.message : String(error)}`,
+        500
+      );
     }
   }
 }

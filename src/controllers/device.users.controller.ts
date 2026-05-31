@@ -54,7 +54,7 @@ export class DeviceUsersController {
       return successResponse(
         res,
         result,
-        `Berhasil menarik ${result.totalOnDevice} pengguna dari cache alat.`,
+        `Berhasil menarik ${result.totalOnDevice} pengguna dari cache alat.`
       );
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -109,7 +109,7 @@ export class DeviceUsersController {
         return errorResponse(
           res,
           `Jabatan harus salah satu dari: ${VALID_JABATAN.join(', ')}`,
-          400,
+          400
         );
       }
 

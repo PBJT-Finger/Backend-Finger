@@ -38,6 +38,11 @@ export interface AttendanceRecord {
   recordTime: Date;
   /** IP address of the device that recorded this event */
   ip: string;
+  /**
+   * ZKTeco punch type (0=Check-In, 1=Check-Out, 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out).
+   * Use this instead of guessing from the hour of day.
+   */
+  attendanceType: number;
 }
 
 export interface DeviceInfo {
@@ -79,12 +84,14 @@ export class ZkDeviceClient extends EventEmitter {
   private constructor() {
     super();
     // Prevent fatal process crashes if an error is emitted but no listeners are attached
-    this.on('error', () => { /* silently swallowed */ });
+    this.on('error', () => {
+      /* silently swallowed */
+    });
 
     this.zkInstance = new ZkTcpClient(
       env.FINGERPRINT_IP,
       env.FINGERPRINT_PORT,
-      env.FINGERPRINT_TIMEOUT,
+      env.FINGERPRINT_TIMEOUT
     );
   }
 
@@ -135,7 +142,7 @@ export class ZkDeviceClient extends EventEmitter {
     if (this.isRunning) return;
     this.isRunning = true;
     console.log(
-      `[ZkDeviceClient] Starting polling loop → ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`,
+      `[ZkDeviceClient] Starting polling loop → ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`
     );
     this.scheduleNextPoll(0);
   }
@@ -195,16 +202,23 @@ export class ZkDeviceClient extends EventEmitter {
           socketPromise,
           new Promise<never>((_, reject) =>
             setTimeout(
-              () => reject(new Error(`Connection to ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT} timed out after ${env.FINGERPRINT_TIMEOUT}ms`)),
-              env.FINGERPRINT_TIMEOUT,
-            ),
+              () =>
+                reject(
+                  new Error(
+                    `Connection to ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT} timed out after ${env.FINGERPRINT_TIMEOUT}ms`
+                  )
+                ),
+              env.FINGERPRINT_TIMEOUT
+            )
           ),
         ]);
 
         await this.zkInstance.connect();
 
         this.setStatus('online');
-        console.log(`[ZkDeviceClient] ✓ Connected to ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`);
+        console.log(
+          `[ZkDeviceClient] ✓ Connected to ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`
+        );
       }
 
       const result = await this.zkInstance.getAttendances();
@@ -231,7 +245,9 @@ export class ZkDeviceClient extends EventEmitter {
               });
             }
           }
-          console.log(`[ZkDeviceClient] Cache refreshed: ${this.deviceUserCache.size} users loaded.`);
+          console.log(
+            `[ZkDeviceClient] Cache refreshed: ${this.deviceUserCache.size} users loaded.`
+          );
         } catch (err) {
           console.warn('[ZkDeviceClient] Failed to refresh device users list cache:', err);
         }
@@ -244,6 +260,7 @@ export class ZkDeviceClient extends EventEmitter {
           deviceUserId: r.deviceUserId,
           recordTime: r.recordTime,
           ip: env.FINGERPRINT_IP,
+          attendanceType: r.attendanceType ?? 0,
         };
       });
 
@@ -254,20 +271,19 @@ export class ZkDeviceClient extends EventEmitter {
         this.lastKnownLogCount = newCount;
         this.emit('attendance', newRecords);
         console.log(
-          `[ZkDeviceClient] ${newRecords.length} new attendance record(s) detected. Total: ${newCount}`,
+          `[ZkDeviceClient] ${newRecords.length} new attendance record(s) detected. Total: ${newCount}`
         );
       }
 
       this.scheduleNextPoll(env.POLLING_INTERVAL_MS);
     } catch (err) {
-      const error = err instanceof Error
-        ? err
-        : new Error(typeof err === 'object' ? JSON.stringify(err) : String(err));
+      const error =
+        err instanceof Error
+          ? err
+          : new Error(typeof err === 'object' ? JSON.stringify(err) : String(err));
       // Log with retry countdown so it's easy to track in the terminal
       const retrySec = Math.round(env.RECONNECT_DELAY_MS / 1000);
-      console.warn(
-        `[ZkDeviceClient] ✗ ${error.message} — retrying in ${retrySec}s`,
-      );
+      console.warn(`[ZkDeviceClient] ✗ ${error.message} — retrying in ${retrySec}s`);
       this.emit('error', error);
       this.setStatus('offline');
       // Ensure socket is fully torn down before the next attempt

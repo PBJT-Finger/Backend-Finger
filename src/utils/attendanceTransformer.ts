@@ -1,3 +1,4 @@
+import prisma from '../config/prisma';
 import logger from './logger';
 
 export interface TransformedDosenRecord {
@@ -6,6 +7,7 @@ export interface TransformedDosenRecord {
   nama: string;
   totalHadir: number;
   tidakHadir: number;
+  totalTerlambat: number;
   totalHariKerja: number;
   persentase: number;
   attendanceDates: string;
@@ -45,11 +47,10 @@ export function extractTimeString(timeValue: string | Date | null): string | nul
   if (typeof timeValue === 'string') {
     const match = timeValue.match(/^(\d{2}):(\d{2})/);
     if (match) {
-      const utcDate = new Date(
-        Date.UTC(1970, 0, 1, parseInt(match[1] || '0', 10), parseInt(match[2] || '0', 10))
-      );
-      const h = String(utcDate.getHours()).padStart(2, '0');
-      const m = String(utcDate.getMinutes()).padStart(2, '0');
+      // Values are already the correct local time stored in UTC slots.
+      // Use getUTC* to avoid double timezone offset.
+      const h = String(parseInt(match[1] || '0', 10)).padStart(2, '0');
+      const m = String(parseInt(match[2] || '0', 10)).padStart(2, '0');
       return `${h}:${m}`;
     }
     return timeValue.substring(0, 5);
@@ -69,9 +70,10 @@ export function extractDateString(dateValue: string | Date | null): string {
   if (!dateValue) return '';
   if (typeof dateValue === 'string') return dateValue.split('T')[0] || '';
   if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
-    const y = dateValue.getFullYear();
-    const m = String(dateValue.getMonth() + 1).padStart(2, '0');
-    const d = String(dateValue.getDate()).padStart(2, '0');
+    // Use getUTC* — dates are stored as UTC-aligned (Date.UTC) in the DB
+    const y = dateValue.getUTCFullYear();
+    const m = String(dateValue.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(dateValue.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
   return '';
@@ -102,9 +104,9 @@ export function toUTCDate(timeValue: string | Date | null): Date | null {
 }
 
 /**
- * Calculate number of working days between two dates (excluding Sundays)
+ * Calculate number of working days between two dates (excluding Saturdays, Sundays, and national holidays)
  */
-export function calculateWorkingDays(startDate: string | Date, endDate: string | Date): number {
+export async function calculateWorkingDays(startDate: string | Date, endDate: string | Date): Promise<number> {
   if (!startDate || !endDate) {
     return 0;
   }
@@ -123,12 +125,37 @@ export function calculateWorkingDays(startDate: string | Date, endDate: string |
   const start = parseLocal(startDate);
   const end = parseLocal(endDate);
   if (!start || !end) return 0;
+
+  // Retrieve holidays within the range from the database
+  const holidays = await prisma.holidays.findMany({
+    where: {
+      tanggal: {
+        gte: start,
+        lte: end,
+      },
+    },
+    select: {
+      tanggal: true,
+    },
+  });
+
+  // Keep a set of YYYY-MM-DD formatted holiday date strings
+  const holidaySet = new Set(
+    holidays.map((h) => {
+      const t = h.tanggal;
+      return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+    })
+  );
+
   let count = 0;
   const current = new Date(start);
 
   while (current <= end) {
     const dayOfWeek = current.getDay();
-    if (dayOfWeek !== 0) {
+    const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+    
+    // Exclude Sundays (0), Saturdays (6), and holidays
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidaySet.has(dateStr)) {
       count++;
     }
     current.setDate(current.getDate() + 1);
@@ -143,7 +170,9 @@ export function calculateWorkingDays(startDate: string | Date, endDate: string |
 export function transformDosenAttendance(
   attendanceRecords: RawAttendanceRecord[],
   _startDate?: string | Date,
-  _endDate?: string | Date
+  _endDate?: string | Date,
+  totalWorkingDays?: number,
+  holidaySet?: Set<string>
 ): TransformedDosenRecord[] {
   try {
     if (!attendanceRecords || attendanceRecords.length === 0) {
@@ -180,46 +209,42 @@ export function transformDosenAttendance(
       const group = grouped[user_id];
       if (group) {
         const dateStr = extractDateString(record.tanggal);
-        if (dateStr) group.attendanceDates.add(dateStr);
+        if (dateStr) {
+          group.attendanceDates.add(dateStr);
+          if (record.status === 'TERLAMBAT') {
+            group.totalTerlambat++;
+          }
+        }
 
         if (record.jam_masuk) {
           const checkInUTC = toUTCDate(record.jam_masuk);
-          if (
-            checkInUTC &&
-            (!group.lastCheckInUTC || checkInUTC > group.lastCheckInUTC)
-          ) {
+          if (checkInUTC && (!group.lastCheckInUTC || checkInUTC > group.lastCheckInUTC)) {
             group.lastCheckInUTC = checkInUTC;
           }
         }
 
         if (record.jam_keluar) {
           const checkOutUTC = toUTCDate(record.jam_keluar);
-          if (
-            checkOutUTC &&
-            (!group.lastCheckOutUTC || checkOutUTC > group.lastCheckOutUTC)
-          ) {
+          if (checkOutUTC && (!group.lastCheckOutUTC || checkOutUTC > group.lastCheckOutUTC)) {
             group.lastCheckOutUTC = checkOutUTC;
           }
-        }
-
-        if (record.status === 'TERLAMBAT') {
-          group.totalTerlambat++;
         }
       }
     });
 
     const result = Object.values(grouped).map((group) => {
       const totalHadir = group.attendanceDates.size;
-      const totalHariKerja = totalHadir;
+      const totalHariKerja = totalWorkingDays !== undefined ? totalWorkingDays : totalHadir;
 
       return {
         id: group.user_id,
         user_id: group.user_id,
         nama: group.nama,
         totalHadir,
-        tidakHadir: 0,
+        tidakHadir: Math.max(0, totalHariKerja - totalHadir),
+        totalTerlambat: group.totalTerlambat,
         totalHariKerja,
-        persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
+        persentase: totalHariKerja > 0 ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100)) : (totalHadir > 0 ? 100 : 0),
         attendanceDates: formatAttendanceDates(group.attendanceDates),
         lastCheckIn: group.lastCheckInUTC
           ? extractTimeString(group.lastCheckInUTC) || 'Belum ada data'
@@ -246,7 +271,9 @@ export function transformDosenAttendance(
 export function transformKaryawanAttendance(
   attendanceRecords: RawAttendanceRecord[],
   _startDate?: string | Date,
-  _endDate?: string | Date
+  _endDate?: string | Date,
+  totalWorkingDays?: number,
+  holidaySet?: Set<string>
 ): TransformedKaryawanRecord[] {
   try {
     if (!attendanceRecords || attendanceRecords.length === 0) {
@@ -283,47 +310,42 @@ export function transformKaryawanAttendance(
       const group = grouped[user_id];
       if (group) {
         const dateStr = extractDateString(record.tanggal);
-        if (dateStr) group.attendanceDates.add(dateStr);
+        if (dateStr) {
+          group.attendanceDates.add(dateStr);
+          if (record.status === 'TERLAMBAT') {
+            group.totalTerlambat++;
+          }
+        }
 
         if (record.jam_masuk) {
           const checkInUTC = toUTCDate(record.jam_masuk);
-          if (
-            checkInUTC &&
-            (!group.lastCheckInUTC || checkInUTC > group.lastCheckInUTC)
-          ) {
+          if (checkInUTC && (!group.lastCheckInUTC || checkInUTC > group.lastCheckInUTC)) {
             group.lastCheckInUTC = checkInUTC;
           }
         }
 
         if (record.jam_keluar) {
           const checkOutUTC = toUTCDate(record.jam_keluar);
-          if (
-            checkOutUTC &&
-            (!group.lastCheckOutUTC || checkOutUTC > group.lastCheckOutUTC)
-          ) {
+          if (checkOutUTC && (!group.lastCheckOutUTC || checkOutUTC > group.lastCheckOutUTC)) {
             group.lastCheckOutUTC = checkOutUTC;
           }
-        }
-
-        if (record.status === 'TERLAMBAT') {
-          group.totalTerlambat++;
         }
       }
     });
 
     const result = Object.values(grouped).map((group) => {
       const totalHadir = group.attendanceDates.size;
-      const totalHariKerja = totalHadir;
+      const totalHariKerja = totalWorkingDays !== undefined ? totalWorkingDays : totalHadir;
 
       return {
         id: group.user_id,
         user_id: group.user_id,
         nama: group.nama,
         totalHadir,
-        tidakHadir: 0,
+        tidakHadir: Math.max(0, totalHariKerja - totalHadir),
         totalTerlambat: group.totalTerlambat,
         totalHariKerja,
-        persentase: totalHariKerja > 0 ? Math.round((totalHadir / totalHariKerja) * 100) : 0,
+        persentase: totalHariKerja > 0 ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100)) : (totalHadir > 0 ? 100 : 0),
         attendanceDates: formatAttendanceDates(group.attendanceDates),
         lastCheckIn: group.lastCheckInUTC
           ? extractTimeString(group.lastCheckInUTC) || 'Belum ada data'

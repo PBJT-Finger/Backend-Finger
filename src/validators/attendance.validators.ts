@@ -131,7 +131,11 @@ export const validateRekapRange: ValidationChain[] = [
 /**
  * Validation for POST /api/attendance/import (file upload)
  */
-export const validateImportFile = (req: Request, res: Response, next: NextFunction): void | Response => {
+export const validateImportFile = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void | Response => {
   // Check if file exists
   if (!req.file) {
     return res.status(400).json({

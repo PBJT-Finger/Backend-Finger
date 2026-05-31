@@ -66,7 +66,11 @@ export const translations: Record<string, Translations> = {
 /**
  * Get translation for a given key
  */
-export function getTranslation(lang: string, key: string, category: 'tags' | 'descriptions' | null = null): string {
+export function getTranslation(
+  lang: string,
+  key: string,
+  category: 'tags' | 'descriptions' | null = null
+): string {
   const langData = translations[lang];
   if (!langData) return key;
 
