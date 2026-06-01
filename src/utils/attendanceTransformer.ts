@@ -106,7 +106,10 @@ export function toUTCDate(timeValue: string | Date | null): Date | null {
 /**
  * Calculate number of working days between two dates (excluding Saturdays, Sundays, and national holidays)
  */
-export async function calculateWorkingDays(startDate: string | Date, endDate: string | Date): Promise<number> {
+export async function calculateWorkingDays(
+  startDate: string | Date,
+  endDate: string | Date
+): Promise<number> {
   if (!startDate || !endDate) {
     return 0;
   }
@@ -153,7 +156,7 @@ export async function calculateWorkingDays(startDate: string | Date, endDate: st
   while (current <= end) {
     const dayOfWeek = current.getDay();
     const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
-    
+
     // Exclude Sundays (0), Saturdays (6), and holidays
     if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidaySet.has(dateStr)) {
       count++;
@@ -244,7 +247,12 @@ export function transformDosenAttendance(
         tidakHadir: Math.max(0, totalHariKerja - totalHadir),
         totalTerlambat: group.totalTerlambat,
         totalHariKerja,
-        persentase: totalHariKerja > 0 ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100)) : (totalHadir > 0 ? 100 : 0),
+        persentase:
+          totalHariKerja > 0
+            ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
+            : totalHadir > 0
+              ? 100
+              : 0,
         attendanceDates: formatAttendanceDates(group.attendanceDates),
         lastCheckIn: group.lastCheckInUTC
           ? extractTimeString(group.lastCheckInUTC) || 'Belum ada data'
@@ -345,7 +353,12 @@ export function transformKaryawanAttendance(
         tidakHadir: Math.max(0, totalHariKerja - totalHadir),
         totalTerlambat: group.totalTerlambat,
         totalHariKerja,
-        persentase: totalHariKerja > 0 ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100)) : (totalHadir > 0 ? 100 : 0),
+        persentase:
+          totalHariKerja > 0
+            ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
+            : totalHadir > 0
+              ? 100
+              : 0,
         attendanceDates: formatAttendanceDates(group.attendanceDates),
         lastCheckIn: group.lastCheckInUTC
           ? extractTimeString(group.lastCheckInUTC) || 'Belum ada data'

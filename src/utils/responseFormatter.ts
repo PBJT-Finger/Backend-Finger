@@ -45,7 +45,7 @@ export const errorResponse = (
 /**
  * Send login/authentication response
  */
- 
+
 export const loginResponse = (
   res: Response,
   user: any,
@@ -101,7 +101,7 @@ export const paginatedResponse = (
 /**
  * Send registration response
  */
- 
+
 export const registerResponse = (
   res: Response,
   user: any,

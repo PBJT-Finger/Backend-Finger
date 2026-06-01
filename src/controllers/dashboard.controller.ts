@@ -37,7 +37,7 @@ export class DashboardController {
       });
 
       // Calculate statistics
-       
+
       const stats: Record<string, any> = {
         today: {
           total_attendance: todayAttendance.length,

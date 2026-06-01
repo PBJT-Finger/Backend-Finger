@@ -11,14 +11,14 @@
  * @param obj - Object to redact
  * @returns Redacted copy of object
  */
- 
+
 export function redactSensitiveData(obj: any): any {
   if (!obj || typeof obj !== 'object') {
     return obj;
   }
 
   // Create shallow copy (array or object)
-   
+
   const redacted: any = Array.isArray(obj) ? [...obj] : { ...obj };
 
   // Sensitive key patterns to redact

@@ -8,7 +8,7 @@ import prisma from '../src/config/prisma';
 
 async function main() {
   const args = process.argv.slice(2);
-  
+
   if (args.length < 3) {
     console.error('❌ Error: Parameter tidak lengkap.');
     console.log('\nCara Penggunaan:');

@@ -80,9 +80,8 @@ export class AttendanceController {
         })
       );
 
-      const totalWorkingDays = startDateStr && endDateStr 
-        ? await calculateWorkingDays(startDateStr, endDateStr) 
-        : 0;
+      const totalWorkingDays =
+        startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
       // Transform to aggregated data
       const transformedData = transformDosenAttendance(
@@ -169,9 +168,8 @@ export class AttendanceController {
         })
       );
 
-      const totalWorkingDays = startDateStr && endDateStr 
-        ? await calculateWorkingDays(startDateStr, endDateStr) 
-        : 0;
+      const totalWorkingDays =
+        startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
       // Transform to aggregated data
       const transformedData = transformKaryawanAttendance(
@@ -349,7 +347,7 @@ export class AttendanceController {
       });
 
       // Initialize stats with all users
-       
+
       const employeeStats: Record<string, any> = {};
 
       allUsers.forEach((u) => {
@@ -503,7 +501,10 @@ export class AttendanceController {
         return `${startDay} ${startMonth || ''} ${startYear} - ${endDay} ${endMonth || ''} ${endYear}`;
       };
 
-      const totalWorkingDaysInPeriod = await calculateWorkingDays(startDate as string, endDate as string);
+      const totalWorkingDaysInPeriod = await calculateWorkingDays(
+        startDate as string,
+        endDate as string
+      );
 
       const summary = Object.values(employeeStats).map((emp, index) => {
         const attendanceDatesArray = Array.from(emp.attendanceDates as Set<string>).sort();
@@ -522,7 +523,12 @@ export class AttendanceController {
           hadirMalam: emp.hadir_malam.size,
           totalTerlambat: emp.terlambat_dates ? emp.terlambat_dates.size : 0,
           totalHariKerja: totalHariKerja,
-          persentase: totalHariKerja > 0 ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100)) : (totalHadir > 0 ? 100 : 0),
+          persentase:
+            totalHariKerja > 0
+              ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
+              : totalHadir > 0
+                ? 100
+                : 0,
           attendanceDates: formatDateRange(attendanceDatesArray),
           lastCheckIn: formatTimeOnly(emp.last_check_in),
           lastCheckOut: formatTimeOnly(emp.last_check_out),

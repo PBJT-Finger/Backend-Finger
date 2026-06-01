@@ -12,10 +12,12 @@ async function main() {
       email: 'admin@example.com',
       full_name: 'Administrator',
       role: 'ADMIN',
-      is_active: true
-    }
+      is_active: true,
+    },
   });
   console.log('✅ Admin user created/updated:', admin.username);
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect());
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());
