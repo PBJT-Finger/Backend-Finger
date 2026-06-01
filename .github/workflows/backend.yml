@@ -208,6 +208,8 @@ jobs:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           GHCR_USER: ${{ secrets.GHCR_USERNAME || github.repository_owner }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
         run: |
           IMG_REPO=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
           BACKEND_IMAGE="${IMG_REPO}:${IMAGE_TAG}"
@@ -225,6 +227,8 @@ jobs:
              IMG_REPO='${IMG_REPO}'
              IMAGE_TAG='${IMAGE_TAG}'
              DB_PASSWORD='${DB_PASSWORD}'
+             JWT_ACCESS_SECRET='${JWT_ACCESS_SECRET}'
+             JWT_REFRESH_SECRET='${JWT_REFRESH_SECRET}'
              DB_NAME='finger_db'
 
              cd \"\$DEPLOY_PATH\"
@@ -248,7 +252,10 @@ jobs:
              # Update Docker Swarm service
              # Asumsi nama stack backend adalah finger-be
              echo '🚀 Updating swarm service finger-be_backend...'
-             docker service update --image \"\$BACKEND_IMAGE\" --with-registry-auth finger-be_backend
+             docker service update --image \"\$BACKEND_IMAGE\" \
+               --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
+               --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
+               --with-registry-auth finger-be_backend
 
              # Verify deployment status
              echo '⏳ Waiting for service update to stabilize...'
