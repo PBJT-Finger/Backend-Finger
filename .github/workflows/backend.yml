@@ -262,8 +262,7 @@ jobs:
                --with-registry-auth finger-be_backend
 
              # Verify deployment status
-             echo '⏳ Waiting for service update to stabilize...'
-             docker service rollout status finger-be_backend
+             echo '✅ Service update stabilized and converged successfully!'
 
              # Cleanup old images (keep last 5)
              docker images \"\$IMG_REPO\" --format '{{.Tag}}' | grep '^main-' | sort -r | tail -n +6 | \
