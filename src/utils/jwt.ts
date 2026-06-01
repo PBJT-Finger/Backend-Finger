@@ -55,7 +55,7 @@ export const verifyRefreshToken = (token: string): UserTokenPayload => {
 };
 
 // Generate token pair
- 
+
 export const generateTokens = (user: any): { accessToken: string; refreshToken: string } => {
   const payload: UserTokenPayload = {
     id: user.id,

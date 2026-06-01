@@ -43,7 +43,7 @@ export interface ImportResultReport {
   duplicates: number;
   errors: string[];
   warnings?: string[] | undefined;
-   
+
   duplicateDetails?: any[] | undefined;
 }
 
@@ -326,7 +326,7 @@ export class AttendanceImportService {
    * @param index - Row index (for error reporting)
    * @returns { valid: boolean, errors: Array, data: Object }
    */
-   
+
   public static async validateRow(
     row: Record<string, string | null>,
     index: number
@@ -343,7 +343,7 @@ export class AttendanceImportService {
     const user_id = String(row['user_id']).trim();
 
     // Check employee exists
-     
+
     let employee: any;
     try {
       employee = await prisma.employees.findUnique({
@@ -561,9 +561,8 @@ export class AttendanceImportService {
         warnings: [] as string[],
       };
 
-       
       const validRecords: any[] = [];
-       
+
       const duplicateRecords: any[] = [];
 
       for (let i = 0; i < grouped.length; i++) {
@@ -571,7 +570,7 @@ export class AttendanceImportService {
         if (!record) continue;
 
         // Check employee exists
-         
+
         let employee: any;
         try {
           employee = await prisma.employees.findUnique({
@@ -796,9 +795,8 @@ export class AttendanceImportService {
         errors: [] as string[],
       };
 
-       
       const validRecords: any[] = [];
-       
+
       const duplicateRecords: any[] = [];
 
       for (let i = 0; i < rows.length; i++) {

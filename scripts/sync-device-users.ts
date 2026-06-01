@@ -25,28 +25,28 @@ async function syncDeviceUsers(): Promise<void> {
     console.log('[INFO] Fetching master users from device...');
     const usersResponse = await zkInstance.getUsers();
     const rawUsers: any[] = usersResponse?.data || [];
-    
+
     console.log(`[INFO] Found ${rawUsers.length} users on the device.`);
 
     for (const u of rawUsers) {
       const user_id = String(u.userId || u.uid);
       const nama = u.name || user_id;
-      
+
       console.log(`[INFO] Upserting Employee -> User ID: ${user_id}, Name: ${nama}`);
-      
+
       await prisma.employees.upsert({
         where: { user_id: user_id },
         update: {
           nama: nama,
-          shift_id: 1
+          shift_id: 1,
         },
         create: {
           user_id: user_id,
           nama: nama,
           jabatan: 'KARYAWAN', // default required by enum
           shift_id: 1,
-          is_active: true
-        }
+          is_active: true,
+        },
       });
     }
 

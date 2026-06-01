@@ -20,8 +20,8 @@
     "seed:holidays": "tsx scripts/seed-holidays.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
-    "format": "prettier --write \"src/**/*.ts\" \"*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"*.ts\""
+    "format": "prettier --write \"**/*.ts\"",
+    "format:check": "prettier --check \"**/*.ts\""
   },
   "dependencies": {
     "@prisma/client": "6",

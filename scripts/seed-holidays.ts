@@ -35,12 +35,12 @@ const holidays2026: HolidayInput[] = [
   { tanggal: '2026-08-17', nama_libur: 'Hari Kemerdekaan Proklamasi RI' },
   { tanggal: '2026-08-25', nama_libur: 'Maulid Nabi Muhammad S.A.W.' },
   { tanggal: '2026-12-24', nama_libur: 'Cuti Bersama Hari Raya Natal' },
-  { tanggal: '2026-12-25', nama_libur: 'Hari Raya Natal' }
+  { tanggal: '2026-12-25', nama_libur: 'Hari Raya Natal' },
 ];
 
 async function main() {
   console.log('[INFO] Seeding Indonesian Holidays for 2026...');
-  
+
   for (const h of holidays2026) {
     const tanggalDate = new Date(h.tanggal);
     // Use upsert to avoid duplicate key errors

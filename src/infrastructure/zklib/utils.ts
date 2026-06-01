@@ -29,7 +29,9 @@ export const parseHexToTime = (hex: Buffer): Date => {
     second: hex.readUIntLE(5, 1),
   };
 
-  return new Date(Date.UTC(2000 + time.year, time.month - 1, time.date, time.hour, time.minute, time.second));
+  return new Date(
+    Date.UTC(2000 + time.year, time.month - 1, time.date, time.hour, time.minute, time.second)
+  );
 };
 
 export const createChkSum = (buf: Buffer): number => {

@@ -22,7 +22,7 @@
  */
 
 // node-zklib does not provide @types — this is the ONLY permitted any boundary.
- 
+
 import { EventEmitter } from 'events';
 import { env } from '../config/env';
 import { ZkTcpClient } from './zklib';

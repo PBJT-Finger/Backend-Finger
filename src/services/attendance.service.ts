@@ -84,7 +84,7 @@ export class AttendanceService {
   /**
    * Get summary for one employee
    */
-   
+
   public static async getEmployeeSummary(
     employee: any,
     startDate: Date,
@@ -166,7 +166,7 @@ export class AttendanceService {
   /**
    * Get detailed attendance for one employee
    */
-   
+
   public static async getEmployeeAttendanceDetail(
     user_id: string,
     startDate: string,

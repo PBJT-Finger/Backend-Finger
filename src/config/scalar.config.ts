@@ -1,6 +1,5 @@
 // src/config/scalar.config.ts - Hide Models for cleaner docs
 
- 
 export function generateScalarHTML(_spec: any): string {
   return `<!DOCTYPE html>
 <html lang="en">
