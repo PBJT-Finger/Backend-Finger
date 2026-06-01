@@ -57,7 +57,7 @@ export class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const params: any[] = [startDate, endDate];
 
       if (jabatan) {
@@ -102,7 +102,7 @@ export class ExportController {
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
       // Transform to aggregated data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
@@ -208,7 +208,7 @@ export class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const params: any[] = [startDate, endDate];
 
       if (jabatan) {
@@ -328,7 +328,7 @@ export class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const params: any[] = [startDate, endDate];
 
       if (jabatan) {
@@ -373,7 +373,7 @@ export class ExportController {
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
       // Transform to aggregated data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
@@ -574,7 +574,7 @@ export class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const params: any[] = [startDate, endDate];
 
       if (jabatan) {
@@ -620,7 +620,7 @@ export class ExportController {
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
       // Transform to aggregated data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);

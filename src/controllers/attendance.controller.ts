@@ -349,7 +349,7 @@ export class AttendanceController {
       });
 
       // Initialize stats with all users
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const employeeStats: Record<string, any> = {};
 
       allUsers.forEach((u) => {

@@ -34,7 +34,7 @@ import { HTTP_STATUS } from '../constants/app';
  * @param res  - Express response (used to send error response)
  * @param _next - Required by Express signature for error handler detection
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 export const errorHandler = (
   err: unknown,
   req: Request,

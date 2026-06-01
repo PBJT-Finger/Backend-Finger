@@ -118,7 +118,7 @@ export function createUserRateLimiter(options: RateLimiterOptions = {}) {
       res.setHeader('X-RateLimit-Reset-User', new Date(now + windowMs).toISOString());
 
       const originalSend = res.send;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       res.send = function (data: any) {
         if (skipFailedRequests && res.statusCode >= 400) {
           redis.zrem(key, requestId).catch((err) =>

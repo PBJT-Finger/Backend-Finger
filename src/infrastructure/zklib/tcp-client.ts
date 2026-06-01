@@ -257,8 +257,8 @@ export class ZkTcpClient {
           const recvData = reply.subarray(16);
           const size = recvData.readUIntLE(1, 4);
 
-          let remain = size % MAX_CHUNK;
-          let numberChunks = Math.round(size - remain) / MAX_CHUNK;
+          const remain = size % MAX_CHUNK;
+          const numberChunks = Math.round(size - remain) / MAX_CHUNK;
           let totalPackets = numberChunks + (remain > 0 ? 1 : 0);
           let replyData = Buffer.from([]);
 
