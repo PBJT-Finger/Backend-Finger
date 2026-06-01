@@ -121,20 +121,24 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
           # Check if the key is base64 encoded (starts with 'LS0tLS1CRUdJTi')
-          if echo "${{ secrets.SSH_PRIVATE_KEY }}" | grep -q '^LS0tLS1CRUdJTi'; then
+          if echo "$SSH_PRIVATE_KEY" | grep -q '^LS0tLS1CRUdJTi'; then
             echo "🔑 Decoding base64 SSH key..."
-            echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/deploy_key
+            echo "$SSH_PRIVATE_KEY" | base64 --decode > ~/.ssh/deploy_key
           else
             echo "🔑 Using plain PEM SSH key..."
-            printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+            # Clean up Windows CRLF (\r) and ensure trailing newline
+            echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+            echo "" >> ~/.ssh/deploy_key
           fi
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
             && echo "✅ Key valid: $(ssh-keygen -l -f ~/.ssh/deploy_key | awk '{print $2}')" \
-            || { echo "❌ Key parse failed"; exit 1; }
+            || { echo "❌ Key parse failed (Check if you copied the full key including BEGIN/END lines without extra spaces!)"; exit 1; }
 
       - name: Add SSH known host
         run: |
