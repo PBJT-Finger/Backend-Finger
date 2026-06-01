@@ -255,6 +255,7 @@ jobs:
              # Asumsi nama stack backend adalah finger-be
              echo '🚀 Updating swarm service finger-be_backend...'
              docker service update --image \"\$BACKEND_IMAGE\" \
+               --label-add traefik.docker.network=finger-net \
                --env-add PORT=3333 \
                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
                --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
