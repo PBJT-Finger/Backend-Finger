@@ -210,6 +210,7 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          API_KEY_SECRET: ${{ secrets.API_KEY_SECRET }}
         run: |
           IMG_REPO=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
           BACKEND_IMAGE="${IMG_REPO}:${IMAGE_TAG}"
@@ -229,6 +230,7 @@ jobs:
              DB_PASSWORD='${DB_PASSWORD}'
              JWT_ACCESS_SECRET='${JWT_ACCESS_SECRET}'
              JWT_REFRESH_SECRET='${JWT_REFRESH_SECRET}'
+             API_KEY_SECRET='${API_KEY_SECRET}'
              DB_NAME='finger_db'
 
              cd \"\$DEPLOY_PATH\"
@@ -255,6 +257,7 @@ jobs:
              docker service update --image \"\$BACKEND_IMAGE\" \
                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
                --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
+               --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
                --with-registry-auth finger-be_backend
 
              # Verify deployment status
