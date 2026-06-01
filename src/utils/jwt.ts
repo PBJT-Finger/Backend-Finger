@@ -55,7 +55,7 @@ export const verifyRefreshToken = (token: string): UserTokenPayload => {
 };
 
 // Generate token pair
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export const generateTokens = (user: any): { accessToken: string; refreshToken: string } => {
   const payload: UserTokenPayload = {
     id: user.id,

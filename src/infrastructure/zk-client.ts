@@ -22,7 +22,7 @@
  */
 
 // node-zklib does not provide @types — this is the ONLY permitted any boundary.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 import { EventEmitter } from 'events';
 import { env } from '../config/env';
 import { ZkTcpClient } from './zklib';

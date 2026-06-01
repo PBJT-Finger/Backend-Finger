@@ -45,7 +45,7 @@ export const errorResponse = (
 /**
  * Send login/authentication response
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export const loginResponse = (
   res: Response,
   user: any,
@@ -101,7 +101,7 @@ export const paginatedResponse = (
 /**
  * Send registration response
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export const registerResponse = (
   res: Response,
   user: any,

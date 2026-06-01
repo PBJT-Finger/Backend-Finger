@@ -84,7 +84,7 @@ export class AttendanceService {
   /**
    * Get summary for one employee
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   public static async getEmployeeSummary(
     employee: any,
     startDate: Date,
@@ -166,7 +166,7 @@ export class AttendanceService {
   /**
    * Get detailed attendance for one employee
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   public static async getEmployeeAttendanceDetail(
     user_id: string,
     startDate: string,

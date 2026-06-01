@@ -81,7 +81,7 @@ export class ZkSyncService {
   private async persistAttendanceBatch(records: AttendanceRecord[]): Promise<BatchResult> {
     const batchId = uuidv4();
     let created = 0;
-    let updated = 0;
+    const updated = 0;
     let errors = 0;
 
     console.log(`[ZkSyncService] Processing batch ${batchId} — ${records.length} record(s)`);

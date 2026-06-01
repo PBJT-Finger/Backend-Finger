@@ -164,6 +164,7 @@ jobs:
       - name: Preflight checks
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -172,6 +173,8 @@ jobs:
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "set -e
              DEPLOY_PATH='${DEPLOY_PATH}'
+             DB_PASSWORD='${DB_PASSWORD}'
+             DB_NAME='finger_db'
              echo '🔍 Preflight checks started...'
 
              [ -d \"\$DEPLOY_PATH\" ] || { echo '❌ Deploy dir not found: '\$DEPLOY_PATH; exit 1; }
