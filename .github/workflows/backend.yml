@@ -167,7 +167,7 @@ jobs:
       # ── Preflight ──────────────────────────────────────────────
       - name: Preflight checks
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/finger-be' }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
           ssh -i ~/.ssh/deploy_key \
@@ -203,7 +203,7 @@ jobs:
       # ── Deploy ────────────────────────────────────────────────
       - name: Deploy backend
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/finger-be' }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           GHCR_USER: ${{ secrets.GHCR_USERNAME || github.repository_owner }}
