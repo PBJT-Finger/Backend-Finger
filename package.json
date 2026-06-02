@@ -17,6 +17,7 @@
     "sync:attendance": "tsx scripts/sync-attendance.ts",
     "device:probe": "tsx scripts/probe.ts",
     "device:seed": "tsx scripts/seed-user.ts",
+    "device:pull-seed": "tsx scripts/pull-and-seed.ts",
     "seed:holidays": "tsx scripts/seed-holidays.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
