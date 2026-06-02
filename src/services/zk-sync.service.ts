@@ -129,9 +129,17 @@ export class ZkSyncService {
    */
   private async upsertAttendanceRecord(record: AttendanceRecord): Promise<void> {
     const t = new Date(record.recordTime);
-    // recordTime is now UTC-aligned (parseTimeToDate uses Date.UTC).
-    // Use getUTC* to extract the original device time values.
-    const tanggal = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
+    // zklib parses local device time into UTC fields (e.g., 08:00 WIB becomes 08:00 UTC).
+    // We extract the exact local time fields:
+    const localYear = t.getUTCFullYear();
+    const localMonth = t.getUTCMonth();
+    const localDate = t.getUTCDate();
+    const localHour = t.getUTCHours();
+    const localMinute = t.getUTCMinutes();
+    const localSecond = t.getUTCSeconds();
+
+    // The 'tanggal' field is midnight UTC representing the local date.
+    const tanggal = new Date(Date.UTC(localYear, localMonth, localDate));
 
     // 1. deviceUserId maps directly to user_id
     const user_id = record.deviceUserId;
@@ -147,9 +155,10 @@ export class ZkSyncService {
     const resolvedName = employee?.nama ?? deviceName ?? `Karyawan ${record.deviceUserId}`;
     const resolvedJabatan = employee?.jabatan === 'DOSEN' ? 'DOSEN' : 'KARYAWAN';
 
-    // Store time components — use getUTC* since recordTime is UTC-aligned
+    // Store time components as TRUE UTC (WIB is UTC+7, so subtract 7 hours)
+    // We keep the epoch year (1970) to align with existing frontend expectations.
     const timePart = new Date(
-      Date.UTC(1970, 0, 1, t.getUTCHours(), t.getUTCMinutes(), t.getUTCSeconds())
+      Date.UTC(1970, 0, 1, localHour - 7, localMinute, localSecond)
     );
 
     // ─── Determine masuk/keluar from device attendanceType ───────────────────
