@@ -84,68 +84,7 @@ async function main() {
   console.log(`Upserted ${employees.length} employees from device.`);
 
   // 4. Generate Mock Attendance for the last 30 days
-  console.log('Generating mock attendance for the real users...');
-
-  // Clear existing attendance for testing purposes (Optional but good for clean seed)
-  // await prisma.attendance.deleteMany({});
-
-  const today = new Date();
-  let attendanceCount = 0;
-
-  for (let i = 30; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-
-    // Skip weekends (0 = Sunday, 6 = Saturday)
-    if (date.getDay() === 0 || date.getDay() === 6) {
-      continue;
-    }
-
-    const dateString = date.toISOString().split('T')[0];
-
-    for (const emp of employees) {
-      // 90% chance to be present
-      if (Math.random() < 0.9) {
-        // Random arrival time between 07:30 and 08:30
-        const arrivalMinutes = Math.floor(Math.random() * 60);
-        const jam_masuk = new Date(`${dateString}T07:30:00Z`);
-        jam_masuk.setMinutes(jam_masuk.getMinutes() + arrivalMinutes);
-
-        // Random departure time between 16:00 and 17:30
-        const departureMinutes = Math.floor(Math.random() * 90);
-        const jam_keluar = new Date(`${dateString}T16:00:00Z`);
-        jam_keluar.setMinutes(jam_keluar.getMinutes() + departureMinutes);
-
-        // Check if attendance already exists to avoid unique constraint issues if any
-        const existing = await prisma.attendance.findFirst({
-          where: {
-            user_id: emp.user_id,
-            tanggal: date,
-          },
-        });
-
-        if (!existing) {
-          await prisma.attendance.create({
-            data: {
-              user_id: emp.user_id,
-              nama: emp.nama,
-              jabatan: attendance_jabatan.KARYAWAN,
-              tanggal: date,
-              jam_masuk: jam_masuk,
-              jam_keluar: jam_keluar,
-              device_id: device.device_id,
-              verification_method: 'SIDIK_JARI',
-              status: 'HADIR',
-              status_keluar: 'HADIR',
-              is_deleted: false,
-            },
-          });
-          attendanceCount++;
-        }
-      }
-    }
-  }
-  console.log(`Generated ${attendanceCount} mock attendance records for the real users.`);
+  console.log('Skipping mock attendance generation for production.');
   console.log('Seed completed successfully!');
 }
 
