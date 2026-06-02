@@ -157,9 +157,7 @@ export class ZkSyncService {
 
     // Store time components as TRUE UTC (WIB is UTC+7, so subtract 7 hours)
     // We keep the epoch year (1970) to align with existing frontend expectations.
-    const timePart = new Date(
-      Date.UTC(1970, 0, 1, localHour - 7, localMinute, localSecond)
-    );
+    const timePart = new Date(Date.UTC(1970, 0, 1, localHour - 7, localMinute, localSecond));
 
     // ─── Determine masuk/keluar from device attendanceType ───────────────────
     // ZKTeco punch type (byte 26 of 40-byte record):
