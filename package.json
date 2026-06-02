@@ -25,7 +25,7 @@
     "format:check": "prettier --check \"**/*.ts\""
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "6",
