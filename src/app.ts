@@ -106,7 +106,13 @@ app.use(
 // Konfigurasi CORS dengan multi-origin support
 const allowedOrigins = process.env['CORS_ORIGINS']
   ? process.env['CORS_ORIGINS'].split(',').map((origin) => origin.trim())
-  : ['http://localhost:5555', 'http://localhost:3000', 'http://localhost:3333'];
+  : [
+      'http://localhost:5555',
+      'http://localhost:3000',
+      'http://localhost:3333',
+      'https://finger.pbjt.web.id',
+      'https://finger-be.pbjt.web.id'
+    ];
 
 const isDevelopment = process.env['NODE_ENV'] !== 'production';
 
