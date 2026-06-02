@@ -213,7 +213,18 @@ export class ZkDeviceClient extends EventEmitter {
           ),
         ]);
 
-        await this.zkInstance.connect();
+        const connectPromise = this.zkInstance.connect();
+        connectPromise.catch(() => {}); // swallow background rejection
+        
+        await Promise.race([
+          connectPromise,
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Handshake with ZKTeco device timed out after ${env.FINGERPRINT_TIMEOUT}ms`)),
+              env.FINGERPRINT_TIMEOUT
+            )
+          ),
+        ]);
 
         this.setStatus('online');
         console.log(
@@ -221,17 +232,39 @@ export class ZkDeviceClient extends EventEmitter {
         );
       }
 
-      const result = await this.zkInstance.getAttendances();
+      const attendancesPromise = this.zkInstance.getAttendances();
+      attendancesPromise.catch(() => {});
+      
+      const result = await Promise.race([
+        attendancesPromise,
+        new Promise<any>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`getAttendances timed out after ${env.FINGERPRINT_TIMEOUT}ms`)),
+            env.FINGERPRINT_TIMEOUT
+          )
+        ),
+      ]);
       const rawRecords = result?.data ?? [];
 
       // Check if there are any records with user IDs not present in the cache
       const hasUnknownUser = rawRecords.some(
-        (r) => r.deviceUserId && !this.deviceUserCache.has(String(r.deviceUserId))
+        (r: any) => r.deviceUserId && !this.deviceUserCache.has(String(r.deviceUserId))
       );
 
       if (hasUnknownUser || this.deviceUserCache.size === 0) {
         try {
-          const usersRes = await this.zkInstance.getUsers();
+          const usersPromise = this.zkInstance.getUsers();
+          usersPromise.catch(() => {});
+          
+          const usersRes = await Promise.race([
+            usersPromise,
+            new Promise<any>((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`getUsers timed out after ${env.FINGERPRINT_TIMEOUT}ms`)),
+                env.FINGERPRINT_TIMEOUT
+              )
+            ),
+          ]);
           const rawUsers = usersRes?.data ?? [];
           this.deviceUserCache.clear();
           for (const u of rawUsers) {
@@ -254,7 +287,7 @@ export class ZkDeviceClient extends EventEmitter {
       }
 
       // Map raw ZkTcpClient output to our typed AttendanceRecord interface
-      const allRecords: AttendanceRecord[] = rawRecords.map((r) => {
+      const allRecords: AttendanceRecord[] = rawRecords.map((r: any) => {
         return {
           userSn: r.userSn,
           deviceUserId: r.deviceUserId,
