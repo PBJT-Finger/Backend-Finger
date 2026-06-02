@@ -132,7 +132,7 @@ JWT_REFRESH_SECRET=isi_dengan_kalimat_sandi_refresh_yang_berbeda
 API_KEY_SECRET=rahasia_api_internal_sistem
 
 # FINGERPRINT ZKTECO
-FINGERPRINT_IP=192.168.1.201
+FINGERPRINT_IP=175.17.5.50
 FINGERPRINT_PORT=4370
 ```
 
@@ -245,7 +245,7 @@ Memanajemen hak akses dashboard web.
 | `DATABASE_URL` | ✅ | — | Prisma connection string (mysql://root:@localhost:3306/finger_db) |
 | `PORT` | ❌ | `3333` | Port server API |
 | `JWT_ACCESS_SECRET` | ✅ | — | Secret token akses (min. 32 char) |
-| `FINGERPRINT_IP` | ✅ | `192.168.1.201` | IP perangkat ZKTeco di LAN |
+| `FINGERPRINT_IP` | ✅ | `175.17.5.50` | IP perangkat ZKTeco di LAN |
 | `FINGERPRINT_PORT` | ❌ | `4370` | Port komunikasi UDP ZKTeco |
 
 ---
