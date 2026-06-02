@@ -111,7 +111,7 @@ const allowedOrigins = process.env['CORS_ORIGINS']
       'http://localhost:3000',
       'http://localhost:3333',
       'https://finger.pbjt.web.id',
-      'https://finger-be.pbjt.web.id'
+      'https://finger-be.pbjt.web.id',
     ];
 
 const isDevelopment = process.env['NODE_ENV'] !== 'production';
