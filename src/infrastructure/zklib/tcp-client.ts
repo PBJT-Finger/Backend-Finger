@@ -61,6 +61,7 @@ export class ZkTcpClient {
   }
 
   public connect(): Promise<boolean> {
+    // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
       try {
         const reply = await this.executeCmd(COMMANDS.CMD_CONNECT, '');
@@ -180,6 +181,7 @@ export class ZkTcpClient {
   }
 
   public executeCmd(command: number, data: string | Buffer): Promise<Buffer> {
+    // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
       if (command === COMMANDS.CMD_CONNECT) {
         this.sessionId = 0;
@@ -229,6 +231,7 @@ export class ZkTcpClient {
     reqData: Buffer,
     cb?: (loaded: number, total: number) => void
   ): Promise<{ data: Buffer; err: Error | null }> {
+    // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
       this.replyId++;
       const buf = createTCPHeader(
@@ -440,7 +443,7 @@ export class ZkTcpClient {
   public async disconnect(): Promise<boolean> {
     try {
       await this.executeCmd(COMMANDS.CMD_EXIT, '');
-    } catch (err) {
+    } catch (_err) {
       // Ignored
     }
     return await this.closeSocket();
