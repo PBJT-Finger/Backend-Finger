@@ -211,6 +211,7 @@ jobs:
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           API_KEY_SECRET: ${{ secrets.API_KEY_SECRET }}
+          FINGERPRINT_IP: ${{ secrets.FINGERPRINT_IP || '175.17.5.50' }}
         run: |
           IMG_REPO=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
           BACKEND_IMAGE="${IMG_REPO}:${IMAGE_TAG}"
@@ -231,6 +232,7 @@ jobs:
              JWT_ACCESS_SECRET='${JWT_ACCESS_SECRET}'
              JWT_REFRESH_SECRET='${JWT_REFRESH_SECRET}'
              API_KEY_SECRET='${API_KEY_SECRET}'
+             FINGERPRINT_IP='${FINGERPRINT_IP}'
              DB_NAME='finger_db'
 
              cd \"\$DEPLOY_PATH\"
@@ -260,7 +262,7 @@ jobs:
                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
                --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
                --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
-               --env-add FINGERPRINT_IP=175.17.5.50 \
+               --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
                --with-registry-auth finger-be_backend
 
              # Verify deployment status
