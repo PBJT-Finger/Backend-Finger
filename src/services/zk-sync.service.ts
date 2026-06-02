@@ -29,7 +29,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../config/prisma';
 import { ZkDeviceClient, AttendanceRecord } from '../infrastructure/zk-client';
-import type { Prisma } from '@prisma/client';
+// import type { Prisma } from '@prisma/client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

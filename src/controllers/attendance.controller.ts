@@ -378,7 +378,7 @@ export class AttendanceController {
         where: holidayWhere,
         select: { tanggal: true },
       });
-      const holidaySet = new Set(
+      const _holidaySet = new Set(
         holidays.map((h) => {
           const t = h.tanggal;
           return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;

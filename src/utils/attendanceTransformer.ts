@@ -175,7 +175,7 @@ export function transformDosenAttendance(
   _startDate?: string | Date,
   _endDate?: string | Date,
   totalWorkingDays?: number,
-  holidaySet?: Set<string>
+  _holidaySet?: Set<string>
 ): TransformedDosenRecord[] {
   try {
     if (!attendanceRecords || attendanceRecords.length === 0) {
@@ -281,7 +281,7 @@ export function transformKaryawanAttendance(
   _startDate?: string | Date,
   _endDate?: string | Date,
   totalWorkingDays?: number,
-  holidaySet?: Set<string>
+  _holidaySet?: Set<string>
 ): TransformedKaryawanRecord[] {
   try {
     if (!attendanceRecords || attendanceRecords.length === 0) {

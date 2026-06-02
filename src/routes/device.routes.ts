@@ -40,7 +40,7 @@ router.get('/shifts', authenticateToken, async (req: Request, res: Response) => 
       orderBy: { id: 'asc' },
     });
     return successResponse(res, shifts, 'Shifts retrieved successfully');
-  } catch (error) {
+  } catch (_error) {
     return errorResponse(res, 'Gagal mengambil data shift', 500);
   }
 });

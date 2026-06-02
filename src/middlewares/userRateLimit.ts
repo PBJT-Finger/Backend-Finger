@@ -67,7 +67,7 @@ export function createUserRateLimiter(options: RateLimiterOptions = {}) {
     const userId = req.user.id;
     const key = `${keyPrefix}${userId}`;
     const now = Date.now();
-    const windowStart = now - windowMs;
+    const _windowStart = now - windowMs;
 
     try {
       const multi = redis.multi();

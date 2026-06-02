@@ -1,5 +1,5 @@
 // src/app.ts - Aplikasi Express utama untuk Sistem Rekap Absensi Kampus
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import path from 'path';
 import helmet from 'helmet';
 import cors from 'cors';

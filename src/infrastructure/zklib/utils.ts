@@ -171,7 +171,7 @@ export const checkNotEventTCP = (data: Buffer): boolean => {
     const commandId = payload.readUIntLE(0, 2);
     const event = payload.readUIntLE(4, 2);
     return event === COMMANDS.EF_ATTLOG && commandId === COMMANDS.CMD_REG_EVENT;
-  } catch (err) {
+  } catch (_err) {
     return false;
   }
 };
