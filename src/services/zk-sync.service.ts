@@ -155,9 +155,10 @@ export class ZkSyncService {
     const resolvedName = employee?.nama ?? deviceName ?? `Karyawan ${record.deviceUserId}`;
     const resolvedJabatan = employee?.jabatan === 'DOSEN' ? 'DOSEN' : 'KARYAWAN';
 
-    // Store time components as TRUE UTC (WIB is UTC+7, so subtract 7 hours)
-    // We keep the epoch year (1970) to align with existing frontend expectations.
-    const timePart = new Date(Date.UTC(1970, 0, 1, localHour - 7, localMinute, localSecond));
+    // Store time components exactly as they come from the device.
+    // The device sends local time. We store it directly into the UTC epoch (1970)
+    // so that when Prisma returns it and we call getUTCHours(), it returns the exact local time.
+    const timePart = new Date(Date.UTC(1970, 0, 1, localHour, localMinute, localSecond));
 
     // ─── Determine masuk/keluar from device attendanceType ───────────────────
     // ZKTeco punch type (byte 26 of 40-byte record):
