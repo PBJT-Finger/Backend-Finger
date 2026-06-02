@@ -215,12 +215,17 @@ export class ZkDeviceClient extends EventEmitter {
 
         const connectPromise = this.zkInstance.connect();
         connectPromise.catch(() => {}); // swallow background rejection
-        
+
         await Promise.race([
           connectPromise,
           new Promise<never>((_, reject) =>
             setTimeout(
-              () => reject(new Error(`Handshake with ZKTeco device timed out after ${env.FINGERPRINT_TIMEOUT}ms`)),
+              () =>
+                reject(
+                  new Error(
+                    `Handshake with ZKTeco device timed out after ${env.FINGERPRINT_TIMEOUT}ms`
+                  )
+                ),
               env.FINGERPRINT_TIMEOUT
             )
           ),
@@ -234,7 +239,7 @@ export class ZkDeviceClient extends EventEmitter {
 
       const attendancesPromise = this.zkInstance.getAttendances();
       attendancesPromise.catch(() => {});
-      
+
       const result = await Promise.race([
         attendancesPromise,
         new Promise<any>((_, reject) =>
@@ -255,7 +260,7 @@ export class ZkDeviceClient extends EventEmitter {
         try {
           const usersPromise = this.zkInstance.getUsers();
           usersPromise.catch(() => {});
-          
+
           const usersRes = await Promise.race([
             usersPromise,
             new Promise<any>((_, reject) =>
