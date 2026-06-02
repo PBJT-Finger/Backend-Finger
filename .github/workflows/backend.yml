@@ -260,6 +260,7 @@ jobs:
                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
                --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
                --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
+               --env-add FINGERPRINT_IP=175.17.5.50 \
                --with-registry-auth finger-be_backend
 
              # Verify deployment status
