@@ -19,15 +19,15 @@ import path from 'path';
 import { ZkTcpClient } from '../src/infrastructure/zklib';
 
 // ─── Konfigurasi ────────────────────────────────────────────────────────────
-const DEVICE_IP   = process.env.FINGERPRINT_IP ?? '175.17.5.50';
+const DEVICE_IP = process.env.FINGERPRINT_IP ?? '175.17.5.50';
 const DEVICE_PORT = parseInt(process.env.FINGERPRINT_PORT ?? '4370', 10);
-const TIMEOUT_MS  = parseInt(process.env.FINGERPRINT_TIMEOUT ?? '15000', 10);
+const TIMEOUT_MS = parseInt(process.env.FINGERPRINT_TIMEOUT ?? '15000', 10);
 
 // Shift default untuk semua karyawan yang belum ada assignment-nya
 const DEFAULT_SHIFT_ID = 1;
 
 // Output file
-const OUTPUT_DIR  = path.resolve(__dirname, '../seeds');
+const OUTPUT_DIR = path.resolve(__dirname, '../seeds');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'employees_from_device.sql');
 const OUTPUT_JSON = path.join(OUTPUT_DIR, 'employees_from_device.json');
 
@@ -58,11 +58,11 @@ function buildSeedSQL(users: Array<{ userId: string; name: string }>): string {
   ];
 
   const valueRows = users.map((u, idx) => {
-    const userId  = escapeSQL(u.userId);
-    const nama    = escapeSQL(u.name || `User-${u.userId}`);
+    const userId = escapeSQL(u.userId);
+    const nama = escapeSQL(u.name || `User-${u.userId}`);
     // Default ke KARYAWAN — admin bisa update via UI setelah import
     const jabatan = 'KARYAWAN';
-    const isLast  = idx === users.length - 1;
+    const isLast = idx === users.length - 1;
     return `  ('${userId}', '${nama}', '${jabatan}', ${DEFAULT_SHIFT_ID}, 'AKTIF', 1, '${now}', '${now}')${isLast ? '' : ','}`;
   });
 
@@ -127,15 +127,19 @@ async function main(): Promise<void> {
     }
 
     // Normalize data
-    const users = rawUsers.map((u) => ({
-      userId: String((u as any).userId ?? (u as any).uid ?? ''),
-      name  : String((u as any).name ?? '').trim(),
-    })).filter((u) => u.userId !== '');
+    const users = rawUsers
+      .map((u) => ({
+        userId: String((u as any).userId ?? (u as any).uid ?? ''),
+        name: String((u as any).name ?? '').trim(),
+      }))
+      .filter((u) => u.userId !== '');
 
     // Tampilkan daftar
     console.log('\n--- Daftar User dari Alat ---');
     users.forEach((u, i) => {
-      console.log(`  [${String(i + 1).padStart(3, '0')}] ID: ${u.userId.padEnd(6)} | Nama: ${u.name}`);
+      console.log(
+        `  [${String(i + 1).padStart(3, '0')}] ID: ${u.userId.padEnd(6)} | Nama: ${u.name}`
+      );
     });
     console.log(`--- Total: ${users.length} user ---\n`);
 
@@ -156,13 +160,16 @@ async function main(): Promise<void> {
     console.log('\n[SELESAI] Untuk import ke MySQL jalankan:');
     console.log(`  mysql -u root -p finger_db < ${OUTPUT_FILE}`);
     console.log('\nAtau dari dalam container Docker:');
-    console.log('  docker exec -i finger-be_mysql mysql -uroot -p<password> finger_db < seeds/employees_from_device.sql');
-
+    console.log(
+      '  docker exec -i finger-be_mysql mysql -uroot -p<password> finger_db < seeds/employees_from_device.sql'
+    );
   } catch (err) {
     console.error('\n[ERROR] Gagal terhubung ke alat fingerprint:');
     console.error(err);
     console.error('\nPastikan:');
-    console.error(`  1. Alat fingerprint menyala dan bisa di-ping dari server ini: ping ${DEVICE_IP}`);
+    console.error(
+      `  1. Alat fingerprint menyala dan bisa di-ping dari server ini: ping ${DEVICE_IP}`
+    );
     console.error('  2. Port 4370 tidak diblokir firewall');
     console.error('  3. Script ini dijalankan dari server Proxmox (bukan PC lokal)');
     process.exit(1);
