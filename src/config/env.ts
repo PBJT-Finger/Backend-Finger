@@ -70,7 +70,8 @@ export const env = cleanEnv(process.env, {
   }),
   CORS_ORIGINS: str({
     desc: 'Comma-separated list of allowed CORS origins',
-    default: 'http://localhost:5555,http://localhost:3000,http://localhost:3333,https://finger.pbjt.web.id,https://finger-be.pbjt.web.id',
+    default:
+      'http://localhost:5555,http://localhost:3000,http://localhost:3333,https://finger.pbjt.web.id,https://finger-be.pbjt.web.id',
   }),
 
   // ─── Logging ─────────────────────────────────────────────────────────────────
