@@ -247,7 +247,7 @@ jobs:
 
              # Run migrations ONCE using a temporary container on the swarm network
              echo '🗄️ Running database migrations...'
-             docker run --rm --network finger-be_finger-be-net \
+             docker run --rm --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
                \"\$BACKEND_IMAGE\" npx prisma migrate deploy \
                && echo '✅ Migrations complete' \
