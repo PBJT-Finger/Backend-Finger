@@ -114,7 +114,7 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      # ── Tailscale (no tags → admin-owned node → autogroup:admin) ──
+      # ── Tailscale ──────────────────────────────────────────────
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
@@ -125,28 +125,24 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
-          # Check if the key is base64 encoded (starts with 'LS0tLS1CRUdJTi')
           if echo "$SSH_PRIVATE_KEY" | grep -q '^LS0tLS1CRUdJTi'; then
             echo "🔑 Decoding base64 SSH key..."
             echo "$SSH_PRIVATE_KEY" | base64 --decode > ~/.ssh/deploy_key
           else
             echo "🔑 Using plain PEM SSH key..."
-            # Clean up Windows CRLF (\r) and ensure trailing newline
             echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/deploy_key
             echo "" >> ~/.ssh/deploy_key
           fi
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
             && echo "✅ Key valid: $(ssh-keygen -l -f ~/.ssh/deploy_key | awk '{print $2}')" \
-            || { echo "❌ Key parse failed (Check if you copied the full key including BEGIN/END lines without extra spaces!)"; exit 1; }
+            || { echo "❌ Key parse failed"; exit 1; }
 
       - name: Add SSH known host
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
-          echo "🔍 Adding SSH known host..."
-          if [ -z "$SSH_HOST" ]; then
-            echo "❌ SSH_HOST secret is empty!"
-            exit 1
-          fi
+          : "${SSH_HOST:?❌ Secret SSH_HOST is not set!}"
           mkdir -p ~/.ssh
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || {
             echo "❌ ssh-keyscan failed — host unreachable or port closed"
@@ -154,37 +150,40 @@ jobs:
           }
           chmod 644 ~/.ssh/known_hosts
           echo "✅ SSH known host added"
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
 
-      - name: Checkout (for docker-compose.yml sync)
+      - name: Checkout
         uses: actions/checkout@v4
-
-      # ── Skip Compose Sync for Swarm ────────────────────────────
-      - name: Skip compose sync for Swarm
-        run: echo "Swarm stack is managed externally. Skipping compose file sync."
 
       # ── Preflight ──────────────────────────────────────────────
       - name: Preflight checks
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/finger-be' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
+          # Fail loudly if any required secret is missing
+          : "${DEPLOY_PATH:?❌ Secret DEPLOY_PATH is not set!}"
+          : "${DB_PASSWORD:?❌ Secret DB_PASSWORD is not set!}"
+          : "${DB_NAME:?❌ Secret DB_NAME is not set!}"
+          : "${SSH_PORT:?❌ Secret SSH_PORT is not set!}"
+
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
-            -p "${{ secrets.SSH_PORT || 22 }}" \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            -p "${SSH_PORT}" \
+            "${SSH_USER}@${SSH_HOST}" \
             "set -e
              DEPLOY_PATH='${DEPLOY_PATH}'
              DB_PASSWORD='${DB_PASSWORD}'
-             DB_NAME='finger_db'
+             DB_NAME='${DB_NAME}'
              echo '🔍 Preflight checks started...'
 
              [ -d \"\$DEPLOY_PATH\" ] || { echo '❌ Deploy dir not found: '\$DEPLOY_PATH; exit 1; }
              cd \"\$DEPLOY_PATH\"
 
-             # Generate .env.docker using GitHub Secrets
              echo '🔐 Generating .env.docker...'
              echo \"DATABASE_URL=mysql://root:\${DB_PASSWORD}@mysql:3306/\${DB_NAME}\" > .env.docker
              echo \"DB_PASSWORD=\${DB_PASSWORD}\" >> .env.docker
@@ -192,35 +191,46 @@ jobs:
              echo \"DB_USERNAME=root\" >> .env.docker
              echo \"DB_HOST=mysql\" >> .env.docker
              echo \"REDIS_HOST=redis\" >> .env.docker
-             echo '✅ .env.docker generated successfully'
+             echo '✅ .env.docker generated'
 
-             echo '🐳 Checking Docker daemon...'
              docker info > /dev/null 2>&1 || { echo '❌ Docker daemon not running!'; exit 1; }
-             echo '✅ Docker daemon running'
-
              echo '✅ All preflight checks passed!'"
 
       # ── Deploy ────────────────────────────────────────────────
       - name: Deploy backend
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/finger-be' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
-          GHCR_USER: ${{ secrets.GHCR_USERNAME || github.repository_owner }}
+          GHCR_USER: ${{ secrets.GHCR_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           API_KEY_SECRET: ${{ secrets.API_KEY_SECRET }}
-          FINGERPRINT_IP: ${{ secrets.FINGERPRINT_IP || '175.17.5.50' }}
+          FINGERPRINT_IP: ${{ secrets.FINGERPRINT_IP }}
+          TZ: ${{ secrets.TZ }}
+          POLLING_INTERVAL_MS: ${{ secrets.POLLING_INTERVAL_MS }}
+          RECONNECT_DELAY_MS: ${{ secrets.RECONNECT_DELAY_MS }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
+          # Fail loudly if any critical secret is missing
+          : "${DEPLOY_PATH:?❌ Secret DEPLOY_PATH is not set!}"
+          : "${FINGERPRINT_IP:?❌ Secret FINGERPRINT_IP is not set!}"
+          : "${DB_PASSWORD:?❌ Secret DB_PASSWORD is not set!}"
+          : "${DB_NAME:?❌ Secret DB_NAME is not set!}"
+          : "${SSH_PORT:?❌ Secret SSH_PORT is not set!}"
+
           IMG_REPO=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
           BACKEND_IMAGE="${IMG_REPO}:${IMAGE_TAG}"
 
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
-            -p "${{ secrets.SSH_PORT || 22 }}" \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            -p "${SSH_PORT}" \
+            "${SSH_USER}@${SSH_HOST}" \
             "set -e
              DEPLOY_PATH='${DEPLOY_PATH}'
              BACKEND_IMAGE='${BACKEND_IMAGE}'
@@ -229,15 +239,17 @@ jobs:
              IMG_REPO='${IMG_REPO}'
              IMAGE_TAG='${IMAGE_TAG}'
              DB_PASSWORD='${DB_PASSWORD}'
+             DB_NAME='${DB_NAME}'
              JWT_ACCESS_SECRET='${JWT_ACCESS_SECRET}'
              JWT_REFRESH_SECRET='${JWT_REFRESH_SECRET}'
              API_KEY_SECRET='${API_KEY_SECRET}'
              FINGERPRINT_IP='${FINGERPRINT_IP}'
-             DB_NAME='finger_db'
+             TZ='${TZ:-Asia/Jakarta}'
+             POLLING_INTERVAL_MS='${POLLING_INTERVAL_MS:-30000}'
+             RECONNECT_DELAY_MS='${RECONNECT_DELAY_MS:-30000}'
 
              cd \"\$DEPLOY_PATH\"
 
-             # GHCR login
              if [ -n \"\$GHCR_PAT\" ]; then
                echo '🔐 Logging into GHCR...'
                echo \"\$GHCR_PAT\" | docker login ghcr.io -u \"\$GHCR_USER\" --password-stdin
@@ -245,7 +257,6 @@ jobs:
 
              echo \"📦 Deploying: \$BACKEND_IMAGE\"
 
-             # Run migrations ONCE using a temporary container on the swarm network
              echo '🗄️ Running database migrations...'
              docker run --rm --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
@@ -253,22 +264,21 @@ jobs:
                && echo '✅ Migrations complete' \
                || { echo '❌ Migration failed!'; exit 1; }
 
-             # Update Docker Swarm service
-             # Asumsi nama stack backend adalah finger-be
              echo '🚀 Updating swarm service finger-be_backend...'
              docker service update --image \"\$BACKEND_IMAGE\" \
                --label-add traefik.docker.network=finger-net \
                --env-add PORT=3333 \
+               --env-add TZ=\"\$TZ\" \
                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
                --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
                --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
+               --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
+               --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
                --with-registry-auth finger-be_backend
 
-             # Verify deployment status
              echo '✅ Service update stabilized and converged successfully!'
 
-             # Cleanup old images (keep last 5)
              docker images \"\$IMG_REPO\" --format '{{.Tag}}' | grep '^main-' | sort -r | tail -n +6 | \
                xargs -r -I {} docker rmi \"\${IMG_REPO}:{}\" || true
              docker image prune -f || true
@@ -282,12 +292,27 @@ jobs:
           echo "**Image:** \`$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]'):${{ needs.build.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
 
-# REQUIRED SECRETS:
-# - SSH_HOST          : Tailscale IP server (100.72.45.110)
-# - SSH_USER          : deploy
-# - SSH_PRIVATE_KEY   : Private key finger_back (full content)
-# - SSH_PORT          : 22 (optional)
-# - DEPLOY_PATH       : /opt/fingerback (optional)
-# - TAILSCALE_AUTHKEY : Reusable ephemeral key (tanpa tag)
-# - GHCR_PAT          : GitHub PAT read:packages (optional, public image)
-# - GHCR_USERNAME     : GitHub username (optional)
+# REQUIRED SECRETS (GitHub → Settings → Secrets and variables → Actions):
+# ─── Infrastruktur ───────────────────────────────────────────────────────────
+# - SSH_HOST             : Tailscale IP server (contoh: 100.72.45.110)
+# - SSH_USER             : username SSH (contoh: deploy)
+# - SSH_PORT             : port SSH (contoh: 22)
+# - SSH_PRIVATE_KEY      : isi penuh private key (termasuk baris BEGIN/END)
+# - DEPLOY_PATH          : path deploy di server (contoh: /opt/finger-be)
+# - TAILSCALE_AUTHKEY    : Reusable ephemeral key (tanpa tag)
+# ─── Registry ────────────────────────────────────────────────────────────────
+# - GHCR_PAT             : GitHub PAT dengan scope read:packages
+# - GHCR_USERNAME        : GitHub username pemilik package
+# ─── Database ────────────────────────────────────────────────────────────────
+# - DB_PASSWORD          : password MySQL
+# - DB_NAME              : nama database (contoh: finger_db)
+# ─── Aplikasi ────────────────────────────────────────────────────────────────
+# - JWT_ACCESS_SECRET    : secret untuk access token
+# - JWT_REFRESH_SECRET   : secret untuk refresh token
+# - API_KEY_SECRET       : secret untuk API key
+# ─── Perangkat Fingerprint ───────────────────────────────────────────────────
+# - FINGERPRINT_IP       : IP pintu depan Router Biru (contoh: 172.17.40.214)
+# - POLLING_INTERVAL_MS  : interval polling ZKTeco dalam ms (contoh: 30000)
+# - RECONNECT_DELAY_MS   : delay reconnect dalam ms (contoh: 30000)
+# ─── Sistem ──────────────────────────────────────────────────────────────────
+# - TZ                   : timezone server (contoh: Asia/Jakarta)
