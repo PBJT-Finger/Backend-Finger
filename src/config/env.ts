@@ -124,16 +124,16 @@ export const env = cleanEnv(process.env, {
     default: 10_000,
   }),
   POLLING_INTERVAL_MS: num({
-    desc: 'Interval between each ZK device polling cycle in milliseconds',
-    default: 2_000,
+    desc: 'Interval between each ZK device polling cycle in milliseconds. 30s = 2 polls/min — keeps embedded device cool while still feeling real-time for attendance dashboards.',
+    default: 30_000,
   }),
   RECONNECT_DELAY_MS: num({
-    desc: 'Delay before reconnect attempt after a failed poll cycle in milliseconds',
-    default: 8_000,
+    desc: 'Delay before reconnect attempt after a failed poll cycle in milliseconds. Equal to POLLING_INTERVAL_MS so a failed cycle simply waits one full interval before retrying.',
+    default: 30_000,
   }),
   IN_PORT_TIMEOUT_MS: num({
-    desc: 'Internal ZKLib in-port timeout in milliseconds',
-    default: 4_000,
+    desc: 'Internal ZKLib in-port timeout in milliseconds.',
+    default: 5_000,
   }),
 });
 
