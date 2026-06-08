@@ -106,7 +106,7 @@ export class AuthController {
           return errorResponse(res, firstErr ? firstErr.msg : 'Validasi gagal', 400);
         }
 
-        const { username, email, password } = req.body;
+        const { username, email, password, role } = req.body;
 
         // Check if username exists
         const existingUsername = await prisma.admins.findFirst({
@@ -134,7 +134,7 @@ export class AuthController {
             username,
             email,
             password_hash: hashedPassword,
-            role: 'admin',
+            role: role && ['admin', 'pimpinan'].includes(role.toLowerCase()) ? role.toLowerCase() : 'admin',
             is_active: true,
             created_at: new Date(),
             updated_at: new Date(),

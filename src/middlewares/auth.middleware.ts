@@ -118,6 +118,31 @@ export const authenticateToken = async (
 
     req.user = user;
 
+    // Reject write actions for PIMPINAN role, except logout
+    const writeMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
+    const isLogout = req.path.endsWith('/logout');
+    if (
+      writeMethods.includes(req.method.toUpperCase()) &&
+      user.role.toUpperCase() === 'PIMPINAN' &&
+      !isLogout
+    ) {
+      logger.warn('Auth failed: Write access denied for PIMPINAN role', {
+        userId: user.id,
+        role: user.role,
+        path: req.path,
+        method: req.method,
+        correlationId: req.correlationId,
+      });
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'WRITE_ACCESS_DENIED',
+          message: 'Akses ditolak: Pimpinan hanya memiliki hak akses baca dan ekspor.',
+        },
+      });
+      return;
+    }
+
     logger.info('Authentication successful', {
       userId: user.id,
       username: user.username,

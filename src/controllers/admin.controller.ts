@@ -5,7 +5,7 @@ import logger from '../utils/logger';
 import bcrypt from 'bcrypt';
 
 const BCRYPT_SALT_ROUNDS = 12;
-const VALID_ROLES = ['admin', 'super_admin'];
+const VALID_ROLES = ['admin', 'super_admin', 'pimpinan'];
 
 export class AdminController {
   /**

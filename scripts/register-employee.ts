@@ -19,9 +19,9 @@ async function main() {
     process.exit(1);
   }
 
-  const userId = args[0];
-  const name = args[1];
-  const positionInput = args[2].toUpperCase();
+  const userId = args[0]!;
+  const name = args[1]!;
+  const positionInput = args[2]!.toUpperCase();
 
   if (positionInput !== 'DOSEN' && positionInput !== 'KARYAWAN') {
     console.error('❌ Error: Jabatan harus berupa "DOSEN" atau "KARYAWAN".');
