@@ -131,7 +131,7 @@ export class DeviceUsersController {
       const message =
         result.action === 'created'
           ? `Pengguna "${result.nama}" berhasil didaftarkan sebagai karyawan baru`
-          : `Mapping berhasil ditambahkan untuk karyawan "${result.nama}" yang sudah terdaftar`;
+          : `Pemetaan berhasil diperbarui untuk user "${result.nama}" yang sudah terdaftar`;
 
       logger.audit('DEVICE_USER_REGISTERED', req.user?.id ?? 0, {
         deviceUserId,

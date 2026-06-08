@@ -50,6 +50,8 @@ export interface DeviceUserWithStatus {
   employeeNama: string | null;
   /** Employee jabatan; null if unregistered */
   employeeJabatan: string | null;
+  /** Employee shift ID; null if unregistered */
+  employeeShiftId: number | null;
 }
 
 export interface DeviceUserPullResult {
@@ -122,7 +124,7 @@ export class DeviceUsersService {
       deviceUserIds.length > 0
         ? await prisma.employees.findMany({
             where: { user_id: { in: deviceUserIds } },
-            select: { user_id: true, nama: true, jabatan: true, is_active: true },
+            select: { user_id: true, nama: true, jabatan: true, shift_id: true, is_active: true },
           })
         : [];
 
@@ -151,6 +153,7 @@ export class DeviceUsersService {
         registrationStatus,
         employeeNama: employee?.nama ?? null,
         employeeJabatan: employee?.jabatan ?? null,
+        employeeShiftId: employee?.shift_id ?? null,
       };
     });
 
@@ -230,6 +233,7 @@ export class DeviceUsersService {
             nama,
             jabatan,
             shift_id: shiftId,
+            is_active: true,
           },
         });
         action = 'mapping_added';
