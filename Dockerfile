@@ -1,25 +1,36 @@
 # ===================================================
 # Backend-Finger — Dockerfile
-# Multi-stage build: deps → build → production
-# Base: node:22-alpine (minimal attack surface)
+# Multi-stage build: deps -> build -> production
+# Base: node:22-alpine
 # ===================================================
 
-# ---------- Stage 1: Install dependencies ----------
-FROM node:22-alpine AS deps
-
-# Install OS-level deps needed by some npm packages
-RUN apk add --no-cache libc6-compat openssl
+# ---------- Stage 1: Build the TypeScript code ----------
+FROM node:22-alpine AS builder
 
 WORKDIR /app
-
-# Copy package files first (Docker layer cache optimization)
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 
-# Install production deps only + generate Prisma client
+# Install ALL dependencies (including devDependencies like typescript)
+RUN npm ci
+
+# Copy source code and build
+COPY tsconfig.json ./
+COPY src ./src/
+RUN npx prisma generate
+RUN npm run build
+
+# ---------- Stage 2: Production dependencies ----------
+FROM node:22-alpine AS deps
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY prisma ./prisma/
+
+# Install ONLY production dependencies to keep image small
 RUN npm ci --omit=dev && npx prisma generate
 
-# ---------- Stage 2: Production image ----------
+# ---------- Stage 3: Production image ----------
 FROM node:22-alpine AS runner
 
 # Security: Use non-root user
@@ -28,15 +39,19 @@ RUN addgroup --system --gid 1001 nodejs \
 
 WORKDIR /app
 
-# Copy installed node_modules from deps stage (includes .prisma/client)
+# Copy production node_modules
 COPY --from=deps --chown=express:nodejs /app/node_modules ./node_modules
 
-# Copy application source
+# Copy compiled javascript code from builder
+COPY --from=builder --chown=express:nodejs /app/dist ./dist
+# Copy static files (swagger docs, etc)
+COPY --chown=express:nodejs public ./dist/public
+
+# Copy application files
 COPY --chown=express:nodejs prisma ./prisma/
-COPY --chown=express:nodejs src ./src/
 COPY --chown=express:nodejs package.json ./
 
-# Create required directories (exports + logs) before switching to non-root user
+# Create required directories before switching to non-root user
 RUN mkdir -p exports logs && chown -R express:nodejs exports logs
 
 # Switch to non-root user
@@ -45,11 +60,9 @@ USER express
 # Expose port (runtime value from ENV)
 EXPOSE 3333
 
-# Health check — calls /health endpoint
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD wget -qO- http://localhost:3333/health || exit 1
+    CMD wget -qO- http://127.0.0.1:3333/health || exit 1
 
-# Entrypoint: start server directly
-# NOTE: prisma migrate deploy is now run ONCE in CI (backend.yml deploy step)
-# before the container is recreated — keeping startup fast and predictable.
-CMD ["node", "src/server.js"]
+# Start the compiled server
+CMD ["node", "dist/src/server.js"]

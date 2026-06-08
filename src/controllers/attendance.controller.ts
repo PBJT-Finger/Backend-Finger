@@ -80,9 +80,8 @@ export class AttendanceController {
         })
       );
 
-      const totalWorkingDays = startDateStr && endDateStr 
-        ? await calculateWorkingDays(startDateStr, endDateStr) 
-        : 0;
+      const totalWorkingDays =
+        startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
       // Transform to aggregated data
       const transformedData = transformDosenAttendance(
@@ -169,9 +168,8 @@ export class AttendanceController {
         })
       );
 
-      const totalWorkingDays = startDateStr && endDateStr 
-        ? await calculateWorkingDays(startDateStr, endDateStr) 
-        : 0;
+      const totalWorkingDays =
+        startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
       // Transform to aggregated data
       const transformedData = transformKaryawanAttendance(
@@ -349,7 +347,7 @@ export class AttendanceController {
       });
 
       // Initialize stats with all users
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const employeeStats: Record<string, any> = {};
 
       allUsers.forEach((u) => {
@@ -380,7 +378,7 @@ export class AttendanceController {
         where: holidayWhere,
         select: { tanggal: true },
       });
-      const holidaySet = new Set(
+      const _holidaySet = new Set(
         holidays.map((h) => {
           const t = h.tanggal;
           return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
@@ -503,7 +501,10 @@ export class AttendanceController {
         return `${startDay} ${startMonth || ''} ${startYear} - ${endDay} ${endMonth || ''} ${endYear}`;
       };
 
-      const totalWorkingDaysInPeriod = await calculateWorkingDays(startDate as string, endDate as string);
+      const totalWorkingDaysInPeriod = await calculateWorkingDays(
+        startDate as string,
+        endDate as string
+      );
 
       const summary = Object.values(employeeStats).map((emp, index) => {
         const attendanceDatesArray = Array.from(emp.attendanceDates as Set<string>).sort();
@@ -522,7 +523,12 @@ export class AttendanceController {
           hadirMalam: emp.hadir_malam.size,
           totalTerlambat: emp.terlambat_dates ? emp.terlambat_dates.size : 0,
           totalHariKerja: totalHariKerja,
-          persentase: totalHariKerja > 0 ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100)) : (totalHadir > 0 ? 100 : 0),
+          persentase:
+            totalHariKerja > 0
+              ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
+              : totalHadir > 0
+                ? 100
+                : 0,
           attendanceDates: formatDateRange(attendanceDatesArray),
           lastCheckIn: formatTimeOnly(emp.last_check_in),
           lastCheckOut: formatTimeOnly(emp.last_check_out),

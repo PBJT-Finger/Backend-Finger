@@ -11,14 +11,14 @@
  * @param obj - Object to redact
  * @returns Redacted copy of object
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export function redactSensitiveData(obj: any): any {
   if (!obj || typeof obj !== 'object') {
     return obj;
   }
 
   // Create shallow copy (array or object)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const redacted: any = Array.isArray(obj) ? [...obj] : { ...obj };
 
   // Sensitive key patterns to redact

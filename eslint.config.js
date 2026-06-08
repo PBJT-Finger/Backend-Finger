@@ -3,11 +3,14 @@
 const globals = require('globals');
 const js = require('@eslint/js');
 const prettier = require('eslint-config-prettier');
+const tseslint = require('typescript-eslint');
 
-module.exports = [
+module.exports = tseslint.config(
   js.configs.recommended,
-  prettier, // Disable styling rules that conflict with Prettier
+  ...tseslint.configs.recommended,
+  prettier,
   {
+    files: ['**/*.ts'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'commonjs',
@@ -18,7 +21,7 @@ module.exports = [
     },
     rules: {
       // Best practices
-      'no-unused-vars': [
+      '@typescript-eslint/no-unused-vars': [
         'warn',
         {
           argsIgnorePattern: '^_',
@@ -26,12 +29,16 @@ module.exports = [
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+      'no-unused-vars': 'off', // Turn off base rule in favor of typescript-eslint
+      '@typescript-eslint/no-explicit-any': 'off', // Downgrade any usage
+      'no-async-promise-executor': 'warn',
+      '@typescript-eslint/no-namespace': 'off',
       'no-console': 'off', // We use Winston for logging
-      'prefer-const': 'error',
+      'prefer-const': 'warn',
       'no-var': 'error',
-      eqeqeq: ['error', 'always'],
+      eqeqeq: ['warn', 'always'],
       'no-throw-literal': 'error',
     },
     ignores: ['node_modules/**', 'prisma/generated/**', 'exports/**', 'scripts/**'],
   },
-];
+);

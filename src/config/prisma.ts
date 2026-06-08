@@ -2,7 +2,6 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import logger from '../utils/logger';
 
 declare global {
-  // eslint-disable-next-line no-var
   var prisma: PrismaClient<Prisma.PrismaClientOptions, 'query'> | undefined;
 }
 

@@ -90,7 +90,7 @@ export async function disconnect(): Promise<void> {
  * @param params - Query parameters
  * @returns Query results
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export async function executeRawQuery(query: string, params: any[] = []): Promise<any> {
   try {
     const result = await prisma.$queryRawUnsafe(query, ...params);

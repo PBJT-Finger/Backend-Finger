@@ -43,8 +43,8 @@ const startServer = async (): Promise<void> => {
   try {
     await initializeApp();
 
-    server = app.listen(PORT, () => {
-      logger.info(`🚀 Server berjalan di port ${PORT}`);
+    server = app.listen(Number(PORT), '0.0.0.0', () => {
+      logger.info(`🚀 Server berjalan di port ${PORT} (0.0.0.0)`);
       logger.info(`📊 Environment: ${process.env['NODE_ENV'] || 'development'}`);
       logger.info(
         `🔒 Keamanan: ${process.env['NODE_ENV'] === 'production' ? 'Mode Production (Rate Limiting Aktif)' : 'Mode Development'}`

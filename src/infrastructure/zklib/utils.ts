@@ -29,7 +29,9 @@ export const parseHexToTime = (hex: Buffer): Date => {
     second: hex.readUIntLE(5, 1),
   };
 
-  return new Date(Date.UTC(2000 + time.year, time.month - 1, time.date, time.hour, time.minute, time.second));
+  return new Date(
+    Date.UTC(2000 + time.year, time.month - 1, time.date, time.hour, time.minute, time.second)
+  );
 };
 
 export const createChkSum = (buf: Buffer): number => {
@@ -169,7 +171,7 @@ export const checkNotEventTCP = (data: Buffer): boolean => {
     const commandId = payload.readUIntLE(0, 2);
     const event = payload.readUIntLE(4, 2);
     return event === COMMANDS.EF_ATTLOG && commandId === COMMANDS.CMD_REG_EVENT;
-  } catch (err) {
+  } catch (_err) {
     return false;
   }
 };
