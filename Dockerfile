@@ -44,6 +44,8 @@ COPY --from=deps --chown=express:nodejs /app/node_modules ./node_modules
 
 # Copy compiled javascript code from builder
 COPY --from=builder --chown=express:nodejs /app/dist ./dist
+# Copy static files (swagger docs, etc)
+COPY --chown=express:nodejs public ./dist/public
 
 # Copy application files
 COPY --chown=express:nodejs prisma ./prisma/
