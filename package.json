@@ -9,19 +9,23 @@
     "build": "rimraf dist && tsc --project tsconfig.json",
     "type-check": "tsc --noEmit",
     "postinstall": "prisma generate",
-    "db:setup": "mysql -u finger_user -pfinger finger_db < seeds/seed_data.sql",
-    "db:reset": "mysql -u finger_user -pfinger finger_db < seeds/seed_data.sql",
-    "db:import-today": "mysql -u finger_user -pfinger finger_db < seeds/insert_today_data.sql",
+    "db:setup": "prisma db push && prisma db seed",
+    "db:reset": "prisma db push --force-reset && prisma db seed",
+    "db:import-today": "mysql -u root -pRafly19 finger_db < seeds/insert_today_data.sql",
     "seed:device-mapping": "tsx scripts/seed-device-mapping.ts",
     "employee:add": "tsx scripts/add-new-employee.ts",
     "sync:attendance": "tsx scripts/sync-attendance.ts",
     "device:probe": "tsx scripts/probe.ts",
     "device:seed": "tsx scripts/seed-user.ts",
+    "device:pull-seed": "tsx scripts/pull-and-seed.ts",
     "seed:holidays": "tsx scripts/seed-holidays.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
-    "format": "prettier --write \"src/**/*.ts\" \"*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"*.ts\""
+    "format": "prettier --write \"**/*.ts\"",
+    "format:check": "prettier --check \"**/*.ts\""
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "6",
@@ -74,7 +78,8 @@
     "rimraf": "^5.0.5",
     "ts-node": "^10.9.2",
     "tsx": "^4.7.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.60.0"
   },
   "author": "Your Name",
   "license": "ISC",

@@ -10,6 +10,7 @@ on:
       - 'package-lock.json'
       - 'Dockerfile'
       - '.github/workflows/backend.yml'
+      - 'public/**'
   pull_request:
     branches: [main]
     paths:
@@ -26,36 +27,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ===== JOB 1: LINT + FORMAT CHECK =====
-  lint:
-    name: Lint & Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Check Prettier formatting
-        run: npm run format:check
-
-      - name: Run ESLint
-        run: npm run lint
-
-  # ===== JOB 2: BUILD & PUSH IMAGE =====
+  # ===== JOB 1: BUILD & PUSH IMAGE =====
   build:
     name: Build & Push Image
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    needs: lint
     permissions:
       contents: read
       packages: write
@@ -114,22 +90,24 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      # ── Tailscale (no tags → admin-owned node → autogroup:admin) ──
+      # ── Tailscale ──────────────────────────────────────────────
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
-          # Check if the key is base64 encoded (starts with 'LS0tLS1CRUdJTi')
-          if echo "${{ secrets.SSH_PRIVATE_KEY }}" | grep -q '^LS0tLS1CRUdJTi'; then
+          if echo "$SSH_PRIVATE_KEY" | grep -q '^LS0tLS1CRUdJTi'; then
             echo "🔑 Decoding base64 SSH key..."
-            echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/deploy_key
+            echo "$SSH_PRIVATE_KEY" | base64 --decode > ~/.ssh/deploy_key
           else
             echo "🔑 Using plain PEM SSH key..."
-            printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+            echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+            echo "" >> ~/.ssh/deploy_key
           fi
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
@@ -137,12 +115,10 @@ jobs:
             || { echo "❌ Key parse failed"; exit 1; }
 
       - name: Add SSH known host
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
-          echo "🔍 Adding SSH known host..."
-          if [ -z "$SSH_HOST" ]; then
-            echo "❌ SSH_HOST secret is empty!"
-            exit 1
-          fi
+          : "${SSH_HOST:?❌ Secret SSH_HOST is not set!}"
           mkdir -p ~/.ssh
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || {
             echo "❌ ssh-keyscan failed — host unreachable or port closed"
@@ -150,84 +126,87 @@ jobs:
           }
           chmod 644 ~/.ssh/known_hosts
           echo "✅ SSH known host added"
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
 
-      - name: Checkout (for docker-compose.yml sync)
+      - name: Checkout
         uses: actions/checkout@v4
-
-      # ── Sync docker-compose.yml ────────────────────────────────
-      - name: Sync docker-compose.yml to server
-        run: |
-          DEPLOY_PATH="${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}"
-          scp -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -P "${{ secrets.SSH_PORT || 22 }}" \
-            docker-compose.yml \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${DEPLOY_PATH}/docker-compose.yml"
-          echo "✅ docker-compose.yml synced to ${DEPLOY_PATH}"
 
       # ── Preflight ──────────────────────────────────────────────
       - name: Preflight checks
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
+          # Fail loudly if any required secret is missing
+          : "${DEPLOY_PATH:?❌ Secret DEPLOY_PATH is not set!}"
+          : "${DB_PASSWORD:?❌ Secret DB_PASSWORD is not set!}"
+          : "${DB_NAME:?❌ Secret DB_NAME is not set!}"
+          : "${SSH_PORT:?❌ Secret SSH_PORT is not set!}"
+
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
-            -p "${{ secrets.SSH_PORT || 22 }}" \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            -p "${SSH_PORT}" \
+            "${SSH_USER}@${SSH_HOST}" \
             "set -e
              DEPLOY_PATH='${DEPLOY_PATH}'
+             DB_PASSWORD='${DB_PASSWORD}'
+             DB_NAME='${DB_NAME}'
              echo '🔍 Preflight checks started...'
 
              [ -d \"\$DEPLOY_PATH\" ] || { echo '❌ Deploy dir not found: '\$DEPLOY_PATH; exit 1; }
              cd \"\$DEPLOY_PATH\"
 
-             echo '📝 Validating docker-compose config...'
-             docker compose config > /dev/null 2>&1 || { echo '❌ docker-compose config invalid!'; exit 1; }
-             echo '✅ Docker Compose config valid'
+             echo '🔐 Generating .env.docker...'
+             echo \"DATABASE_URL=mysql://root:\${DB_PASSWORD}@mysql:3306/\${DB_NAME}\" > .env.docker
+             echo \"DB_PASSWORD=\${DB_PASSWORD}\" >> .env.docker
+             echo \"DB_NAME=\${DB_NAME}\" >> .env.docker
+             echo \"DB_USERNAME=root\" >> .env.docker
+             echo \"DB_HOST=mysql\" >> .env.docker
+             echo \"REDIS_HOST=redis\" >> .env.docker
+             echo '✅ .env.docker generated'
 
-             echo '🔐 Checking .env.docker...'
-             [ -f .env.docker ] || { echo '❌ .env.docker not found!'; exit 1; }
-             echo '✅ .env.docker exists'
-
-             echo '🐳 Checking Docker daemon...'
              docker info > /dev/null 2>&1 || { echo '❌ Docker daemon not running!'; exit 1; }
-             echo '✅ Docker daemon running'
-
-             echo '💾 Checking disk space...'
-             AVAILABLE=\$(df \"\$DEPLOY_PATH\" | tail -1 | awk '{print \$4}')
-             if [ \"\$AVAILABLE\" -lt 2097152 ]; then
-               echo '⚠️ Warning: Low disk space (< 2GB free)'
-             else
-               echo '✅ Disk space sufficient'
-             fi
-
-             if docker compose ps finger-mysql 2>/dev/null | grep -q 'healthy'; then
-               echo '✅ MySQL healthy'
-             else
-               echo '⚠️ MySQL not running (first deploy?)'
-             fi
-
              echo '✅ All preflight checks passed!'"
 
       # ── Deploy ────────────────────────────────────────────────
       - name: Deploy backend
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fingerback' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
-          GHCR_USER: ${{ secrets.GHCR_USERNAME || github.repository_owner }}
+          GHCR_USER: ${{ secrets.GHCR_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          API_KEY_SECRET: ${{ secrets.API_KEY_SECRET }}
+          FINGERPRINT_IP: ${{ secrets.FINGERPRINT_IP }}
+          TZ: ${{ secrets.TZ }}
+          POLLING_INTERVAL_MS: ${{ secrets.POLLING_INTERVAL_MS }}
+          RECONNECT_DELAY_MS: ${{ secrets.RECONNECT_DELAY_MS }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
+          # Fail loudly if any critical secret is missing
+          : "${DEPLOY_PATH:?❌ Secret DEPLOY_PATH is not set!}"
+          : "${FINGERPRINT_IP:?❌ Secret FINGERPRINT_IP is not set!}"
+          : "${DB_PASSWORD:?❌ Secret DB_PASSWORD is not set!}"
+          : "${DB_NAME:?❌ Secret DB_NAME is not set!}"
+          : "${SSH_PORT:?❌ Secret SSH_PORT is not set!}"
+
           IMG_REPO=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
           BACKEND_IMAGE="${IMG_REPO}:${IMAGE_TAG}"
 
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
-            -p "${{ secrets.SSH_PORT || 22 }}" \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            -p "${SSH_PORT}" \
+            "${SSH_USER}@${SSH_HOST}" \
             "set -e
              DEPLOY_PATH='${DEPLOY_PATH}'
              BACKEND_IMAGE='${BACKEND_IMAGE}'
@@ -235,84 +214,46 @@ jobs:
              GHCR_USER='${GHCR_USER}'
              IMG_REPO='${IMG_REPO}'
              IMAGE_TAG='${IMAGE_TAG}'
+             DB_PASSWORD='${DB_PASSWORD}'
+             DB_NAME='${DB_NAME}'
+             JWT_ACCESS_SECRET='${JWT_ACCESS_SECRET}'
+             JWT_REFRESH_SECRET='${JWT_REFRESH_SECRET}'
+             API_KEY_SECRET='${API_KEY_SECRET}'
+             FINGERPRINT_IP='${FINGERPRINT_IP}'
+             TZ='${TZ:-Asia/Jakarta}'
+             POLLING_INTERVAL_MS='${POLLING_INTERVAL_MS:-30000}'
+             RECONNECT_DELAY_MS='${RECONNECT_DELAY_MS:-30000}'
 
              cd \"\$DEPLOY_PATH\"
 
-             # GHCR login (optional untuk public image)
              if [ -n \"\$GHCR_PAT\" ]; then
                echo '🔐 Logging into GHCR...'
                echo \"\$GHCR_PAT\" | docker login ghcr.io -u \"\$GHCR_USER\" --password-stdin
-             else
-               echo 'ℹ️ Skipping GHCR login (public image)'
              fi
 
-             # Capture current image for rollback
-             CURRENT_IMAGE=\$(docker inspect finger-backend --format='{{.Config.Image}}' 2>/dev/null || echo 'none')
-             echo \"📌 Current: \$CURRENT_IMAGE\"
              echo \"📦 Deploying: \$BACKEND_IMAGE\"
 
-             # Pull new image
-             docker pull \"\$BACKEND_IMAGE\"
-
-             # Run migrations ONCE here (not in Dockerfile CMD) using
-             # the exact image being deployed — idempotent, safe.
              echo '🗄️ Running database migrations...'
-             BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose -f docker-compose.yml run --rm \
+             docker run --rm --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
-               finger-backend npx prisma migrate deploy \
+               \"\$BACKEND_IMAGE\" npx prisma migrate deploy \
                && echo '✅ Migrations complete' \
                || { echo '❌ Migration failed!'; exit 1; }
 
-             # Cleanup zombie containers
-             docker ps -a --filter 'name=finger-backend' --format '{{.ID}}' | xargs -r docker rm -f || true
+             echo '🚀 Updating swarm service finger-be_backend...'
+             docker service update --image \"\$BACKEND_IMAGE\" \
+               --env-add PORT=3333 \
+               --env-add TZ=\"\$TZ\" \
+               --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
+               --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
+               --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
+               --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
+               --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
+               --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
+               --with-registry-auth finger-be_backend
 
-             # Rolling update — container starts fast (no migrate in CMD)
-             BACKEND_IMAGE=\"\$BACKEND_IMAGE\" docker compose -f docker-compose.yml up -d --no-deps --force-recreate finger-backend
+             echo '✅ Service update stabilized and converged successfully!'
 
-             # Health check (40s start_period + 60s retries)
-             echo '⏳ Waiting for health check...'
-             MAX_WAIT=120
-             ELAPSED=0
-
-             check_health() {
-               docker inspect finger-backend --format='{{.State.Health.Status}}' 2>/dev/null || echo 'unknown'
-             }
-
-             while [ \$ELAPSED -lt \$MAX_WAIT ]; do
-               STATUS=\$(check_health)
-               case \"\$STATUS\" in
-                 healthy)
-                   echo \"✅ finger-backend healthy after \${ELAPSED}s\"
-                   break
-                   ;;
-                 unhealthy)
-                   echo '❌ Container unhealthy!'
-                   docker compose -f docker-compose.yml logs --tail=50 finger-backend
-                   if [ \"\$CURRENT_IMAGE\" != 'none' ]; then
-                     echo \"🔄 Rolling back to \$CURRENT_IMAGE\"
-                     docker compose -f docker-compose.yml up -d --no-deps finger-backend
-                   fi
-                   exit 1
-                   ;;
-                 *)
-                   echo \"⏱️ Waiting... (\${ELAPSED}/\${MAX_WAIT}s) — status: \$STATUS\"
-                   ;;
-               esac
-               sleep 5
-               ELAPSED=\$((ELAPSED + 5))
-             done
-
-             if [ \$ELAPSED -ge \$MAX_WAIT ]; then
-               echo \"❌ Health check timeout after \${MAX_WAIT}s\"
-               docker compose -f docker-compose.yml logs --tail=100 finger-backend
-               if [ \"\$CURRENT_IMAGE\" != 'none' ]; then
-                 echo \"🔄 Rolling back to \$CURRENT_IMAGE\"
-                 docker compose -f docker-compose.yml up -d --no-deps finger-backend
-               fi
-               exit 1
-             fi
-
-             # Cleanup old images (keep last 5)
              docker images \"\$IMG_REPO\" --format '{{.Tag}}' | grep '^main-' | sort -r | tail -n +6 | \
                xargs -r -I {} docker rmi \"\${IMG_REPO}:{}\" || true
              docker image prune -f || true
@@ -326,12 +267,27 @@ jobs:
           echo "**Image:** \`$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]'):${{ needs.build.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
 
-# REQUIRED SECRETS:
-# - SSH_HOST          : Tailscale IP server (100.72.45.110)
-# - SSH_USER          : deploy
-# - SSH_PRIVATE_KEY   : Private key finger_back (full content)
-# - SSH_PORT          : 22 (optional)
-# - DEPLOY_PATH       : /opt/fingerback (optional)
-# - TAILSCALE_AUTHKEY : Reusable ephemeral key (tanpa tag)
-# - GHCR_PAT          : GitHub PAT read:packages (optional, public image)
-# - GHCR_USERNAME     : GitHub username (optional)
+# REQUIRED SECRETS (GitHub → Settings → Secrets and variables → Actions):
+# ─── Infrastruktur ───────────────────────────────────────────────────────────
+# - SSH_HOST             : Tailscale IP server (contoh: 100.72.45.110)
+# - SSH_USER             : username SSH (contoh: deploy)
+# - SSH_PORT             : port SSH (contoh: 22)
+# - SSH_PRIVATE_KEY      : isi penuh private key (termasuk baris BEGIN/END)
+# - DEPLOY_PATH          : path deploy di server (contoh: /opt/finger-be)
+# - TAILSCALE_AUTHKEY    : Reusable ephemeral key (tanpa tag)
+# ─── Registry ────────────────────────────────────────────────────────────────
+# - GHCR_PAT             : GitHub PAT dengan scope read:packages
+# - GHCR_USERNAME        : GitHub username pemilik package
+# ─── Database ────────────────────────────────────────────────────────────────
+# - DB_PASSWORD          : password MySQL
+# - DB_NAME              : nama database (contoh: finger_db)
+# ─── Aplikasi ────────────────────────────────────────────────────────────────
+# - JWT_ACCESS_SECRET    : secret untuk access token
+# - JWT_REFRESH_SECRET   : secret untuk refresh token
+# - API_KEY_SECRET       : secret untuk API key
+# ─── Perangkat Fingerprint ───────────────────────────────────────────────────
+# - FINGERPRINT_IP       : IP pintu depan Router Biru (contoh: 172.17.40.214)
+# - POLLING_INTERVAL_MS  : interval polling ZKTeco dalam ms (contoh: 30000)
+# - RECONNECT_DELAY_MS   : delay reconnect dalam ms (contoh: 30000)
+# ─── Sistem ──────────────────────────────────────────────────────────────────
+# - TZ                   : timezone server (contoh: Asia/Jakarta)

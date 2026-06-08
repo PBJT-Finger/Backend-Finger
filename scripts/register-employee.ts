@@ -8,7 +8,7 @@ import prisma from '../src/config/prisma';
 
 async function main() {
   const args = process.argv.slice(2);
-  
+
   if (args.length < 3) {
     console.error('❌ Error: Parameter tidak lengkap.');
     console.log('\nCara Penggunaan:');
@@ -19,9 +19,9 @@ async function main() {
     process.exit(1);
   }
 
-  const userId = args[0]!;
-  const name = args[1]!;
-  const positionInput = args[2]!.toUpperCase();
+  const userId = args[0] as string;
+  const name = args[1] as string;
+  const positionInput = (args[2] as string).toUpperCase();
 
   if (positionInput !== 'DOSEN' && positionInput !== 'KARYAWAN') {
     console.error('❌ Error: Jabatan harus berupa "DOSEN" atau "KARYAWAN".');

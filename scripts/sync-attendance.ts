@@ -22,11 +22,7 @@ async function syncAttendance(): Promise<void> {
   console.log(`[SYNC-ATTENDANCE] Device: ${deviceIp}:${devicePort}`);
 
   // Create zkInstance with matching connection parameters
-  const zkInstance = new ZkTcpClient(
-    deviceIp,
-    devicePort,
-    connectionTimeout
-  );
+  const zkInstance = new ZkTcpClient(deviceIp, devicePort, connectionTimeout);
 
   try {
     // 1. Fetch employees
@@ -129,7 +125,9 @@ async function syncAttendance(): Promise<void> {
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`[SYNC-ATTENDANCE] ✅ Sync completed in ${duration}s. Processed ${successCount} entries.`);
+    console.log(
+      `[SYNC-ATTENDANCE] ✅ Sync completed in ${duration}s. Processed ${successCount} entries.`
+    );
   } catch (error: any) {
     console.error('[SYNC-ATTENDANCE] 💥 Fatal error during sync:', error.message);
   } finally {

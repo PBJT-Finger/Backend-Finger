@@ -57,7 +57,7 @@ export class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const params: any[] = [startDate, endDate];
 
       if (jabatan) {
@@ -102,12 +102,24 @@ export class ExportController {
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
       // Transform to aggregated data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
-        transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
+        transformedData = transformDosenAttendance(
+          attendance,
+          startDate,
+          endDate,
+          totalWorkingDays,
+          holidaySet
+        );
       } else {
-        transformedData = transformKaryawanAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
+        transformedData = transformKaryawanAttendance(
+          attendance,
+          startDate,
+          endDate,
+          totalWorkingDays,
+          holidaySet
+        );
       }
 
       // Create workbook with ExcelJS
@@ -208,7 +220,7 @@ export class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const params: any[] = [startDate, endDate];
 
       if (jabatan) {
@@ -328,7 +340,7 @@ export class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const params: any[] = [startDate, endDate];
 
       if (jabatan) {
@@ -373,12 +385,24 @@ export class ExportController {
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
       // Transform to aggregated data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
-        transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
+        transformedData = transformDosenAttendance(
+          attendance,
+          startDate,
+          endDate,
+          totalWorkingDays,
+          holidaySet
+        );
       } else {
-        transformedData = transformKaryawanAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
+        transformedData = transformKaryawanAttendance(
+          attendance,
+          startDate,
+          endDate,
+          totalWorkingDays,
+          holidaySet
+        );
       }
 
       // Create PDF document
@@ -394,22 +418,36 @@ export class ExportController {
 
       // Title & Header info
       doc.moveDown(1.5);
-      doc.fontSize(18).fillColor('#1E293B').font('Helvetica-Bold').text('LAPORAN REKAPITULASI KEHADIRAN', { align: 'center' });
+      doc
+        .fontSize(18)
+        .fillColor('#1E293B')
+        .font('Helvetica-Bold')
+        .text('LAPORAN REKAPITULASI KEHADIRAN', { align: 'center' });
       doc.moveDown(0.2);
 
       let jabatanLabel = 'SEMUA PEGAWAI';
       if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN / TENAGA PENDIDIK';
       if (jabatan === 'KARYAWAN') jabatanLabel = 'KARYAWAN / STAFF';
 
-      doc.fontSize(12).fillColor('#475569').font('Helvetica-Bold').text(jabatanLabel.toUpperCase(), { align: 'center' });
+      doc
+        .fontSize(12)
+        .fillColor('#475569')
+        .font('Helvetica-Bold')
+        .text(jabatanLabel.toUpperCase(), { align: 'center' });
       doc.moveDown(0.2);
 
-      doc.fontSize(9).fillColor('#64748B').font('Helvetica-Oblique').text(`Periode: ${formatDateID(startDate)} s/d ${formatDateID(endDate)}`, { align: 'center' });
+      doc
+        .fontSize(9)
+        .fillColor('#64748B')
+        .font('Helvetica-Oblique')
+        .text(`Periode: ${formatDateID(startDate)} s/d ${formatDateID(endDate)}`, {
+          align: 'center',
+        });
       doc.moveDown(1.5);
 
       const tableTop = doc.y;
       const startX = 31; // Center of Landscape A4 (841.89 - 780) / 2 = 30.94
-      
+
       const colWidths = [40, 265, 110, 85, 90, 95, 95];
       const headers = [
         'No',
@@ -431,7 +469,7 @@ export class ExportController {
 
         headers.forEach((header, i) => {
           const w = colWidths[i] || 50;
-          
+
           // Draw header cell background (Light grey with grey border)
           doc.rect(xPos, startY, w, headerHeight).fillAndStroke('#F1F5F9', '#CBD5E1');
 
@@ -469,7 +507,7 @@ export class ExportController {
         }
 
         let xPos = startX;
-        
+
         const rowData = [
           { text: String(index + 1) },
           { text: record.nama || '-' },
@@ -485,7 +523,7 @@ export class ExportController {
 
         rowData.forEach((cell, i) => {
           const w = colWidths[i] || 50;
-          
+
           // Draw cell background and light grey border
           doc.rect(xPos, yPos, w, rowHeight).fillAndStroke(rowBg, '#E2E8F0');
 
@@ -574,7 +612,7 @@ export class ExportController {
         FROM attendance a
         WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
       `;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const params: any[] = [startDate, endDate];
 
       if (jabatan) {
@@ -620,23 +658,35 @@ export class ExportController {
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
       // Transform to aggregated data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
-        transformedData = transformDosenAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
+        transformedData = transformDosenAttendance(
+          attendance,
+          startDate,
+          endDate,
+          totalWorkingDays,
+          holidaySet
+        );
       } else {
-        transformedData = transformKaryawanAttendance(attendance, startDate, endDate, totalWorkingDays, holidaySet);
+        transformedData = transformKaryawanAttendance(
+          attendance,
+          startDate,
+          endDate,
+          totalWorkingDays,
+          holidaySet
+        );
       }
 
       // Format data for CSV
       const csvData = transformedData.map((record, index) => ({
-        'No': index + 1,
-        'Nama': record.nama || '-',
+        No: index + 1,
+        Nama: record.nama || '-',
         'Hari Kerja Target': record.totalHariKerja || 0,
-        'Hadir': record.totalHadir || 0,
-        'Terlambat': record.totalTerlambat || 0,
+        Hadir: record.totalHadir || 0,
+        Terlambat: record.totalTerlambat || 0,
         'Tidak Hadir': record.tidakHadir || 0,
-        'Persentase': `${record.persentase || 0}%`,
+        Persentase: `${record.persentase || 0}%`,
       }));
 
       const firstRecord = csvData[0];

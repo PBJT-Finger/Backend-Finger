@@ -1,6 +1,5 @@
 // src/config/scalar.config.ts - Hide Models for cleaner docs
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function generateScalarHTML(_spec: any): string {
   return `<!DOCTYPE html>
 <html lang="en">

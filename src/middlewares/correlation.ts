@@ -5,9 +5,9 @@ declare global {
   namespace Express {
     interface Request {
       correlationId?: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       correlationMeta?: any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       logger?: any;
     }
   }
@@ -43,7 +43,6 @@ export function enhancedCorrelation(req: Request, res: Response, next: NextFunct
 
   req.correlationId = correlationId;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const correlationMeta: Record<string, any> = {
     correlationId,
     timestamp: new Date().toISOString(),

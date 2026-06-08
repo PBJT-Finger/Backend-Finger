@@ -29,7 +29,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../config/prisma';
 import { ZkDeviceClient, AttendanceRecord } from '../infrastructure/zk-client';
-import type { Prisma } from '@prisma/client';
+// import type { Prisma } from '@prisma/client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ export class ZkSyncService {
   private async persistAttendanceBatch(records: AttendanceRecord[]): Promise<BatchResult> {
     const batchId = uuidv4();
     let created = 0;
-    let updated = 0;
+    const updated = 0;
     let errors = 0;
 
     console.log(`[ZkSyncService] Processing batch ${batchId} — ${records.length} record(s)`);
@@ -129,9 +129,17 @@ export class ZkSyncService {
    */
   private async upsertAttendanceRecord(record: AttendanceRecord): Promise<void> {
     const t = new Date(record.recordTime);
-    // recordTime is now UTC-aligned (parseTimeToDate uses Date.UTC).
-    // Use getUTC* to extract the original device time values.
-    const tanggal = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
+    // zklib parses local device time into UTC fields (e.g., 08:00 WIB becomes 08:00 UTC).
+    // We extract the exact local time fields:
+    const localYear = t.getUTCFullYear();
+    const localMonth = t.getUTCMonth();
+    const localDate = t.getUTCDate();
+    const localHour = t.getUTCHours();
+    const localMinute = t.getUTCMinutes();
+    const localSecond = t.getUTCSeconds();
+
+    // The 'tanggal' field is midnight UTC representing the local date.
+    const tanggal = new Date(Date.UTC(localYear, localMonth, localDate));
 
     // 1. deviceUserId maps directly to user_id
     const user_id = record.deviceUserId;
@@ -147,10 +155,10 @@ export class ZkSyncService {
     const resolvedName = employee?.nama ?? deviceName ?? `Karyawan ${record.deviceUserId}`;
     const resolvedJabatan = employee?.jabatan === 'DOSEN' ? 'DOSEN' : 'KARYAWAN';
 
-    // Store time components — use getUTC* since recordTime is UTC-aligned
-    const timePart = new Date(
-      Date.UTC(1970, 0, 1, t.getUTCHours(), t.getUTCMinutes(), t.getUTCSeconds())
-    );
+    // Store time components exactly as they come from the device.
+    // The device sends local time. We store it directly into the UTC epoch (1970)
+    // so that when Prisma returns it and we call getUTCHours(), it returns the exact local time.
+    const timePart = new Date(Date.UTC(1970, 0, 1, localHour, localMinute, localSecond));
 
     // ─── Determine masuk/keluar from device attendanceType ───────────────────
     // ZKTeco punch type (byte 26 of 40-byte record):

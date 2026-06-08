@@ -37,7 +37,7 @@ export class DashboardController {
       });
 
       // Calculate statistics
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const stats: Record<string, any> = {
         today: {
           total_attendance: todayAttendance.length,
