@@ -242,6 +242,7 @@ jobs:
 
              echo '🚀 Updating swarm service finger-be_backend...'
              docker service update --image \"\$BACKEND_IMAGE\" \
+               --publish-add published=3333,target=3333 \
                --env-add PORT=3333 \
                --env-add TZ=\"\$TZ\" \
                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
