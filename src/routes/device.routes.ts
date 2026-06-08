@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import DeviceController from '../controllers/device.controller';
 import DeviceUsersController from '../controllers/device.users.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, requireAdmin } from '../middlewares/auth.middleware';
 import { userRateLimits } from '../middlewares/userRateLimit';
 import prisma from '../config/prisma';
 import { successResponse, errorResponse } from '../utils/responseFormatter';
@@ -22,12 +22,12 @@ router.get('/stream', (req, res, next) => {
 // GET /api/device/users/pull — list device users + DB registration status
 // Must be defined BEFORE router.use(authenticateToken) and the /:id routes
 // to avoid Express routing the literal path "/users" to the /:id param handler.
-router.get('/users/pull', authenticateToken, (req, res, next) => {
+router.get('/users/pull', authenticateToken, requireAdmin, (req, res, next) => {
   DeviceUsersController.pullDeviceUsers(req, res).catch(next);
 });
 
 // POST /api/device/users/register — register a device user into the system
-router.post('/users/register', authenticateToken, (req, res, next) => {
+router.post('/users/register', authenticateToken, requireAdmin, (req, res, next) => {
   DeviceUsersController.registerDeviceUser(req, res).catch(next);
 });
 
