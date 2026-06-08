@@ -166,62 +166,105 @@ export class ZkSyncService {
     // Type 1 and 5 are "keluar" variants; all others treated as masuk.
     const isKeluar = record.attendanceType === 1 || record.attendanceType === 5;
 
-    if (!isKeluar) {
-      // ─── SCAN MASUK (Check-In) ───
-      const shiftStartHour = employee?.shifts
-        ? new Date(employee.shifts.jam_masuk).getUTCHours()
-        : 8;
-      const shiftStartMinute = employee?.shifts
-        ? new Date(employee.shifts.jam_masuk).getUTCMinutes()
-        : 0;
-      const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
-      const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
-      const toleranceMinutes = 15;
+    const existing = await prisma.attendance.findFirst({
+      where: { user_id: resolvedUserId, tanggal: tanggal },
+    });
 
-      const morningStatus = scanMinutes > shiftMinutes + toleranceMinutes ? 'TERLAMBAT' : 'HADIR';
+    if (existing) {
+      // Prevent exact duplicate processing (replay from ZKTeco memory)
+      if (
+        (existing.jam_masuk && existing.jam_masuk.getTime() === timePart.getTime()) ||
+        (existing.jam_keluar && existing.jam_keluar.getTime() === timePart.getTime())
+      ) {
+        return;
+      }
 
-      await prisma.attendance.create({
-        data: {
-          user_id: resolvedUserId,
-          nama: resolvedName,
-          jabatan: resolvedJabatan,
-          tanggal: tanggal,
-          jam_masuk: timePart,
-          jam_keluar: null,
-          device_id: record.ip,
-          verification_method: 'SIDIK_JARI',
-          status: morningStatus,
-          status_keluar: 'HADIR',
-        },
-      });
+      if (!isKeluar) {
+        // It's a Check-In scan but a record for today already exists.
+        // If the new scan is earlier than the existing check-in, update jam_masuk.
+        if (!existing.jam_masuk || timePart.getTime() < existing.jam_masuk.getTime()) {
+          const shiftStartHour = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCHours() : 8;
+          const shiftStartMinute = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCMinutes() : 0;
+          const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
+          const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
+          const morningStatus = scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR';
+
+          await prisma.attendance.update({
+            where: { id: existing.id },
+            data: { jam_masuk: timePart, status: morningStatus },
+          });
+        } else {
+          // Otherwise, assume it's a Check-Out (user forgot to press the Check-Out button)
+          const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
+          const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
+          const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
+          const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
+          const afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
+
+          await prisma.attendance.update({
+            where: { id: existing.id },
+            data: { jam_keluar: timePart, status_keluar: afternoonStatus },
+          });
+        }
+      } else {
+        // It's an explicit Check-Out scan. Update jam_keluar.
+        const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
+        const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
+        const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
+        const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
+        const afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
+
+        await prisma.attendance.update({
+          where: { id: existing.id },
+          data: { jam_keluar: timePart, status_keluar: afternoonStatus },
+        });
+      }
     } else {
-      // ─── SCAN KELUAR / PULANG (Check-Out) ───
-      const shiftEndHour = employee?.shifts
-        ? new Date(employee.shifts.jam_keluar).getUTCHours()
-        : 16;
-      const shiftEndMinute = employee?.shifts
-        ? new Date(employee.shifts.jam_keluar).getUTCMinutes()
-        : 30;
+      // First scan of the day
+      if (!isKeluar) {
+        const shiftStartHour = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCHours() : 8;
+        const shiftStartMinute = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCMinutes() : 0;
+        const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
+        const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
+        const morningStatus = scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR';
 
-      const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
-      const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
+        await prisma.attendance.create({
+          data: {
+            user_id: resolvedUserId,
+            nama: resolvedName,
+            jabatan: resolvedJabatan,
+            tanggal: tanggal,
+            jam_masuk: timePart,
+            jam_keluar: null,
+            device_id: record.ip,
+            verification_method: 'SIDIK_JARI',
+            status: morningStatus,
+            status_keluar: 'HADIR',
+          },
+        });
+      } else {
+        // Edge case: User's very first scan of the day is a checkout!
+        const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
+        const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
+        const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
+        const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
+        const afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
 
-      const afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
-
-      await prisma.attendance.create({
-        data: {
-          user_id: resolvedUserId,
-          nama: resolvedName,
-          jabatan: resolvedJabatan,
-          tanggal: tanggal,
-          jam_masuk: null,
-          jam_keluar: timePart,
-          device_id: record.ip,
-          verification_method: 'SIDIK_JARI',
-          status: 'HADIR',
-          status_keluar: afternoonStatus,
-        },
-      });
+        await prisma.attendance.create({
+          data: {
+            user_id: resolvedUserId,
+            nama: resolvedName,
+            jabatan: resolvedJabatan,
+            tanggal: tanggal,
+            jam_masuk: null,
+            jam_keluar: timePart,
+            device_id: record.ip,
+            verification_method: 'SIDIK_JARI',
+            status: 'HADIR',
+            status_keluar: afternoonStatus,
+          },
+        });
+      }
     }
   }
 }
