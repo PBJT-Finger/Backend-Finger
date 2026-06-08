@@ -304,6 +304,12 @@ export class ZkDeviceClient extends EventEmitter {
 
       const newCount = allRecords.length;
 
+      // [CRITICAL FIX]: Handle device memory clear
+      if (newCount < this.lastKnownLogCount) {
+        console.warn(`[ZkDeviceClient] Device logs were cleared! Resetting pointer from ${this.lastKnownLogCount} to 0.`);
+        this.lastKnownLogCount = 0;
+      }
+
       if (newCount > this.lastKnownLogCount) {
         const newRecords = allRecords.slice(this.lastKnownLogCount);
         this.lastKnownLogCount = newCount;
