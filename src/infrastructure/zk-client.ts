@@ -313,6 +313,15 @@ export class ZkDeviceClient extends EventEmitter {
         );
       }
 
+      // =========================================================================
+      // [CRITICAL FIX FOR DEVICE OVERHEATING]
+      // ZKTeco embedded processors overheat if a TCP socket is held open constantly.
+      // We implement "Stateless/Ephemeral Polling": disconnect immediately after
+      // reading the data, giving the hardware 30 seconds to sleep and cool down.
+      // =========================================================================
+      await this.safeDisconnect();
+      this.setStatus('offline');
+
       this.scheduleNextPoll(env.POLLING_INTERVAL_MS);
     } catch (err) {
       const error =
