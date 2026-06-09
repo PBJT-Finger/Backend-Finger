@@ -258,6 +258,7 @@ jobs:
                --env-add REDIS_PASSWORD=\"\$REDIS_PASSWORD\" \
                --env-add DB_PASSWORD=\"\$DB_PASSWORD\" \
                --env-add DB_NAME=\"\$DB_NAME\" \
+               --env-add DATABASE_URL=\"mysql://root:\${DB_PASSWORD}@mysql:3306/\${DB_NAME}\" \
                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
                --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
                --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
