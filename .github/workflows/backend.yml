@@ -181,6 +181,7 @@ jobs:
           GHCR_USER: ${{ secrets.GHCR_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_NAME: ${{ secrets.DB_NAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           API_KEY_SECRET: ${{ secrets.API_KEY_SECRET }}
@@ -197,6 +198,7 @@ jobs:
           : "${FINGERPRINT_IP:?❌ Secret FINGERPRINT_IP is not set!}"
           : "${DB_PASSWORD:?❌ Secret DB_PASSWORD is not set!}"
           : "${DB_NAME:?❌ Secret DB_NAME is not set!}"
+          : "${REDIS_PASSWORD:?❌ Secret REDIS_PASSWORD is not set!}"
           : "${SSH_PORT:?❌ Secret SSH_PORT is not set!}"
 
           IMG_REPO=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
@@ -216,6 +218,7 @@ jobs:
              IMAGE_TAG='${IMAGE_TAG}'
              DB_PASSWORD='${DB_PASSWORD}'
              DB_NAME='${DB_NAME}'
+             REDIS_PASSWORD='${REDIS_PASSWORD}'
              JWT_ACCESS_SECRET='${JWT_ACCESS_SECRET}'
              JWT_REFRESH_SECRET='${JWT_REFRESH_SECRET}'
              API_KEY_SECRET='${API_KEY_SECRET}'
@@ -240,6 +243,11 @@ jobs:
                && echo '✅ Migrations complete' \
                || { echo '❌ Migration failed!'; exit 1; }
 
+             echo '🚀 Updating swarm service finger-be_redis...'
+             docker service update finger-be_redis \
+               --args \"redis-server --appendonly yes --requirepass \${REDIS_PASSWORD}\" \
+               || echo '⚠️ Warning: Failed to update redis service'
+
              echo '🚀 Updating swarm service finger-be_backend...'
              docker service update --image \"\$BACKEND_IMAGE\" \
                --env-add PORT=3333 \
@@ -247,6 +255,7 @@ jobs:
                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
                --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
                --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
+               --env-add REDIS_PASSWORD=\"\$REDIS_PASSWORD\" \
                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
                --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
                --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
