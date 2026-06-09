@@ -18,6 +18,7 @@ import exportRoutes from './routes/export.routes';
 import adminRoutes from './routes/admin.routes';
 import healthRoutes from './routes/health.routes';
 import metricsRoutes from './routes/metrics.routes';
+import employeeRoutes from './routes/employee.routes';
 
 // Import middleware
 import { requestLogger } from './middlewares/auth.middleware';
@@ -258,6 +259,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/employees', employeeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/device', deviceRoutes);
 
