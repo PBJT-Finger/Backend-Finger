@@ -113,9 +113,13 @@ export class DeviceUsersController {
         );
       }
 
-      const parsedShiftId = typeof shiftId === 'number' ? shiftId : parseInt(String(shiftId), 10);
-      if (isNaN(parsedShiftId) || parsedShiftId <= 0) {
-        return errorResponse(res, 'shiftId harus berupa angka positif', 400);
+      let parsedShiftId: number | null = null;
+      if (shiftId !== undefined && shiftId !== null && shiftId !== '') {
+        const temp = typeof shiftId === 'number' ? shiftId : parseInt(String(shiftId), 10);
+        if (isNaN(temp) || temp <= 0) {
+          return errorResponse(res, 'shiftId harus berupa angka positif', 400);
+        }
+        parsedShiftId = temp;
       }
 
       // ── Service call ──────────────────────────────────────────────────────
