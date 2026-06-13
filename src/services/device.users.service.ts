@@ -73,7 +73,7 @@ export interface RegisterDeviceUserDto {
   /** Jabatan enum value */
   jabatan: 'DOSEN' | 'KARYAWAN';
   /** Shift ID from the shifts table */
-  shiftId: number;
+  shiftId?: number | null;
 }
 
 export interface RegisterResult {
@@ -213,7 +213,7 @@ export class DeviceUsersService {
             user_id: deviceUserId,
             nama,
             jabatan,
-            shift_id: shiftId,
+            shift_id: shiftId ?? null,
             is_active: true,
             tanggal_masuk: new Date(),
           },
@@ -232,7 +232,7 @@ export class DeviceUsersService {
           data: {
             nama,
             jabatan,
-            shift_id: shiftId,
+            shift_id: shiftId ?? null,
             is_active: true,
           },
         });

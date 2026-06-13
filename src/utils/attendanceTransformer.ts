@@ -188,7 +188,7 @@ export function transformDosenAttendance(
         user_id: string;
         nama: string;
         attendanceDates: Set<string>;
-        totalTerlambat: number;
+        lateDates: Set<string>;
         lastCheckInUTC: Date | null;
         lastCheckOutUTC: Date | null;
       }
@@ -203,7 +203,7 @@ export function transformDosenAttendance(
           user_id: user_id,
           nama: record.nama || 'Unknown',
           attendanceDates: new Set<string>(),
-          totalTerlambat: 0,
+          lateDates: new Set<string>(),
           lastCheckInUTC: null,
           lastCheckOutUTC: null,
         };
@@ -215,7 +215,7 @@ export function transformDosenAttendance(
         if (dateStr) {
           group.attendanceDates.add(dateStr);
           if (record.status === 'TERLAMBAT') {
-            group.totalTerlambat++;
+            group.lateDates.add(dateStr);
           }
         }
 
@@ -245,7 +245,7 @@ export function transformDosenAttendance(
         nama: group.nama,
         totalHadir,
         tidakHadir: Math.max(0, totalHariKerja - totalHadir),
-        totalTerlambat: group.totalTerlambat,
+        totalTerlambat: group.lateDates.size,
         totalHariKerja,
         persentase:
           totalHariKerja > 0
@@ -294,7 +294,7 @@ export function transformKaryawanAttendance(
         user_id: string;
         nama: string;
         attendanceDates: Set<string>;
-        totalTerlambat: number;
+        lateDates: Set<string>;
         lastCheckInUTC: Date | null;
         lastCheckOutUTC: Date | null;
       }
@@ -309,7 +309,7 @@ export function transformKaryawanAttendance(
           user_id: user_id,
           nama: record.nama || 'Unknown',
           attendanceDates: new Set<string>(),
-          totalTerlambat: 0,
+          lateDates: new Set<string>(),
           lastCheckInUTC: null,
           lastCheckOutUTC: null,
         };
@@ -321,7 +321,7 @@ export function transformKaryawanAttendance(
         if (dateStr) {
           group.attendanceDates.add(dateStr);
           if (record.status === 'TERLAMBAT') {
-            group.totalTerlambat++;
+            group.lateDates.add(dateStr);
           }
         }
 
@@ -351,7 +351,7 @@ export function transformKaryawanAttendance(
         nama: group.nama,
         totalHadir,
         tidakHadir: Math.max(0, totalHariKerja - totalHadir),
-        totalTerlambat: group.totalTerlambat,
+        totalTerlambat: group.lateDates.size,
         totalHariKerja,
         persentase:
           totalHariKerja > 0

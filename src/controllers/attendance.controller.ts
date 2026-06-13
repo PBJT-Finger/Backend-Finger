@@ -83,17 +83,26 @@ export class AttendanceController {
       const totalWorkingDays =
         startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
+      // Get all active employees to map correct names and roles
+      const activeEmployees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
+
       // Transform to aggregated data
       const transformedData = transformDosenAttendance(
-        attendance.map((a) => ({
-          tanggal: a.tanggal,
-          user_id: a.user_id,
-          nama: a.nama,
-          jabatan: a.jabatan,
-          jam_masuk: a.jam_masuk,
-          jam_keluar: a.jam_keluar,
-          status: a.status,
-        })),
+        attendance.map((a) => {
+          const emp = employeeMap.get(a.user_id);
+          return {
+            tanggal: a.tanggal,
+            user_id: a.user_id,
+            nama: emp?.nama ?? a.nama,
+            jabatan: emp?.jabatan ?? a.jabatan,
+            jam_masuk: a.jam_masuk,
+            jam_keluar: a.jam_keluar,
+            status: a.status,
+          };
+        }),
         startDateStr || undefined,
         endDateStr || undefined,
         totalWorkingDays,
@@ -171,17 +180,26 @@ export class AttendanceController {
       const totalWorkingDays =
         startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
+      // Get all active employees to map correct names and roles
+      const activeEmployees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
+
       // Transform to aggregated data
       const transformedData = transformKaryawanAttendance(
-        attendance.map((a) => ({
-          tanggal: a.tanggal,
-          user_id: a.user_id,
-          nama: a.nama,
-          jabatan: a.jabatan,
-          jam_masuk: a.jam_masuk,
-          jam_keluar: a.jam_keluar,
-          status: a.status,
-        })),
+        attendance.map((a) => {
+          const emp = employeeMap.get(a.user_id);
+          return {
+            tanggal: a.tanggal,
+            user_id: a.user_id,
+            nama: emp?.nama ?? a.nama,
+            jabatan: emp?.jabatan ?? a.jabatan,
+            jam_masuk: a.jam_masuk,
+            jam_keluar: a.jam_keluar,
+            status: a.status,
+          };
+        }),
         startDateStr || undefined,
         endDateStr || undefined,
         totalWorkingDays,
@@ -261,10 +279,25 @@ export class AttendanceController {
         take: limitNum,
       });
 
+      // Get all active employees to map correct names and roles
+      const activeEmployees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
+
+      const mappedAttendance = attendance.map((a) => {
+        const emp = employeeMap.get(a.user_id);
+        return {
+          ...a,
+          nama: emp?.nama ?? a.nama,
+          jabatan: emp?.jabatan ?? a.jabatan,
+        };
+      });
+
       return successResponse(
         res,
         {
-          data: attendance,
+          data: mappedAttendance,
           pagination: {
             page: pageNum,
             limit: limitNum,
@@ -346,15 +379,21 @@ export class AttendanceController {
         select: { user_id: true, nama: true, jabatan: true },
       });
 
-      // Initialize stats with all users
+      // Get all active employees to map correct names and roles
+      const activeEmployees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
 
+      // Initialize stats with all users
       const employeeStats: Record<string, any> = {};
 
       allUsers.forEach((u) => {
+        const emp = employeeMap.get(u.user_id);
         employeeStats[u.user_id] = {
           user_id: u.user_id,
-          nama: u.nama,
-          jabatan: u.jabatan,
+          nama: emp?.nama ?? u.nama,
+          jabatan: emp?.jabatan ?? u.jabatan,
           attendanceDates: new Set<string>(),
           terlambat_dates: new Set<string>(),
           hadir_pagi: new Set<string>(),
@@ -394,10 +433,11 @@ export class AttendanceController {
         const key = record.user_id;
         if (!key) return;
         if (!employeeStats[key]) {
+          const emp = employeeMap.get(record.user_id);
           employeeStats[key] = {
             user_id: record.user_id,
-            nama: record.nama,
-            jabatan: record.jabatan,
+            nama: emp?.nama ?? record.nama,
+            jabatan: emp?.jabatan ?? record.jabatan,
             attendanceDates: new Set<string>(),
             terlambat_dates: new Set<string>(),
             hadir_pagi: new Set<string>(),

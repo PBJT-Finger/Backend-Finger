@@ -79,6 +79,19 @@ export class ExportController {
         return errorResponse(res, 'No data found for export', 404);
       }
 
+      const activeEmployees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
+      const mappedAttendance = attendance.map((a) => {
+        const emp = a.user_id ? employeeMap.get(a.user_id) : null;
+        return {
+          ...a,
+          nama: emp?.nama ?? a.nama,
+          jabatan: emp?.jabatan ?? a.jabatan,
+        };
+      });
+
       // Get holidays in the selected range
       const holidayWhere: any = {};
       const startLocalDate = startDate ? new Date(startDate) : null;
@@ -106,7 +119,7 @@ export class ExportController {
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(
-          attendance,
+          mappedAttendance,
           startDate,
           endDate,
           totalWorkingDays,
@@ -114,7 +127,7 @@ export class ExportController {
         );
       } else {
         transformedData = transformKaryawanAttendance(
-          attendance,
+          mappedAttendance,
           startDate,
           endDate,
           totalWorkingDays,
@@ -242,8 +255,21 @@ export class ExportController {
         return errorResponse(res, 'No data found for export', 404);
       }
 
+      const activeEmployees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
+      const mappedAttendance = attendance.map((a) => {
+        const emp = a.user_id ? employeeMap.get(a.user_id) : null;
+        return {
+          ...a,
+          nama: emp?.nama ?? a.nama,
+          jabatan: emp?.jabatan ?? a.jabatan,
+        };
+      });
+
       // Format data for Excel — per-date detail rows (Daily Log)
-      const excelData = attendance.map((record) => ({
+      const excelData = mappedAttendance.map((record) => ({
         Tanggal: formatDateID(record.tanggal),
         ID: record.user_id || '',
         Nama: record.nama || '',
@@ -362,6 +388,19 @@ export class ExportController {
         return errorResponse(res, 'No data found for export', 404);
       }
 
+      const activeEmployees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
+      const mappedAttendance = attendance.map((a) => {
+        const emp = a.user_id ? employeeMap.get(a.user_id) : null;
+        return {
+          ...a,
+          nama: emp?.nama ?? a.nama,
+          jabatan: emp?.jabatan ?? a.jabatan,
+        };
+      });
+
       // Get holidays in the selected range
       const holidayWhere: any = {};
       const startLocalDate = startDate ? new Date(startDate) : null;
@@ -389,7 +428,7 @@ export class ExportController {
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(
-          attendance,
+          mappedAttendance,
           startDate,
           endDate,
           totalWorkingDays,
@@ -397,7 +436,7 @@ export class ExportController {
         );
       } else {
         transformedData = transformKaryawanAttendance(
-          attendance,
+          mappedAttendance,
           startDate,
           endDate,
           totalWorkingDays,
@@ -634,6 +673,19 @@ export class ExportController {
         return errorResponse(res, 'No data found for export', 404);
       }
 
+      const activeEmployees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
+      const mappedAttendance = attendance.map((a) => {
+        const emp = a.user_id ? employeeMap.get(a.user_id) : null;
+        return {
+          ...a,
+          nama: emp?.nama ?? a.nama,
+          jabatan: emp?.jabatan ?? a.jabatan,
+        };
+      });
+
       // Format data for CSV
       // Get holidays in the selected range
       const holidayWhere: any = {};
@@ -662,7 +714,7 @@ export class ExportController {
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(
-          attendance,
+          mappedAttendance,
           startDate,
           endDate,
           totalWorkingDays,
@@ -670,7 +722,7 @@ export class ExportController {
         );
       } else {
         transformedData = transformKaryawanAttendance(
-          attendance,
+          mappedAttendance,
           startDate,
           endDate,
           totalWorkingDays,
