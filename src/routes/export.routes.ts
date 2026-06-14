@@ -43,6 +43,42 @@ router.use(authenticateToken);
  *               format: binary
  */
 router.get('/excel', ExportController.exportToExcel);
+
+/**
+ * @swagger
+ * /api/export/excel-detail:
+ *   get:
+ *     summary: Ekspor data absensi ke Excel (Detail)
+ *     tags: [Export]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: bulan
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Bulan (01-12)
+ *       - in: query
+ *         name: tahun
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tahun (YYYY)
+ *       - in: query
+ *         name: id
+ *         schema:
+ *           type: string
+ *         description: Filter berdasarkan ID pengguna
+ *     responses:
+ *       200:
+ *         description: File Excel detail berhasil diunduh
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
 router.get('/excel-detail', ExportController.exportToExcelDetail);
 
 /**
