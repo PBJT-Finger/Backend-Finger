@@ -72,6 +72,18 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
         name: 'Admin',
         description: 'Manajemen akun admin - CRUD operasi untuk user management sistem',
       },
+      {
+        name: 'Employees',
+        description: 'Manajemen data master pegawai (Dosen dan Karyawan) - CRUD operasi',
+      },
+      {
+        name: 'Device',
+        description: 'Operasi perangkat absensi - status, streaming, dan kontrol perangkat',
+      },
+      {
+        name: 'Device Users',
+        description: 'Manajemen data user sidik jari pada perangkat (pull, register, update)',
+      },
     ],
     components: {
       securitySchemes: {

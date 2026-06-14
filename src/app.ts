@@ -57,7 +57,8 @@ const exportLimiter = rateLimit(RATE_LIMITS.EXPORT_API);
 const summaryLimiter = rateLimit(RATE_LIMITS.SUMMARY_API);
 const dashboardLimiter = rateLimit(RATE_LIMITS.DASHBOARD_API);
 
-// Middleware keamanan dengan Helmet
+// Middleware keamanan dengan Helmet (Dinonaktifkan sementara atas permintaan user)
+/*
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -104,6 +105,7 @@ app.use(
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   })
 );
+*/
 
 // Konfigurasi CORS dengan multi-origin support
 const allowedOrigins = process.env['CORS_ORIGINS']
