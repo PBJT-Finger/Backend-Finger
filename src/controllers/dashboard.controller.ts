@@ -25,9 +25,17 @@ export class DashboardController {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Get today's attendance
+      // Get all active employee user IDs
+      const activeEmployees = await prisma.employees.findMany({
+        where: { is_active: true },
+        select: { user_id: true }
+      });
+      const activeUserIds = activeEmployees.map((e) => e.user_id);
+
+      // Get today's attendance (restricted to active employees)
       const todayAttendance = await prisma.attendance.findMany({
         where: {
+          user_id: { in: activeUserIds },
           tanggal: {
             gte: today,
             lt: tomorrow,
@@ -69,12 +77,13 @@ export class DashboardController {
           ? Math.round((stats['today'].unique_employees / stats['total'].employees) * 100)
           : 0;
 
-      // Get this month's statistics
+      // Get this month's statistics (restricted to active employees)
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const firstDayOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
       const monthlyCount = await prisma.attendance.count({
         where: {
+          user_id: { in: activeUserIds },
           tanggal: {
             gte: firstDayOfMonth,
             lt: firstDayOfNextMonth,
@@ -89,9 +98,12 @@ export class DashboardController {
         year: today.getFullYear(),
       };
 
-      // Recent attendance (last 10)
+      // Recent attendance (last 10, restricted to active employees)
       const recentAttendance = await prisma.attendance.findMany({
-        where: { is_deleted: false },
+        where: {
+          user_id: { in: activeUserIds },
+          is_deleted: false,
+        },
         orderBy: { created_at: 'desc' },
         take: 10,
       });
@@ -127,8 +139,16 @@ export class DashboardController {
       startDate.setDate(startDate.getDate() - days);
       startDate.setHours(0, 0, 0, 0);
 
+      // Get all active employee user IDs
+      const activeEmployees = await prisma.employees.findMany({
+        where: { is_active: true },
+        select: { user_id: true }
+      });
+      const activeUserIds = activeEmployees.map((e) => e.user_id);
+
       const attendance = await prisma.attendance.findMany({
         where: {
+          user_id: { in: activeUserIds },
           tanggal: { gte: startDate },
           is_deleted: false,
         },

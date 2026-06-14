@@ -175,10 +175,11 @@ export function transformDosenAttendance(
   _startDate?: string | Date,
   _endDate?: string | Date,
   totalWorkingDays?: number,
-  _holidaySet?: Set<string>
+  _holidaySet?: Set<string>,
+  activeEmployees?: Array<{ user_id: string; nama: string }>
 ): TransformedDosenRecord[] {
   try {
-    if (!attendanceRecords || attendanceRecords.length === 0) {
+    if ((!attendanceRecords || attendanceRecords.length === 0) && (!activeEmployees || activeEmployees.length === 0)) {
       return [];
     }
 
@@ -194,9 +195,23 @@ export function transformDosenAttendance(
       }
     > = {};
 
-    attendanceRecords.forEach((record) => {
-      const user_id = record.user_id;
-      if (!user_id) return;
+    if (activeEmployees) {
+      activeEmployees.forEach((emp) => {
+        grouped[emp.user_id] = {
+          user_id: emp.user_id,
+          nama: emp.nama || 'Unknown',
+          attendanceDates: new Set<string>(),
+          lateDates: new Set<string>(),
+          lastCheckInUTC: null,
+          lastCheckOutUTC: null,
+        };
+      });
+    }
+
+    if (attendanceRecords) {
+      attendanceRecords.forEach((record) => {
+        const user_id = record.user_id;
+        if (!user_id) return;
 
       if (!grouped[user_id]) {
         grouped[user_id] = {
@@ -234,6 +249,7 @@ export function transformDosenAttendance(
         }
       }
     });
+  }
 
     const result = Object.values(grouped).map((group) => {
       const totalHadir = group.attendanceDates.size;
@@ -281,10 +297,11 @@ export function transformKaryawanAttendance(
   _startDate?: string | Date,
   _endDate?: string | Date,
   totalWorkingDays?: number,
-  _holidaySet?: Set<string>
+  _holidaySet?: Set<string>,
+  activeEmployees?: Array<{ user_id: string; nama: string }>
 ): TransformedKaryawanRecord[] {
   try {
-    if (!attendanceRecords || attendanceRecords.length === 0) {
+    if ((!attendanceRecords || attendanceRecords.length === 0) && (!activeEmployees || activeEmployees.length === 0)) {
       return [];
     }
 
@@ -300,9 +317,23 @@ export function transformKaryawanAttendance(
       }
     > = {};
 
-    attendanceRecords.forEach((record) => {
-      const user_id = record.user_id;
-      if (!user_id) return;
+    if (activeEmployees) {
+      activeEmployees.forEach((emp) => {
+        grouped[emp.user_id] = {
+          user_id: emp.user_id,
+          nama: emp.nama || 'Unknown',
+          attendanceDates: new Set<string>(),
+          lateDates: new Set<string>(),
+          lastCheckInUTC: null,
+          lastCheckOutUTC: null,
+        };
+      });
+    }
+
+    if (attendanceRecords) {
+      attendanceRecords.forEach((record) => {
+        const user_id = record.user_id;
+        if (!user_id) return;
 
       if (!grouped[user_id]) {
         grouped[user_id] = {
@@ -340,6 +371,7 @@ export function transformKaryawanAttendance(
         }
       }
     });
+  }
 
     const result = Object.values(grouped).map((group) => {
       const totalHadir = group.attendanceDates.size;
