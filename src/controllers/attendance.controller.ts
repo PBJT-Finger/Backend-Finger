@@ -588,14 +588,6 @@ export class AttendanceController {
             lastCheckOut: formatTimeOnly(emp.last_check_out),
           };
         })
-        .filter((emp) => {
-          // [FIX] For DOSEN, only show if they have actually scanned.
-          // For KARYAWAN, show all active employees.
-          if (emp.jabatan === 'DOSEN') {
-            return emp.totalHadir > 0;
-          }
-          return true;
-        })
         .map((emp, index) => ({
           ...emp,
           no: index + 1,
