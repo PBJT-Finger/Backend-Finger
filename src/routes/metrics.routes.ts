@@ -3,6 +3,16 @@ import { register } from '../utils/metrics';
 
 const router = Router();
 
+/**
+ * @swagger
+ * /api/metrics:
+ *   get:
+ *     summary: Ekspor metrics Prometheus
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Data metrics Prometheus
+ */
 router.get('/metrics', async (req: Request, res: Response): Promise<void> => {
   try {
     res.set('Content-Type', register.contentType);

@@ -301,7 +301,32 @@ router.patch(
   AttendanceController.updateAdminNotes
 );
 
+/**
+ * @swagger
+ * /api/attendance/dosen:
+ *   get:
+ *     summary: Dapatkan data absensi khusus dosen
+ *     tags: [Attendance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Berhasil mengambil data dosen
+ */
 router.get('/dosen', AttendanceController.getLecturerAttendance);
+
+/**
+ * @swagger
+ * /api/attendance/karyawan:
+ *   get:
+ *     summary: Dapatkan data absensi khusus karyawan reguler
+ *     tags: [Attendance]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Berhasil mengambil data karyawan
+ */
 router.get('/karyawan', AttendanceController.getEmployeeAttendance);
 
 export default router;
