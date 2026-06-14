@@ -560,34 +560,46 @@ export class AttendanceController {
         endDate as string
       );
 
-      const summary = Object.values(employeeStats).map((emp, index) => {
-        const attendanceDatesArray = Array.from(emp.attendanceDates as Set<string>).sort();
-        const totalHadir = attendanceDatesArray.length;
-        const totalHariKerja = totalWorkingDaysInPeriod;
-        const tidakHadir = Math.max(0, totalHariKerja - totalHadir);
+      const summary = Object.values(employeeStats)
+        .map((emp) => {
+          const attendanceDatesArray = Array.from(emp.attendanceDates as Set<string>).sort();
+          const totalHadir = attendanceDatesArray.length;
+          const totalHariKerja = totalWorkingDaysInPeriod;
+          const tidakHadir = Math.max(0, totalHariKerja - totalHadir);
 
-        return {
-          id: emp.user_id,
+          return {
+            id: emp.user_id,
+            nama: emp.nama,
+            jabatan: emp.jabatan,
+            totalHadir: totalHadir,
+            tidakHadir: tidakHadir,
+            hadirPagi: emp.hadir_pagi.size,
+            hadirMalam: emp.hadir_malam.size,
+            totalTerlambat: emp.terlambat_dates ? emp.terlambat_dates.size : 0,
+            totalHariKerja: totalHariKerja,
+            persentase:
+              totalHariKerja > 0
+                ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
+                : totalHadir > 0
+                  ? 100
+                  : 0,
+            attendanceDates: formatDateRange(attendanceDatesArray),
+            lastCheckIn: formatTimeOnly(emp.last_check_in),
+            lastCheckOut: formatTimeOnly(emp.last_check_out),
+          };
+        })
+        .filter((emp) => {
+          // [FIX] For DOSEN, only show if they have actually scanned.
+          // For KARYAWAN, show all active employees.
+          if (emp.jabatan === 'DOSEN') {
+            return emp.totalHadir > 0;
+          }
+          return true;
+        })
+        .map((emp, index) => ({
+          ...emp,
           no: index + 1,
-          nama: emp.nama,
-          jabatan: emp.jabatan,
-          totalHadir: totalHadir,
-          tidakHadir: tidakHadir,
-          hadirPagi: emp.hadir_pagi.size,
-          hadirMalam: emp.hadir_malam.size,
-          totalTerlambat: emp.terlambat_dates ? emp.terlambat_dates.size : 0,
-          totalHariKerja: totalHariKerja,
-          persentase:
-            totalHariKerja > 0
-              ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
-              : totalHadir > 0
-                ? 100
-                : 0,
-          attendanceDates: formatDateRange(attendanceDatesArray),
-          lastCheckIn: formatTimeOnly(emp.last_check_in),
-          lastCheckOut: formatTimeOnly(emp.last_check_out),
-        };
-      });
+        }));
 
       return successResponse(res, summary, 'Attendance summary calculated successfully');
     } catch (error) {
