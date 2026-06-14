@@ -251,33 +251,35 @@ export function transformDosenAttendance(
     });
   }
 
-    const result = Object.values(grouped).map((group) => {
-      const totalHadir = group.attendanceDates.size;
-      const totalHariKerja = totalWorkingDays !== undefined ? totalWorkingDays : totalHadir;
+    const result = Object.values(grouped)
+      .map((group) => {
+        const totalHadir = group.attendanceDates.size;
+        const totalHariKerja = totalWorkingDays !== undefined ? totalWorkingDays : totalHadir;
 
-      return {
-        id: group.user_id,
-        user_id: group.user_id,
-        nama: group.nama,
-        totalHadir,
-        tidakHadir: Math.max(0, totalHariKerja - totalHadir),
-        totalTerlambat: group.lateDates.size,
-        totalHariKerja,
-        persentase:
-          totalHariKerja > 0
-            ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
-            : totalHadir > 0
-              ? 100
-              : 0,
-        attendanceDates: formatAttendanceDates(group.attendanceDates),
-        lastCheckIn: group.lastCheckInUTC
-          ? extractTimeString(group.lastCheckInUTC) || 'Belum ada data'
-          : 'Belum ada data',
-        lastCheckOut: group.lastCheckOutUTC
-          ? extractTimeString(group.lastCheckOutUTC) || 'Belum ada data'
-          : 'Belum ada data',
-      };
-    });
+        return {
+          id: group.user_id,
+          user_id: group.user_id,
+          nama: group.nama,
+          totalHadir,
+          tidakHadir: Math.max(0, totalHariKerja - totalHadir),
+          totalTerlambat: group.lateDates.size,
+          totalHariKerja,
+          persentase:
+            totalHariKerja > 0
+              ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
+              : totalHadir > 0
+                ? 100
+                : 0,
+          attendanceDates: formatAttendanceDates(group.attendanceDates),
+          lastCheckIn: group.lastCheckInUTC
+            ? extractTimeString(group.lastCheckInUTC) || 'Belum ada data'
+            : 'Belum ada data',
+          lastCheckOut: group.lastCheckOutUTC
+            ? extractTimeString(group.lastCheckOutUTC) || 'Belum ada data'
+            : 'Belum ada data',
+        };
+      })
+      .filter((r) => r.totalHadir > 0);
 
     return result;
   } catch (error) {
