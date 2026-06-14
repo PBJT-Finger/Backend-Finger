@@ -28,12 +28,16 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
     },
     servers: [
       {
-        url: `http://localhost:${env.PORT}`,
-        description: 'Development Server',
+        url: '/',
+        description: 'Current Environment (Auto-detect)',
       },
       {
         url: 'https://finger-be.pbjt.web.id',
         description: 'Production Server',
+      },
+      {
+        url: `http://localhost:${env.PORT}`,
+        description: 'Local Development Server',
       },
     ],
 
