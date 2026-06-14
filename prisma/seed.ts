@@ -69,6 +69,7 @@ async function main() {
       where: { user_id: u.userId },
       update: {
         nama: u.name,
+        is_active: true,
       },
       create: {
         user_id: u.userId,

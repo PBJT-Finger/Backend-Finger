@@ -39,6 +39,7 @@ async function syncDeviceUsers(): Promise<void> {
         update: {
           nama: nama,
           shift_id: 1,
+          is_active: true,
         },
         create: {
           user_id: user_id,
