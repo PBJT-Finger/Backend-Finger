@@ -30,7 +30,9 @@ export class DashboardController {
         where: { is_active: true },
         select: { user_id: true }
       });
-      const activeUserIds = activeEmployees.map((e) => e.user_id);
+      const activeUserIds = activeEmployees
+        .map((e) => e.user_id)
+        .filter((id) => !['1', '5', '6', '7'].includes(id));
 
       // Get today's attendance (restricted to active employees)
       const todayAttendance = await prisma.attendance.findMany({

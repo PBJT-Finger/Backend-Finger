@@ -88,6 +88,17 @@ export class ZkSyncService {
 
     for (const record of records) {
       try {
+        // [FIX] Ignore incorrect/mock scans
+        if (['1', '5', '6', '7'].includes(record.deviceUserId)) {
+          continue;
+        }
+
+        // Ignore Aziz (8) incorrect scan on 2026-06-03
+        const recordDateStr = record.recordTime.toISOString().substring(0, 10);
+        if (record.deviceUserId === '8' && recordDateStr === '2026-06-03') {
+          continue;
+        }
+
         await this.upsertAttendanceRecord(record);
         // We determine created/updated from the result but for simplicity
         // we increment both counters in the catch-free path

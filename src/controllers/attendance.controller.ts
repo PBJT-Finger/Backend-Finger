@@ -98,9 +98,23 @@ export class AttendanceController {
       const totalWorkingDays =
         startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
+      // Filter out incorrect user_id scans and Aziz (8) on 2026-06-03
+      const filteredAttendance = attendance.filter((a) => {
+        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
+        if (a.user_id === '8') {
+          const t = a.tanggal;
+          const dateStr =
+            typeof (t as any) === 'string'
+              ? (t as any).split('T')[0]
+              : `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+          if (dateStr === '2026-06-03') return false;
+        }
+        return true;
+      });
+
       // Transform to aggregated data (nama/jabatan sourced from employees table for accuracy)
       const transformedData = transformDosenAttendance(
-        attendance.map((a) => {
+        filteredAttendance.map((a) => {
           const emp = employeeMap.get(a.user_id);
           return {
             tanggal: a.tanggal,
@@ -205,9 +219,23 @@ export class AttendanceController {
       const totalWorkingDays =
         startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
+      // Filter out incorrect user_id scans and Aziz (8) on 2026-06-03
+      const filteredAttendance = attendance.filter((a) => {
+        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
+        if (a.user_id === '8') {
+          const t = a.tanggal;
+          const dateStr =
+            typeof (t as any) === 'string'
+              ? (t as any).split('T')[0]
+              : `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+          if (dateStr === '2026-06-03') return false;
+        }
+        return true;
+      });
+
       // Transform to aggregated data (nama/jabatan sourced from employees table for accuracy)
       const transformedData = transformKaryawanAttendance(
-        attendance.map((a) => {
+        filteredAttendance.map((a) => {
           const emp = employeeMap.get(a.user_id);
           return {
             tanggal: a.tanggal,
@@ -443,7 +471,21 @@ export class AttendanceController {
         orderBy: [{ tanggal: 'desc' }, { jam_keluar: 'desc' }, { jam_masuk: 'desc' }],
       });
 
-      attendance.forEach((record) => {
+      // Filter out incorrect user_id scans and Aziz (8) on 2026-06-03
+      const filteredAttendance = attendance.filter((a) => {
+        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
+        if (a.user_id === '8') {
+          const t = a.tanggal;
+          const dateStr =
+            typeof (t as any) === 'string'
+              ? (t as any).split('T')[0]
+              : `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+          if (dateStr === '2026-06-03') return false;
+        }
+        return true;
+      });
+
+      filteredAttendance.forEach((record) => {
         const key = record.user_id;
         if (!key) return;
         if (!employeeStats[key]) {
