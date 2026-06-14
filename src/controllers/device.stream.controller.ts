@@ -19,6 +19,7 @@ export interface SseAttendanceRecord {
   recordTime: string;
   ip: string;
   source: 'history' | 'live';
+  is_active: boolean;
 }
 
 const HISTORY_FETCH_TIMEOUT_MS = 5_000;
@@ -57,8 +58,8 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
     sseWrite(res, 'history', { records: [] });
   }, HISTORY_FETCH_TIMEOUT_MS);
 
-  prisma.attendance
-    .findMany({
+  Promise.all([
+    prisma.attendance.findMany({
       where: { is_deleted: false },
       orderBy: { created_at: 'desc' },
       take: 500,
@@ -75,9 +76,14 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
         created_at: true,
         device_id: true,
       },
+    }),
+    prisma.employees.findMany({
+      select: { user_id: true, is_active: true }
     })
-    .then((recentLogs) => {
+  ])
+    .then(([recentLogs, employees]) => {
       clearTimeout(historyTimeout);
+      const empMap = new Map(employees.map((e) => [e.user_id, e]));
       const history: SseAttendanceRecord[] = recentLogs.map((row) => {
         // Helper to combine date and time part into local timezone-aligned ISO string
         const combineDateTime = (tanggal: Date, timePart: Date | null): string => {
@@ -100,6 +106,9 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
           row.jam_keluar || row.jam_masuk || row.created_at
         );
 
+        const emp = empMap.get(row.user_id);
+        const isActive = emp?.is_active ?? false;
+
         return {
           userSn: row.id,
           user_id: row.user_id,
@@ -112,6 +121,7 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
           recordTime: recordTimeStr,
           ip: row.device_id ?? 'DB',
           source: 'history',
+          is_active: isActive,
         };
       });
       sseWrite(res, 'history', { records: history });
@@ -130,7 +140,7 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
       const userIds = records.map((r) => String(r.deviceUserId));
 
       const employees = await prisma.employees.findMany({
-        where: { user_id: { in: userIds }, is_active: true },
+        where: { user_id: { in: userIds } },
         include: { shifts: true },
       });
       const empMap = new Map(employees.map((e) => [e.user_id, e]));
@@ -198,6 +208,7 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
           recordTime: scanTimeIso.toISOString(),
           ip: r.ip,
           source: 'live',
+          is_active: emp?.is_active ?? false,
         };
       });
 

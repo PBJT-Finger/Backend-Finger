@@ -115,7 +115,8 @@ export class AttendanceController {
         startDateStr || undefined,
         endDateStr || undefined,
         totalWorkingDays,
-        holidaySet
+        holidaySet,
+        activeDosenEmployees.map((e) => ({ user_id: e.user_id, nama: e.nama }))
       );
 
       // Apply pagination
@@ -221,7 +222,8 @@ export class AttendanceController {
         startDateStr || undefined,
         endDateStr || undefined,
         totalWorkingDays,
-        holidaySet
+        holidaySet,
+        activeKaryawanEmployees.map((e) => ({ user_id: e.user_id, nama: e.nama }))
       );
 
       // Apply pagination
@@ -297,11 +299,11 @@ export class AttendanceController {
         take: limitNum,
       });
 
-      // Get all active employees to map correct names and roles
-      const activeEmployees = await prisma.employees.findMany({
-        select: { user_id: true, nama: true, jabatan: true },
+      // Get all employees to map correct names, roles, and active status
+      const employees = await prisma.employees.findMany({
+        select: { user_id: true, nama: true, jabatan: true, is_active: true },
       });
-      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
+      const employeeMap = new Map(employees.map((e) => [e.user_id, e]));
 
       const mappedAttendance = attendance.map((a) => {
         const emp = employeeMap.get(a.user_id);
@@ -309,6 +311,7 @@ export class AttendanceController {
           ...a,
           nama: emp?.nama ?? a.nama,
           jabatan: emp?.jabatan ?? a.jabatan,
+          is_active: emp?.is_active ?? false,
         };
       });
 
