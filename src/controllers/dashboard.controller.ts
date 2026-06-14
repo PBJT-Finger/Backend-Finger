@@ -32,7 +32,7 @@ export class DashboardController {
       });
       const activeUserIds = activeEmployees
         .map((e) => e.user_id)
-        .filter((id) => !['1', '5', '6', '7'].includes(id));
+        .filter((id) => !['5', '6', '7'].includes(id));
 
       // Get today's attendance (restricted to active employees)
       const todayAttendance = await prisma.attendance.findMany({

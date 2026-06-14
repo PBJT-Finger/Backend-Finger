@@ -100,7 +100,7 @@ export class AttendanceController {
 
       // Filter out incorrect user_id scans and Aziz (8) on 2026-06-03
       const filteredAttendance = attendance.filter((a) => {
-        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
+        if (['5', '6', '7'].includes(a.user_id)) return false;
         if (a.user_id === '8') {
           const t = a.tanggal;
           const dateStr =
@@ -221,7 +221,7 @@ export class AttendanceController {
 
       // Filter out incorrect user_id scans and Aziz (8) on 2026-06-03
       const filteredAttendance = attendance.filter((a) => {
-        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
+        if (['5', '6', '7'].includes(a.user_id)) return false;
         if (a.user_id === '8') {
           const t = a.tanggal;
           const dateStr =
@@ -473,7 +473,7 @@ export class AttendanceController {
 
       // Filter out incorrect user_id scans and Aziz (8) on 2026-06-03
       const filteredAttendance = attendance.filter((a) => {
-        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
+        if (['5', '6', '7'].includes(a.user_id)) return false;
         if (a.user_id === '8') {
           const t = a.tanggal;
           const dateStr =

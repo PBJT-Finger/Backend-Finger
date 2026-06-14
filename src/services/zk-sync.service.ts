@@ -88,8 +88,8 @@ export class ZkSyncService {
 
     for (const record of records) {
       try {
-        // [FIX] Ignore incorrect/mock scans
-        if (['1', '5', '6', '7'].includes(record.deviceUserId)) {
+        // [FIX] Ignore incorrect/mock scans (Melinda '1' is active and should not be ignored)
+        if (['5', '6', '7'].includes(record.deviceUserId)) {
           continue;
         }
 
