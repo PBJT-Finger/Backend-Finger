@@ -278,8 +278,7 @@ export function transformDosenAttendance(
             ? extractTimeString(group.lastCheckOutUTC) || 'Belum ada data'
             : 'Belum ada data',
         };
-      })
-      .filter((r) => r.totalHadir > 0);
+      });
 
     return result;
   } catch (error) {
