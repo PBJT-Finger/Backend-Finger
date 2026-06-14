@@ -185,7 +185,9 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
           const shiftStartMinute = emp?.shifts ? new Date(emp.shifts.jam_masuk).getUTCMinutes() : 0;
           const scanMinutes = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
           const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
-          status = scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR';
+          const localHour = scanTime.getUTCHours();
+          const isNightSession = localHour >= 15;
+          status = isNightSession ? 'HADIR' : (scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR');
         } else {
           // SCAN KELUAR / PULANG
           jamKeluar = scanTimeIso.toISOString();
