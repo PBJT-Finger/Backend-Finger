@@ -35,13 +35,28 @@ export class AttendanceController {
     try {
       const { start_date, end_date, dosen_id, page = 1, limit = 50 } = req.query;
 
+      const startDateStr = typeof start_date === 'string' ? start_date : null;
+      const endDateStr = typeof end_date === 'string' ? end_date : null;
+
+      // [FIX] Only include attendance from users who are ACTIVELY registered as DOSEN.
+      // This prevents scan-only (unregistered) users from appearing in the dosen rekap.
+      const activeDosenEmployees = await prisma.employees.findMany({
+        where: { jabatan: 'DOSEN', is_active: true },
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const activeDosenUserIds = activeDosenEmployees.map((e) => e.user_id);
+      const employeeMap = new Map(activeDosenEmployees.map((e) => [e.user_id, e]));
+
+      if (activeDosenUserIds.length === 0) {
+        return successResponse(res, [], 'Tidak ada dosen aktif yang terdaftar.');
+      }
+
       const whereClause: Record<string, unknown> = {
         jabatan: 'DOSEN',
         is_deleted: false,
+        // [FIX] Only attendance records belonging to active registered dosen
+        user_id: { in: activeDosenUserIds },
       };
-
-      const startDateStr = typeof start_date === 'string' ? start_date : null;
-      const endDateStr = typeof end_date === 'string' ? end_date : null;
 
       if (startDateStr && endDateStr) {
         whereClause['tanggal'] = {
@@ -83,13 +98,7 @@ export class AttendanceController {
       const totalWorkingDays =
         startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
-      // Get all active employees to map correct names and roles
-      const activeEmployees = await prisma.employees.findMany({
-        select: { user_id: true, nama: true, jabatan: true },
-      });
-      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
-
-      // Transform to aggregated data
+      // Transform to aggregated data (nama/jabatan sourced from employees table for accuracy)
       const transformedData = transformDosenAttendance(
         attendance.map((a) => {
           const emp = employeeMap.get(a.user_id);
@@ -133,13 +142,28 @@ export class AttendanceController {
     try {
       const { start_date, end_date, karyawan_id, page = 1, limit = 50 } = req.query;
 
+      const startDateStr = typeof start_date === 'string' ? start_date : null;
+      const endDateStr = typeof end_date === 'string' ? end_date : null;
+
+      // [FIX] Only include attendance from users who are ACTIVELY registered as KARYAWAN.
+      // This prevents scan-only (unregistered) users from appearing in the karyawan rekap.
+      const activeKaryawanEmployees = await prisma.employees.findMany({
+        where: { jabatan: 'KARYAWAN', is_active: true },
+        select: { user_id: true, nama: true, jabatan: true },
+      });
+      const activeKaryawanUserIds = activeKaryawanEmployees.map((e) => e.user_id);
+      const employeeMap = new Map(activeKaryawanEmployees.map((e) => [e.user_id, e]));
+
+      if (activeKaryawanUserIds.length === 0) {
+        return successResponse(res, [], 'Tidak ada karyawan aktif yang terdaftar.');
+      }
+
       const whereClause: Record<string, unknown> = {
         jabatan: 'KARYAWAN',
         is_deleted: false,
+        // [FIX] Only attendance records belonging to active registered karyawan
+        user_id: { in: activeKaryawanUserIds },
       };
-
-      const startDateStr = typeof start_date === 'string' ? start_date : null;
-      const endDateStr = typeof end_date === 'string' ? end_date : null;
 
       if (startDateStr && endDateStr) {
         whereClause['tanggal'] = {
@@ -180,13 +204,7 @@ export class AttendanceController {
       const totalWorkingDays =
         startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
 
-      // Get all active employees to map correct names and roles
-      const activeEmployees = await prisma.employees.findMany({
-        select: { user_id: true, nama: true, jabatan: true },
-      });
-      const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
-
-      // Transform to aggregated data
+      // Transform to aggregated data (nama/jabatan sourced from employees table for accuracy)
       const transformedData = transformKaryawanAttendance(
         attendance.map((a) => {
           const emp = employeeMap.get(a.user_id);
