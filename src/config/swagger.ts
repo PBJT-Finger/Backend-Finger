@@ -475,10 +475,14 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
       },
     ],
   },
-  apis: ['./src/routes/*.ts', './src/routes/*.js'],
 };
 
-export const specs = swaggerJsdoc(options);
+import path from 'path';
+
+export const specs = swaggerJsdoc({
+  ...options,
+  apis: [path.join(__dirname, '../routes/*.ts'), path.join(__dirname, '../routes/*.js')],
+});
 
 export const swaggerOptions = {
   explorer: true,
