@@ -370,51 +370,35 @@ export class AttendanceController {
         );
       }
 
-      const whereClause: Record<string, unknown> = {
-        tanggal: {
-          gte: parseLocalDate(startDate as string),
-          lte: parseLocalDate(endDate as string),
-        },
-        is_deleted: false,
-      };
-
-      if (id || user_id) {
-        whereClause['user_id'] = id || user_id;
-      }
-
+      // Get all active employees matching the query parameters
+      const employeeWhere: Record<string, unknown> = { is_active: true };
+      if (id || user_id) employeeWhere['user_id'] = id || user_id;
       if (jabatan) {
-        whereClause['jabatan'] = jabatan;
+        employeeWhere['jabatan'] = jabatan;
       } else {
-        whereClause['jabatan'] = { in: ['DOSEN', 'KARYAWAN'] };
+        employeeWhere['jabatan'] = { in: ['DOSEN', 'KARYAWAN'] };
       }
 
-      // Get all distinct users matching the base filter
-      const baseFilter: Record<string, unknown> = { is_deleted: false };
-      if (id || user_id) baseFilter['user_id'] = id || user_id;
-      if (jabatan) baseFilter['jabatan'] = jabatan;
-      else baseFilter['jabatan'] = { in: ['DOSEN', 'KARYAWAN'] };
-
-      const allUsers = await prisma.attendance.findMany({
-        where: baseFilter,
-        distinct: ['user_id'],
-        select: { user_id: true, nama: true, jabatan: true },
-      });
-
-      // Get all active employees to map correct names and roles
       const activeEmployees = await prisma.employees.findMany({
+        where: employeeWhere,
         select: { user_id: true, nama: true, jabatan: true },
       });
+
+      if (activeEmployees.length === 0) {
+        return successResponse(res, [], 'Tidak ada karyawan aktif yang terdaftar.');
+      }
+
+      const activeEmployeeUserIds = activeEmployees.map((e) => e.user_id);
       const employeeMap = new Map(activeEmployees.map((e) => [e.user_id, e]));
 
-      // Initialize stats with all users
+      // Initialize stats with all active employees
       const employeeStats: Record<string, any> = {};
 
-      allUsers.forEach((u) => {
-        const emp = employeeMap.get(u.user_id);
+      activeEmployees.forEach((u) => {
         employeeStats[u.user_id] = {
           user_id: u.user_id,
-          nama: emp?.nama ?? u.nama,
-          jabatan: emp?.jabatan ?? u.jabatan,
+          nama: u.nama,
+          jabatan: u.jabatan,
           attendanceDates: new Set<string>(),
           terlambat_dates: new Set<string>(),
           hadir_pagi: new Set<string>(),
@@ -423,6 +407,15 @@ export class AttendanceController {
           last_check_out: null,
         };
       });
+
+      const whereClause: Record<string, unknown> = {
+        tanggal: {
+          gte: parseLocalDate(startDate as string),
+          lte: parseLocalDate(endDate as string),
+        },
+        is_deleted: false,
+        user_id: { in: activeEmployeeUserIds },
+      };
 
       // Get holidays in the selected range to exclude from stats.attendanceDates
       const holidayWhere: any = {};
