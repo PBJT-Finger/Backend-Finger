@@ -29,15 +29,11 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
     servers: [
       {
         url: `http://localhost:${env.PORT}`,
-        description: 'Development Server (dynamic port from env)',
+        description: 'Development Server',
       },
       {
-        url: `http://localhost:${env.PORT}/api`,
-        description: 'API Base URL',
-      },
-      {
-        url: 'https://api.kampus.edu',
-        description: 'Production server (example)',
+        url: 'https://finger-be.pbjt.web.id',
+        description: 'Production Server',
       },
     ],
 
