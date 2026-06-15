@@ -461,7 +461,7 @@ export class ExportController {
         .fontSize(18)
         .fillColor('#1E293B')
         .font('Helvetica-Bold')
-        .text('LAPORAN REKAPITULASI KEHADIRAN', { align: 'center' });
+        .text('LAPORAN REKAP KEHADIRAN', { align: 'center' });
       doc.moveDown(0.2);
 
       let jabatanLabel = 'SEMUA PEGAWAI';
