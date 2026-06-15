@@ -461,8 +461,8 @@ export class ExportController {
       const logoPath = path.resolve('public/logo-pbjt.png');
       const hasLogo = fs.existsSync(logoPath);
 
-      const logoStartY = 45;
-      const logoWidth = 60;
+      const logoStartY = 40;
+      const logoWidth = 68;
       if (hasLogo) {
         // Render logo (positioned further right and larger, with safe top padding)
         doc.image(logoPath, 65, logoStartY, { width: logoWidth });
@@ -471,10 +471,10 @@ export class ExportController {
       // Kop Surat (Institutional Letterhead) Text - Always centered on the page
       const textX = 35;
       const textWidth = 525;
-      const textStartY = 48;
+      const textStartY = 51;
 
       doc
-        .fontSize(11)
+        .fontSize(11.5)
         .fillColor('#334155')
         .font('Helvetica-Bold')
         .text('YAYASAN PENDIDIKAN BHAKTI PRAJA TEGAL', textX, textStartY, {
@@ -483,7 +483,7 @@ export class ExportController {
         });
 
       doc
-        .fontSize(15)
+        .fontSize(15.5)
         .fillColor('#0F172A')
         .font('Helvetica-Bold')
         .text('POLITEKNIK BAJA TEGAL', {
@@ -492,7 +492,7 @@ export class ExportController {
         });
 
       doc
-        .fontSize(7.2)
+        .fontSize(8.0)
         .fillColor('#475569')
         .font('Helvetica')
         .text('Jl. Raya Slawi - Jatibarang Km. 4 Dukuhwaru, Kab. Tegal, Jawa Tengah 52472', {
@@ -501,7 +501,7 @@ export class ExportController {
         });
 
       doc
-        .fontSize(7.2)
+        .fontSize(8.0)
         .fillColor('#475569')
         .font('Helvetica')
         .text('Telp: (0283) 6196309 / 082325580008 | Website: www.pbjt.ac.id | Email: info@pbjt.ac.id', {
