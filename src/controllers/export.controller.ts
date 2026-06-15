@@ -463,8 +463,8 @@ export class ExportController {
 
       const startY = 32;
       if (hasLogo) {
-        // Render logo (positioned on the left side, text is centered independently)
-        doc.image(logoPath, 45, startY, { width: 55 });
+        // Render logo (positioned further right and larger)
+        doc.image(logoPath, 65, startY, { width: 68 });
       }
 
       // Kop Surat (Institutional Letterhead) Text - Always centered on the page
@@ -490,7 +490,7 @@ export class ExportController {
         });
 
       doc
-        .fontSize(7.5)
+        .fontSize(7.2)
         .fillColor('#475569')
         .font('Helvetica')
         .text('Jl. Raya Slawi - Jatibarang Km. 4 Dukuhwaru, Kab. Tegal, Jawa Tengah 52472', {
@@ -499,7 +499,7 @@ export class ExportController {
         });
 
       doc
-        .fontSize(7.5)
+        .fontSize(7.2)
         .fillColor('#475569')
         .font('Helvetica')
         .text('Telp: (0283) 6196309 / 082325580008 | Website: www.pbjt.ac.id | Email: info@pbjt.ac.id', {
@@ -508,7 +508,7 @@ export class ExportController {
         });
 
       // Position below the Kop Surat texts (taking whichever is lower: doc.y or logo bottom)
-      const logoBottomY = startY + 55;
+      const logoBottomY = startY + 68;
       const separatorY = Math.max(doc.y, logoBottomY) + 8;
 
       // Draw Double Line Separator (Thick & Thin)
