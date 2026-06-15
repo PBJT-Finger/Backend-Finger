@@ -463,13 +463,13 @@ export class ExportController {
 
       const startY = 35;
       if (hasLogo) {
-        // Render logo
-        doc.image(logoPath, 35, startY, { width: 50 });
+        // Render logo (shifted to the right slightly)
+        doc.image(logoPath, 48, startY, { width: 50 });
       }
 
       // Kop Surat (Institutional Letterhead) Text
-      const textX = hasLogo ? 100 : 35;
-      const textWidth = hasLogo ? 460 : 525;
+      const textX = hasLogo ? 112 : 35;
+      const textWidth = hasLogo ? 448 : 525;
 
       doc
         .fontSize(11)
