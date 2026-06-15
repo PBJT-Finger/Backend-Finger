@@ -4,6 +4,8 @@ import { errorResponse } from '../utils/responseFormatter';
 import logger from '../utils/logger';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
+import path from 'path';
+import fs from 'fs';
 
 import {
   extractTimeString,
@@ -455,31 +457,57 @@ export class ExportController {
       // Pipe PDF to response
       doc.pipe(res);
 
-      // Title & Header info
-      doc.moveDown(0.8);
+      // Kop Surat (Institutional Letterhead)
+      doc.moveDown(0.2);
+      doc
+        .fontSize(12)
+        .fillColor('#334155')
+        .font('Helvetica-Bold')
+        .text('YAYASAN PENDIDIKAN BHAKTI PRAJA TEGAL', { align: 'center' });
       doc
         .fontSize(16)
         .fillColor('#0F172A')
         .font('Helvetica-Bold')
         .text('POLITEKNIK BAJA TEGAL', { align: 'center' });
-      doc.moveDown(0.1);
-
       doc
-        .fontSize(12)
-        .fillColor('#1E293B')
-        .font('Helvetica-Bold')
-        .text('LAPORAN REKAP KEHADIRAN', { align: 'center' });
-      doc.moveDown(0.1);
+        .fontSize(8)
+        .fillColor('#475569')
+        .font('Helvetica')
+        .text('Jl. Raya Slawi - Jatibarang Km. 4 Dukuhwaru, Kab. Tegal, Jawa Tengah 52472', { align: 'center' });
+      doc
+        .fontSize(8)
+        .fillColor('#475569')
+        .font('Helvetica')
+        .text('Telp: (0283) 6196309 | Website: www.pbjt.ac.id | Email: info@pbjt.ac.id', { align: 'center' });
+      doc.moveDown(0.4);
 
+      // Draw Double Line Separator (Thick & Thin)
+      const separatorY = doc.y;
+      doc
+        .strokeColor('#0F172A')
+        .lineWidth(2.2)
+        .moveTo(31, separatorY)
+        .lineTo(811, separatorY)
+        .stroke();
+      doc
+        .strokeColor('#0F172A')
+        .lineWidth(0.8)
+        .moveTo(31, separatorY + 3)
+        .lineTo(811, separatorY + 3)
+        .stroke();
+
+      doc.moveDown(0.8);
+
+      // Report Title (Below the line)
       let jabatanLabel = 'SEMUA PEGAWAI';
       if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN';
       if (jabatan === 'KARYAWAN') jabatanLabel = 'KARYAWAN / STAFF';
 
       doc
-        .fontSize(10)
-        .fillColor('#475569')
+        .fontSize(12)
+        .fillColor('#1E293B')
         .font('Helvetica-Bold')
-        .text(jabatanLabel.toUpperCase(), { align: 'center' });
+        .text(`LAPORAN REKAP KEHADIRAN ${jabatanLabel.toUpperCase()}`, { align: 'center' });
       doc.moveDown(0.1);
 
       doc
@@ -489,16 +517,6 @@ export class ExportController {
         .text(`Periode: ${formatDateID(startDate)} s/d ${formatDateID(endDate)}`, {
           align: 'center',
         });
-      doc.moveDown(0.8);
-
-      // Draw thin elegant line separator under header (Kop Surat style)
-      doc
-        .strokeColor('#E2E8F0')
-        .lineWidth(1.5)
-        .moveTo(31, doc.y)
-        .lineTo(811, doc.y)
-        .stroke();
-
       doc.moveDown(0.8);
 
       const tableTop = doc.y;
@@ -566,7 +584,7 @@ export class ExportController {
 
         const rowData = [
           { text: String(index + 1) },
-          { text: record.nama || '-' },
+          { text: (record.nama || '-').replace(/_/g, ' ') },
           { text: String(record.totalHariKerja || 0) },
           { text: String(record.totalHadir || 0) },
           { text: String(record.totalTerlambat || 0), isLate: (record.totalTerlambat || 0) > 0 },
