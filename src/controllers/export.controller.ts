@@ -461,21 +461,23 @@ export class ExportController {
       const logoPath = path.resolve('public/logo-pbjt.png');
       const hasLogo = fs.existsSync(logoPath);
 
-      const startY = 32;
+      const logoStartY = 45;
+      const logoWidth = 60;
       if (hasLogo) {
-        // Render logo (positioned further right and larger)
-        doc.image(logoPath, 65, startY, { width: 68 });
+        // Render logo (positioned further right and larger, with safe top padding)
+        doc.image(logoPath, 65, logoStartY, { width: logoWidth });
       }
 
       // Kop Surat (Institutional Letterhead) Text - Always centered on the page
       const textX = 35;
       const textWidth = 525;
+      const textStartY = 48;
 
       doc
         .fontSize(11)
         .fillColor('#334155')
         .font('Helvetica-Bold')
-        .text('YAYASAN PENDIDIKAN BHAKTI PRAJA TEGAL', textX, startY, {
+        .text('YAYASAN PENDIDIKAN BHAKTI PRAJA TEGAL', textX, textStartY, {
           width: textWidth,
           align: 'center',
         });
@@ -508,7 +510,7 @@ export class ExportController {
         });
 
       // Position below the Kop Surat texts (taking whichever is lower: doc.y or logo bottom)
-      const logoBottomY = startY + 68;
+      const logoBottomY = logoStartY + logoWidth;
       const separatorY = Math.max(doc.y, logoBottomY) + 8;
 
       // Draw Double Line Separator (Thick & Thin)
