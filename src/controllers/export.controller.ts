@@ -457,32 +457,61 @@ export class ExportController {
       // Pipe PDF to response
       doc.pipe(res);
 
-      // Kop Surat (Institutional Letterhead)
-      doc.moveDown(0.2);
+      // Check if logo exists
+      const logoPath = path.resolve('public/logo-pbjt.png');
+      const hasLogo = fs.existsSync(logoPath);
+
+      const startY = 35;
+      if (hasLogo) {
+        // Render logo
+        doc.image(logoPath, 50, startY, { width: 55 });
+      }
+
+      // Kop Surat (Institutional Letterhead) Text
+      const textX = hasLogo ? 120 : 31;
+      const textWidth = hasLogo ? 670 : 780;
+
       doc
-        .fontSize(12)
+        .fontSize(11)
         .fillColor('#334155')
         .font('Helvetica-Bold')
-        .text('YAYASAN PENDIDIKAN BHAKTI PRAJA TEGAL', { align: 'center' });
+        .text('YAYASAN PENDIDIKAN BHAKTI PRAJA TEGAL', textX, startY, {
+          width: textWidth,
+          align: 'center',
+        });
+
       doc
-        .fontSize(16)
+        .fontSize(15)
         .fillColor('#0F172A')
         .font('Helvetica-Bold')
-        .text('POLITEKNIK BAJA TEGAL', { align: 'center' });
+        .text('POLITEKNIK BAJA TEGAL', {
+          width: textWidth,
+          align: 'center',
+        });
+
       doc
-        .fontSize(8)
+        .fontSize(8.5)
         .fillColor('#475569')
         .font('Helvetica')
-        .text('Jl. Raya Slawi - Jatibarang Km. 4 Dukuhwaru, Kab. Tegal, Jawa Tengah 52472', { align: 'center' });
+        .text('Jl. Raya Slawi - Jatibarang Km. 4 Dukuhwaru, Kab. Tegal, Jawa Tengah 52472', {
+          width: textWidth,
+          align: 'center',
+        });
+
       doc
-        .fontSize(8)
+        .fontSize(8.5)
         .fillColor('#475569')
         .font('Helvetica')
-        .text('Telp: (0283) 6196309 | Website: www.pbjt.ac.id | Email: info@pbjt.ac.id', { align: 'center' });
-      doc.moveDown(0.4);
+        .text('Telp: (0283) 6196309 / 082325580008 | Website: www.pbjt.ac.id | Email: info@pbjt.ac.id', {
+          width: textWidth,
+          align: 'center',
+        });
+
+      // Position below the Kop Surat texts (taking whichever is lower: doc.y or logo bottom)
+      const logoBottomY = startY + 55;
+      const separatorY = Math.max(doc.y, logoBottomY) + 8;
 
       // Draw Double Line Separator (Thick & Thin)
-      const separatorY = doc.y;
       doc
         .strokeColor('#0F172A')
         .lineWidth(2.2)
@@ -496,7 +525,7 @@ export class ExportController {
         .lineTo(811, separatorY + 3)
         .stroke();
 
-      doc.moveDown(0.8);
+      doc.y = separatorY + 8;
 
       // Report Title (Below the line)
       let jabatanLabel = 'SEMUA PEGAWAI';
