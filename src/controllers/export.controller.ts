@@ -551,14 +551,14 @@ export class ExportController {
       const tableTop = doc.y;
       const startX = 35; 
 
-      const colWidths = [30, 185, 65, 55, 65, 60, 65];
+      const colWidths = [30, 180, 65, 55, 65, 65, 65];
       const headers = [
         'No',
         'Nama',
         'Hari Kerja\nTarget',
         'Hadir',
         'Terlambat',
-        'Tidak Hadir',
+        'Tidak\nHadir',
         'Persentase',
       ];
 
