@@ -106,7 +106,17 @@ export class AuthController {
           return errorResponse(res, firstErr ? firstErr.msg : 'Validasi gagal', 400);
         }
 
-        const { username, email, password, role } = req.body;
+        const { username, email, password, role, regCode } = req.body;
+
+        // Verify registration secret code if role is admin
+        const targetRole = role?.toLowerCase() || 'admin';
+        if (targetRole === 'admin') {
+          const expectedKey = process.env.ADMIN_REGISTRATION_KEY || 'baja2026';
+          if (regCode !== expectedKey) {
+            logger.warn('Admin registration blocked: invalid secret key', { ip: req.ip, username });
+            return errorResponse(res, 'Kode Registrasi Admin tidak valid atau salah!', 400);
+          }
+        }
 
         // Check if username exists
         const existingUsername = await prisma.admins.findFirst({
