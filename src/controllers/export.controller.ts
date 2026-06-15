@@ -465,7 +465,7 @@ export class ExportController {
       doc.moveDown(0.2);
 
       let jabatanLabel = 'SEMUA PEGAWAI';
-      if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN / TENAGA PENDIDIK';
+      if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN';
       if (jabatan === 'KARYAWAN') jabatanLabel = 'KARYAWAN / STAFF';
 
       doc
