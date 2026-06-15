@@ -468,9 +468,9 @@ export class ExportController {
         doc.image(logoPath, 65, logoStartY, { width: logoWidth });
       }
 
-      // Kop Surat (Institutional Letterhead) Text - Always centered on the page
-      const textX = 35;
-      const textWidth = 525;
+      // Kop Surat (Institutional Letterhead) Text - Centered with safe margin from logo
+      const textX = hasLogo ? 70 : 35;
+      const textWidth = hasLogo ? 490 : 525;
       const textStartY = 51;
 
       doc
