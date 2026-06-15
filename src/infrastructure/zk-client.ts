@@ -3,22 +3,29 @@
  *
  * Anti-Corruption Layer (ACL) for ZKTeco X100-C biometric device.
  *
- * Architecture decision — Polling vs. Live-Push:
- *   The X100-C communicates over proprietary ZKTeco protocol on port 4370.
- *   node-zklib does NOT expose a reliable event listener for live push events
- *   on all firmware versions. To guarantee compatibility, we use a polling
- *   strategy: fetch all attendance logs every N seconds, diff against the
- *   last known count, and emit only NEW records.
+ * Architecture decision — Persistent Connection Polling:
+ *   Connect ONCE, keep the session alive, and poll (getAttendances) on the
+ *   same open TCP socket every N seconds.
  *
- * Trade-off: ~5s latency vs. 100% device compatibility.
+ *   ⚠️  WHY THIS MATTERS:
+ *   ZKTeco firmware plays a notification beep on the physical device speaker
+ *   every time a NEW TCP session is established (CMD_CONNECT). Under the old
+ *   "ephemeral" strategy the device connected/disconnected every 5 s, causing
+ *   a continuous beeping noise that alarmed users and staff.
+ *
+ *   Under persistent mode, CMD_CONNECT is sent ONCE (at startup or after an
+ *   actual network failure). The socket is kept open between poll cycles.
+ *   The device only beeps once on initial connection — exactly as a normal
+ *   fingerprint reader should behave.
+ *
+ *   If the TCP socket drops unexpectedly (e.g., device reboot, network glitch)
+ *   the client detects the error and schedules a full reconnect automatically.
+ *
+ * Trade-off: ~5s polling latency vs. 100% device compatibility.
  *
  * Singleton pattern: Only ONE connection to the physical device should exist.
  * Double-instantiation would corrupt the ZKLib internal state and produce
  * duplicate or missing attendance records.
- *
- * Boundary note: node-zklib does not ship TypeScript typings.
- * The `any` usage below is confined to this file ONLY and is intentional.
- * All consumers of this class receive properly typed interfaces.
  */
 
 // node-zklib does not provide @types — this is the ONLY permitted any boundary.
@@ -133,6 +140,11 @@ export class ZkDeviceClient extends EventEmitter {
   /**
    * Starts the polling loop. Idempotent — safe to call multiple times.
    *
+   * Strategy: PERSISTENT CONNECTION
+   *   - Connect once (CMD_CONNECT) → device beeps once on startup — expected.
+   *   - Poll (getAttendances) every POLLING_INTERVAL_MS on the SAME open socket.
+   *   - Only reconnect when the socket drops (network error, device reboot, etc).
+   *
    * Emits:
    *   - 'status'     → DeviceStatus on every state change
    *   - 'attendance' → AttendanceRecord[] containing only NEW records per cycle
@@ -144,6 +156,7 @@ export class ZkDeviceClient extends EventEmitter {
     console.log(
       `[ZkDeviceClient] Starting polling loop → ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`
     );
+    // Start with immediate first poll (no delay)
     this.scheduleNextPoll(0);
   }
 
@@ -182,6 +195,10 @@ export class ZkDeviceClient extends EventEmitter {
 
   private async runPollCycle(): Promise<void> {
     try {
+      // ── CONNECT PHASE (only if not already online) ────────────────────────
+      // Under persistent connection strategy, this block runs ONCE at startup
+      // and then only after an unexpected socket drop/device error.
+      // CMD_CONNECT triggers the device beep — sent at most ONCE per session.
       if (this.currentStatus !== 'online') {
         this.setStatus('connecting');
 
@@ -194,7 +211,6 @@ export class ZkDeviceClient extends EventEmitter {
         // Without this, a hung TCP handshake blocks the entire polling loop
         // forever — the device never transitions back to 'offline' and no
         // retry is scheduled.
-        // Prevent unhandled promise rejection if createSocket() fails AFTER the timeout
         const socketPromise = this.zkInstance.createSocket();
         socketPromise.catch(() => {}); // swallow background rejection
 
@@ -237,6 +253,7 @@ export class ZkDeviceClient extends EventEmitter {
         );
       }
 
+      // ── POLL PHASE (runs every cycle on the SAME open socket) ────────────
       const attendancesPromise = this.zkInstance.getAttendances();
       attendancesPromise.catch(() => {});
 
@@ -319,27 +336,25 @@ export class ZkDeviceClient extends EventEmitter {
         );
       }
 
-      // =========================================================================
-      // [CRITICAL FIX FOR DEVICE OVERHEATING]
-      // ZKTeco embedded processors overheat if a TCP socket is held open constantly.
-      // We implement "Stateless/Ephemeral Polling": disconnect immediately after
-      // reading the data, giving the hardware 30 seconds to sleep and cool down.
-      // =========================================================================
-      await this.safeDisconnect();
-      this.setStatus('offline');
-
+      // ── PERSISTENT CONNECTION: Do NOT disconnect after each poll ──────────
+      // Keep the socket open. Schedule the next poll cycle and return.
+      // The device will only beep again if the connection drops and needs
+      // to be re-established (handled by the catch block below).
       this.scheduleNextPoll(env.POLLING_INTERVAL_MS);
+
     } catch (err) {
       const error =
         err instanceof Error
           ? err
           : new Error(typeof err === 'object' ? JSON.stringify(err) : String(err));
-      // Log with retry countdown so it's easy to track in the terminal
+
       const retrySec = Math.round(env.RECONNECT_DELAY_MS / 1000);
-      console.warn(`[ZkDeviceClient] ✗ ${error.message} — retrying in ${retrySec}s`);
+      console.warn(`[ZkDeviceClient] ✗ ${error.message} — reconnecting in ${retrySec}s`);
       this.emit('error', error);
+
+      // Mark offline and tear down the broken socket cleanly before retrying.
+      // The next poll cycle will reconnect (single beep on device) and resume.
       this.setStatus('offline');
-      // Ensure socket is fully torn down before the next attempt
       await this.safeDisconnect();
       this.scheduleNextPoll(env.RECONNECT_DELAY_MS);
     }
