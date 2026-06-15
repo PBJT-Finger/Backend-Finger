@@ -456,33 +456,50 @@ export class ExportController {
       doc.pipe(res);
 
       // Title & Header info
-      doc.moveDown(1.5);
+      doc.moveDown(0.8);
       doc
-        .fontSize(18)
+        .fontSize(16)
+        .fillColor('#0F172A')
+        .font('Helvetica-Bold')
+        .text('POLITEKNIK BAJA TEGAL', { align: 'center' });
+      doc.moveDown(0.1);
+
+      doc
+        .fontSize(12)
         .fillColor('#1E293B')
         .font('Helvetica-Bold')
         .text('LAPORAN REKAP KEHADIRAN', { align: 'center' });
-      doc.moveDown(0.2);
+      doc.moveDown(0.1);
 
       let jabatanLabel = 'SEMUA PEGAWAI';
       if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN';
       if (jabatan === 'KARYAWAN') jabatanLabel = 'KARYAWAN / STAFF';
 
       doc
-        .fontSize(12)
+        .fontSize(10)
         .fillColor('#475569')
         .font('Helvetica-Bold')
         .text(jabatanLabel.toUpperCase(), { align: 'center' });
-      doc.moveDown(0.2);
+      doc.moveDown(0.1);
 
       doc
-        .fontSize(9)
+        .fontSize(8.5)
         .fillColor('#64748B')
         .font('Helvetica-Oblique')
         .text(`Periode: ${formatDateID(startDate)} s/d ${formatDateID(endDate)}`, {
           align: 'center',
         });
-      doc.moveDown(1.5);
+      doc.moveDown(0.8);
+
+      // Draw thin elegant line separator under header (Kop Surat style)
+      doc
+        .strokeColor('#E2E8F0')
+        .lineWidth(1.5)
+        .moveTo(31, doc.y)
+        .lineTo(811, doc.y)
+        .stroke();
+
+      doc.moveDown(0.8);
 
       const tableTop = doc.y;
       const startX = 31; // Center of Landscape A4 (841.89 - 780) / 2 = 30.94
