@@ -461,15 +461,15 @@ export class ExportController {
       const logoPath = path.resolve('public/logo-pbjt.png');
       const hasLogo = fs.existsSync(logoPath);
 
-      const startY = 35;
+      const startY = 32;
       if (hasLogo) {
-        // Render logo (shifted to the right slightly)
-        doc.image(logoPath, 48, startY, { width: 50 });
+        // Render logo (shifted further right and slightly larger)
+        doc.image(logoPath, 65, startY, { width: 58 });
       }
 
       // Kop Surat (Institutional Letterhead) Text
-      const textX = hasLogo ? 112 : 35;
-      const textWidth = hasLogo ? 448 : 525;
+      const textX = hasLogo ? 135 : 35;
+      const textWidth = hasLogo ? 425 : 525;
 
       doc
         .fontSize(11)
@@ -508,7 +508,7 @@ export class ExportController {
         });
 
       // Position below the Kop Surat texts (taking whichever is lower: doc.y or logo bottom)
-      const logoBottomY = startY + 50;
+      const logoBottomY = startY + 58;
       const separatorY = Math.max(doc.y, logoBottomY) + 8;
 
       // Draw Double Line Separator (Thick & Thin)
