@@ -446,8 +446,8 @@ export class ExportController {
         );
       }
 
-      // Create PDF document
-      const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
+      // Create PDF document (Portrait A4 with 35pt margins for neat compact fit)
+      const doc = new PDFDocument({ margin: 35, size: 'A4' });
 
       // Set response headers
       const filename = `rekap-absensi-${String(jabatan || 'all')}-${startDate}-to-${endDate}.pdf`;
@@ -464,12 +464,12 @@ export class ExportController {
       const startY = 35;
       if (hasLogo) {
         // Render logo
-        doc.image(logoPath, 50, startY, { width: 55 });
+        doc.image(logoPath, 35, startY, { width: 50 });
       }
 
       // Kop Surat (Institutional Letterhead) Text
-      const textX = hasLogo ? 120 : 31;
-      const textWidth = hasLogo ? 670 : 780;
+      const textX = hasLogo ? 100 : 35;
+      const textWidth = hasLogo ? 460 : 525;
 
       doc
         .fontSize(11)
@@ -508,21 +508,21 @@ export class ExportController {
         });
 
       // Position below the Kop Surat texts (taking whichever is lower: doc.y or logo bottom)
-      const logoBottomY = startY + 55;
+      const logoBottomY = startY + 50;
       const separatorY = Math.max(doc.y, logoBottomY) + 8;
 
       // Draw Double Line Separator (Thick & Thin)
       doc
         .strokeColor('#0F172A')
         .lineWidth(2.2)
-        .moveTo(31, separatorY)
-        .lineTo(811, separatorY)
+        .moveTo(35, separatorY)
+        .lineTo(560, separatorY)
         .stroke();
       doc
         .strokeColor('#0F172A')
         .lineWidth(0.8)
-        .moveTo(31, separatorY + 3)
-        .lineTo(811, separatorY + 3)
+        .moveTo(35, separatorY + 3)
+        .lineTo(560, separatorY + 3)
         .stroke();
 
       doc.y = separatorY + 8;
@@ -549,9 +549,9 @@ export class ExportController {
       doc.moveDown(0.8);
 
       const tableTop = doc.y;
-      const startX = 31; // Center of Landscape A4 (841.89 - 780) / 2 = 30.94
+      const startX = 35; 
 
-      const colWidths = [40, 265, 110, 85, 90, 95, 95];
+      const colWidths = [30, 185, 65, 55, 65, 60, 65];
       const headers = [
         'No',
         'Nama',
@@ -600,7 +600,7 @@ export class ExportController {
 
       transformedData.forEach((record, index) => {
         // Check if we need a new page
-        if (yPos + rowHeight > 520) {
+        if (yPos + rowHeight > 760) {
           doc.addPage();
           doc.moveDown(1.5);
           const newTableTop = 50;
