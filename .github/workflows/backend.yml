@@ -192,6 +192,7 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
+          ADMIN_REGISTRATION_KEY: ${{ secrets.ADMIN_REGISTRATION_KEY }}
         run: |
           # Fail loudly if any critical secret is missing
           : "${DEPLOY_PATH:?❌ Secret DEPLOY_PATH is not set!}"
@@ -223,6 +224,7 @@ jobs:
              JWT_REFRESH_SECRET='${JWT_REFRESH_SECRET}'
              API_KEY_SECRET='${API_KEY_SECRET}'
              FINGERPRINT_IP='${FINGERPRINT_IP}'
+             ADMIN_REGISTRATION_KEY='${ADMIN_REGISTRATION_KEY}'
              TZ='${TZ:-Asia/Jakarta}'
              POLLING_INTERVAL_MS='${POLLING_INTERVAL_MS:-30000}'
              RECONNECT_DELAY_MS='${RECONNECT_DELAY_MS:-30000}'
@@ -249,21 +251,22 @@ jobs:
                || echo '⚠️ Warning: Failed to update redis service'
 
              echo '🚀 Updating swarm service finger-be_backend...'
-             docker service update --image \"\$BACKEND_IMAGE\" \
-               --env-add PORT=3333 \
-               --env-add TZ=\"\$TZ\" \
-               --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
-               --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
-               --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
-               --env-add REDIS_PASSWORD=\"\$REDIS_PASSWORD\" \
-               --env-add DB_PASSWORD=\"\$DB_PASSWORD\" \
-               --env-add DB_NAME=\"\$DB_NAME\" \
-               --env-add DATABASE_URL=\"mysql://root:\${DB_PASSWORD}@mysql:3306/\${DB_NAME}\" \
-               --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
-               --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
-               --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
-               --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
-               --with-registry-auth finger-be_backend
+              docker service update --image \"\$BACKEND_IMAGE\" \
+                --env-add PORT=3333 \
+                --env-add TZ=\"\$TZ\" \
+                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
+                --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
+                --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
+                --env-add REDIS_PASSWORD=\"\$REDIS_PASSWORD\" \
+                --env-add DB_PASSWORD=\"\$DB_PASSWORD\" \
+                --env-add DB_NAME=\"\$DB_NAME\" \
+                --env-add DATABASE_URL=\"mysql://root:\${DB_PASSWORD}@mysql:3306/\${DB_NAME}\" \
+                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
+                --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
+                --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
+                --env-add ADMIN_REGISTRATION_KEY=\"\$ADMIN_REGISTRATION_KEY\" \
+                --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
+                --with-registry-auth finger-be_backend
 
              echo '✅ Service update stabilized and converged successfully!'
 
@@ -298,6 +301,7 @@ jobs:
 # - JWT_ACCESS_SECRET    : secret untuk access token
 # - JWT_REFRESH_SECRET   : secret untuk refresh token
 # - API_KEY_SECRET       : secret untuk API key
+# - ADMIN_REGISTRATION_KEY : key registrasi untuk admin (contoh: baja2026)
 # ─── Perangkat Fingerprint ───────────────────────────────────────────────────
 # - FINGERPRINT_IP       : IP pintu depan Router Biru (contoh: 172.17.40.214)
 # - POLLING_INTERVAL_MS  : interval polling ZKTeco dalam ms (contoh: 30000)
