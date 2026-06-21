@@ -1,48 +1,63 @@
-// src/server.ts - Entry point aplikasi backend Sistem Rekap Absensi Kampus
+// src/server.ts - Titik masuk (Entry point) utama untuk aplikasi backend Sistem Rekap Absensi Kampus
 import http from 'http';
 import app from './app';
 import logger from './utils/logger';
 
-// Validate environment variables first
+// Memvalidasi variabel lingkungan (environment variables) terlebih dahulu sebelum menjalankan logika lainnya
 import { env } from './config/env';
 
+// Mengambil port dari variabel lingkungan yang sudah divalidasi (default biasanya 3333)
 const PORT = env.PORT;
 
-// Initialize Database Connection via Prisma
+// Mengimpor koneksi database MySQL melalui Prisma ORM
 import prisma from './config/prisma';
+
+// Mengimpor client SDK ZKTeco untuk koneksi ke mesin fingerprint fisik
 import { ZkDeviceClient } from './infrastructure/zk-client';
+
+// Mengimpor layanan sinkronisasi data absensi dari mesin ke MySQL
 import { ZkSyncService } from './services/zk-sync.service';
 
+/**
+ * Fungsi untuk menginisialisasi semua ketergantungan aplikasi (Database dan Koneksi Hardware)
+ */
 const initializeApp = async (): Promise<void> => {
   try {
-    // Test database connection via Prisma
+    // 1. Menguji koneksi ke database MySQL menggunakan Prisma ORM
     await prisma.$connect();
-    logger.info('✅ MySQL connected to database (Prisma)');
+    logger.info('✅ MySQL berhasil terhubung ke database (Prisma)');
 
-    // Initialize and start direct ZKTeco hardware connection daemon
-    const zkClient = ZkDeviceClient.getInstance();
-    const zkSync = new ZkSyncService(zkClient);
-    zkSync.start();
-    await zkClient.start();
-    logger.info('✅ ZKTeco Biometric client started successfully (Direct Hardware Integration)');
+    // 2. Menginisialisasi dan memulai daemon sinkronisasi hardware ZKTeco secara realtime
+    const zkClient = ZkDeviceClient.getInstance(); // Menggunakan pola Singleton untuk mendapatkan instansi client ZKTeco
+    const zkSync = new ZkSyncService(zkClient);    // Membuat instance layanan sinkronisasi dengan client ZKTeco
+    zkSync.start();                                // Memulai loop sinkronisasi/polling data absensi
+    await zkClient.start();                        // Menyalakan koneksi soket ke mesin fingerprint fisik
+    logger.info('✅ Client Biometrik ZKTeco berhasil dinyalakan (Integrasi Hardware Langsung)');
 
-    logger.info('✅ Application initialized successfully');
+    logger.info('✅ Aplikasi berhasil diinisialisasi sepenuhnya');
   } catch (error: any) {
-    logger.error('Failed to initialize application', {
+    // Mencatat log error secara detail jika inisialisasi gagal
+    logger.error('Gagal menginisialisasi aplikasi', {
       error: error.message,
       stack: error.stack,
     });
+    // Menghentikan proses node dengan kode error 1 jika terjadi kegagalan fatal
     process.exit(1);
   }
 };
 
-// Start server
+// Variabel untuk menyimpan instance server HTTP Express
 let server: http.Server | undefined;
 
+/**
+ * Fungsi utama untuk menjalankan server Express dan mulai mendengarkan request HTTP
+ */
 const startServer = async (): Promise<void> => {
   try {
+    // Menjalankan inisialisasi database & koneksi mesin fingerprint terlebih dahulu
     await initializeApp();
 
+    // Menyalakan server HTTP Express pada port yang ditentukan dan mengizinkan akses dari semua host (0.0.0.0)
     server = app.listen(Number(PORT), '0.0.0.0', () => {
       logger.info(`🚀 Server berjalan di port ${PORT} (0.0.0.0)`);
       logger.info(`📊 Environment: ${process.env['NODE_ENV'] || 'development'}`);
@@ -53,14 +68,16 @@ const startServer = async (): Promise<void> => {
       logger.info(`📖 Dokumentasi Lengkap tersedia di: http://localhost:${PORT}/finger-api/docs/`);
     });
 
+    // Menangani error spesifik pada server HTTP
     server.on('error', (error: NodeJS.ErrnoException) => {
+      // Jika port yang dituju sudah digunakan oleh proses/aplikasi lain
       if (error.code === 'EADDRINUSE') {
         logger.error(`❌ Port ${PORT} sudah digunakan!`);
         logger.error(`💡 Solusi: Matikan aplikasi lain di port ${PORT} atau gunakan port berbeda`);
-        logger.error(`   Coba: PORT=3001 npm run dev`);
+        logger.error(`   Coba jalankan dengan: PORT=3001 npm run dev`);
         process.exit(1);
       } else {
-        logger.error('Server error:', {
+        logger.error('Terjadi error pada Server:', {
           error: error.message,
           stack: error.stack,
         });
@@ -68,7 +85,7 @@ const startServer = async (): Promise<void> => {
       }
     });
   } catch (error: any) {
-    logger.error('Failed to start server', {
+    logger.error('Gagal menyalakan server', {
       error: error.message,
       stack: error.stack,
     });
@@ -76,32 +93,36 @@ const startServer = async (): Promise<void> => {
   }
 };
 
-// Graceful shutdown handler
+/**
+ * Fungsi untuk mematikan server secara aman (Graceful Shutdown) saat menerima sinyal terminasi
+ * @param signal Nama sinyal sistem yang diterima (misal SIGTERM, SIGINT)
+ */
 const gracefulShutdown = async (signal: string): Promise<void> => {
-  logger.info(`${signal} received. Starting graceful shutdown...`);
+  logger.info(`Sinyal ${signal} diterima. Memulai proses pemadaman aman (Graceful Shutdown)...`);
 
   if (server) {
-    // Stop accepting new connections
+    // Berhenti menerima koneksi baru dari luar
     server.close(async () => {
-      logger.info('HTTP server closed');
+      logger.info('Server HTTP Express telah ditutup');
 
       try {
-        // Close database connection
+        // Memutus koneksi ke database MySQL secara aman
         await prisma.$disconnect();
+        logger.info('Koneksi database Prisma berhasil diputus secara aman');
 
-        logger.info('Graceful shutdown complete');
+        logger.info('Graceful shutdown selesai. Proses dihentikan.');
         process.exit(0);
       } catch (error: any) {
-        logger.error('Error during graceful shutdown', {
+        logger.error('Error saat memutus koneksi/proses shutdown:', {
           error: error.message,
         });
         process.exit(1);
       }
     });
 
-    // Force shutdown after 10 seconds
+    // Jika proses pemadaman memakan waktu terlalu lama (lebih dari 10 detik), matikan secara paksa
     setTimeout(() => {
-      logger.error('Forced shutdown after timeout');
+      logger.error('Pemadaman paksa dilakukan karena melebihi batas waktu (timeout 10 detik)');
       process.exit(1);
     }, 10000);
   } else {
@@ -109,27 +130,27 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
   }
 };
 
-// Handle shutdown signals
+// Menangani sinyal shutdown dari sistem operasi (misal Ctrl+C atau perintah stop dari Docker Swarm)
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Handle uncaught exceptions
+// Menangani error bertipe "uncaughtException" (error yang tidak ditangkap dalam blok try-catch sinkron)
 process.on('uncaughtException', (error: Error) => {
-  logger.error('Uncaught Exception', {
+  logger.error('Terjadi Uncaught Exception (Error tak tertangani):', {
     error: error.message,
     stack: error.stack,
   });
   gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
-// Handle unhandled promise rejections
+// Menangani unhandled promise rejection (asynchronous error yang tidak di-catch)
 process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-  logger.error('Unhandled Rejection', {
+  logger.error('Terjadi Unhandled Rejection (Rejection Promise tak tertangani):', {
     reason: reason,
     promise: promise,
   });
   gracefulShutdown('UNHANDLED_REJECTION');
 });
 
-// Start the server
+// Menjalankan server HTTP
 startServer();

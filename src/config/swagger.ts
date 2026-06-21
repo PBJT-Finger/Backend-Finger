@@ -2,9 +2,10 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './env';
 
+// Opsi konfigurasi dasar untuk dokumentasi OpenAPI (Swagger)
 const options: swaggerJsdoc.Options = {
   definition: {
-    openapi: '3.0.0',
+    openapi: '3.0.0', // Versi spesifikasi OpenAPI yang digunakan
     info: {
       title: 'API Finger - Sistem Absensi Sidik Jari',
       version: '2.0.0',
@@ -26,21 +27,23 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
         url: 'https://opensource.org/licenses/MIT',
       },
     },
+    // Daftar server/URL dasar backend yang tersedia untuk diuji coba langsung
     servers: [
       {
         url: '/',
-        description: 'Current Environment (Auto-detect)',
+        description: 'Deteksi Otomatis Lingkungan (Auto-detect)',
       },
       {
         url: 'https://finger-be.pbjt.web.id',
-        description: 'Production Server',
+        description: 'Server Produksi (Online)',
       },
       {
         url: `http://localhost:${env.PORT}`,
-        description: 'Local Development Server',
+        description: 'Server Development Lokal (Laptop)',
       },
     ],
 
+    // Daftar Kategori (Tags) untuk mengelompokkan berbagai endpoint API
     tags: [
       {
         name: 'Authentication',
@@ -85,6 +88,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
         description: 'Manajemen data user sidik jari pada perangkat (pull, register, update)',
       },
     ],
+    // Komponen skema data (Reusable Schemas) untuk input/output API
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -95,162 +99,166 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
         },
       },
       schemas: {
+        // Skema untuk data transaksi absensi pegawai
         Attendance: {
           type: 'object',
           properties: {
             id: {
               type: 'integer',
-              description: 'Auto-increment primary key',
+              description: 'Auto-increment primary key (ID Transaksi)',
               example: 1234,
             },
             user_id: {
               type: 'string',
-              description: 'ID pengguna',
+              description: 'ID unik pengguna (NIDN/NIP atau ID Alat)',
               example: '198805121234561001',
             },
             nama: {
               type: 'string',
-              description: 'Nama karyawan/dosen',
+              description: 'Nama lengkap dosen/karyawan',
               example: 'Dr. Budi Santoso, M.Kom',
             },
             jabatan: {
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
-              description: 'Jabatan karyawan',
+              description: 'Jabatan pegawai',
               example: 'KARYAWAN',
             },
             tanggal: {
               type: 'string',
               format: 'date',
-              description: 'Tanggal absensi (YYYY-MM-DD)',
+              description: 'Tanggal absensi (Format: YYYY-MM-DD)',
               example: '2026-01-14',
             },
             jam_masuk: {
               type: 'string',
               format: 'time',
               nullable: true,
-              description: 'Waktu check-in (HH:mm:ss)',
+              description: 'Waktu absen masuk (Format: HH:mm:ss)',
               example: '08:15:00',
             },
             jam_keluar: {
               type: 'string',
               format: 'time',
               nullable: true,
-              description: 'Waktu check-out (HH:mm:ss)',
+              description: 'Waktu absen pulang (Format: HH:mm:ss)',
               example: '16:30:00',
             },
             device_id: {
               type: 'string',
               nullable: true,
-              description: 'ID perangkat absensi',
+              description: 'ID perangkat absensi fisik tempat melakukan tap sidik jari',
               example: 'FP-GEDUNG-A-001',
             },
             cloud_id: {
               type: 'string',
               nullable: true,
-              description: 'ID cloud sistem',
+              description: 'ID integrasi cloud',
               example: 'CLOUD-001',
             },
             verification_method: {
               type: 'string',
-              description: 'Metode verifikasi absensi',
+              description: 'Metode verifikasi (sidik jari, kartu, wajah, kata sandi)',
               example: 'SIDIK_JARI',
             },
             status: {
               type: 'string',
-              description: 'Status kehadiran',
+              description: 'Status kehadiran (Tepat Waktu, Terlambat, dll.)',
               example: 'HADIR',
             },
             is_deleted: {
               type: 'boolean',
-              description: 'Soft delete flag',
+              description: 'Flag untuk soft delete (apakah data sudah dihapus)',
               example: false,
             },
           },
         },
+        // Skema rekapitulasi / ringkasan absensi per pegawai
         AttendanceSummary: {
           type: 'object',
           properties: {
             id: {
               type: 'string',
-              description: 'User ID',
+              description: 'User ID pegawai',
               example: '198805121234561001',
             },
             no: {
               type: 'integer',
-              description: 'Nomor urut',
+              description: 'Nomor urut baris data',
               example: 1,
             },
             nama: {
               type: 'string',
-              description: 'Nama karyawan/dosen',
+              description: 'Nama lengkap dosen/karyawan',
               example: 'Dr. Budi Santoso, M.Kom',
             },
             jabatan: {
               type: 'string',
               enum: ['DOSEN', 'KARYAWAN'],
-              description: 'Jabatan karyawan',
+              description: 'Jabatan pegawai',
               example: 'KARYAWAN',
             },
             totalHadir: {
               type: 'integer',
-              description: 'Jumlah hari hadir (berdasarkan check-in)',
+              description: 'Jumlah hari hadir (berdasarkan absen masuk)',
               example: 18,
             },
             totalHariKerja: {
               type: 'integer',
-              description: 'Total hari kerja dalam periode',
+              description: 'Total hari kerja dalam periode waktu yang dicari',
               example: 18,
             },
             attendanceDates: {
               type: 'string',
-              description: 'Rentang tanggal kehadiran (format Indonesia)',
+              description: 'Rentang tanggal kehadiran (format lokalisasi Indonesia)',
               example: '3 Januari 2026 - 4 Februari 2026',
             },
             lastCheckIn: {
               type: 'string',
               nullable: true,
-              description: 'Waktu check-in terakhir (HH:mm)',
+              description: 'Waktu absen masuk terakhir (format HH:mm)',
               example: '08:10',
             },
             lastCheckOut: {
               type: 'string',
               nullable: true,
-              description: 'Waktu check-out terakhir (HH:mm)',
+              description: 'Waktu absen pulang terakhir (format HH:mm)',
               example: '16:30',
             },
           },
         },
+        // Skema metadata pagination hasil query
         PaginationMeta: {
           type: 'object',
           properties: {
             page: {
               type: 'integer',
-              description: 'Current page number',
+              description: 'Halaman saat ini yang ditampilkan',
               example: 1,
             },
             limit: {
               type: 'integer',
-              description: 'Records per page',
+              description: 'Jumlah baris data per halaman',
               example: 50,
             },
             total: {
               type: 'integer',
-              description: 'Total number of records',
+              description: 'Total seluruh baris data di database',
               example: 150,
             },
             totalPages: {
               type: 'integer',
-              description: 'Total number of pages',
+              description: 'Total halaman yang tersedia',
               example: 3,
             },
             totalWorkingDays: {
               type: 'integer',
-              description: 'Total working days in the period (for summary endpoints)',
+              description: 'Total hari kerja dalam periode pencarian',
               example: 22,
             },
           },
         },
+        // Skema request login admin
         LoginRequest: {
           type: 'object',
           required: ['email', 'password'],
@@ -258,17 +266,18 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             email: {
               type: 'string',
               format: 'email',
-              description: 'Admin email (used for login)',
+              description: 'Email admin untuk login',
               example: 'admin@kampus.edu',
             },
             password: {
               type: 'string',
               format: 'password',
-              description: 'Admin password',
+              description: 'Kata sandi admin',
               example: 'admin123',
             },
           },
         },
+        // Skema response sukses login
         LoginResponse: {
           type: 'object',
           properties: {
@@ -278,7 +287,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             },
             message: {
               type: 'string',
-              example: 'Login successful',
+              example: 'Login berhasil',
             },
             data: {
               type: 'object',
@@ -321,7 +330,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
                     },
                     expires_in: {
                       type: 'integer',
-                      description: 'Access token expiry in seconds',
+                      description: 'Masa kedaluwarsa access token dalam detik',
                       example: 900,
                     },
                   },
@@ -330,6 +339,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             },
           },
         },
+        // Skema error response umum
         ErrorResponse: {
           type: 'object',
           properties: {
@@ -339,7 +349,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             },
             message: {
               type: 'string',
-              example: 'Validation error',
+              example: 'Kesalahan validasi data',
             },
             errors: {
               type: 'array',
@@ -352,13 +362,14 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
                   },
                   message: {
                     type: 'string',
-                    example: 'startDate is required',
+                    example: 'startDate wajib diisi',
                   },
                 },
               },
             },
           },
         },
+        // Skema error validasi input
         ValidationError: {
           type: 'object',
           properties: {
@@ -368,7 +379,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             },
             message: {
               type: 'string',
-              example: 'Input validation failed',
+              example: 'Validasi input gagal',
             },
             errors: {
               type: 'array',
@@ -378,6 +389,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             },
           },
         },
+        // Skema error otorisasi/belum login
         UnauthorizedError: {
           type: 'object',
           properties: {
@@ -387,10 +399,11 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             },
             message: {
               type: 'string',
-              example: 'Unauthorized - Invalid or missing token',
+              example: 'Tidak diizinkan - Token tidak valid atau kosong',
             },
           },
         },
+        // Skema error resource tidak ditemukan
         NotFoundError: {
           type: 'object',
           properties: {
@@ -400,10 +413,11 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             },
             message: {
               type: 'string',
-              example: 'Resource not found',
+              example: 'Data tidak ditemukan',
             },
           },
         },
+        // Skema error limit request terlampaui
         RateLimitError: {
           type: 'object',
           properties: {
@@ -413,14 +427,15 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
             },
             message: {
               type: 'string',
-              example: 'Too many requests from this IP, please try again later',
+              example: 'Terlalu banyak permintaan dari IP ini, silakan coba lagi nanti',
             },
           },
         },
       },
+      // Kumpulan tipe-tipe Response standar HTTP yang sering digunakan
       responses: {
         Unauthorized: {
-          description: 'Unauthorized - Invalid or missing authentication token',
+          description: 'Tidak diizinkan - Token autentikasi tidak valid atau hilang',
           content: {
             'application/json': {
               schema: {
@@ -430,7 +445,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           },
         },
         ValidationError: {
-          description: 'Validation error - Invalid input data',
+          description: 'Kesalahan Validasi - Data input tidak sesuai format',
           content: {
             'application/json': {
               schema: {
@@ -440,7 +455,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           },
         },
         NotFound: {
-          description: 'Resource not found',
+          description: 'Data / Resource tidak ditemukan',
           content: {
             'application/json': {
               schema: {
@@ -450,7 +465,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           },
         },
         RateLimitExceeded: {
-          description: 'Rate limit exceeded',
+          description: 'Batas limit request (Rate Limit) terlampaui',
           content: {
             'application/json': {
               schema: {
@@ -460,7 +475,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
           },
         },
         InternalServerError: {
-          description: 'Internal server error',
+          description: 'Kesalahan internal server',
           content: {
             'application/json': {
               schema: {
@@ -472,7 +487,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
                   },
                   message: {
                     type: 'string',
-                    example: 'Internal server error',
+                    example: 'Terjadi kesalahan internal server',
                   },
                 },
               },
@@ -481,6 +496,7 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
         },
       },
     },
+    // Menerapkan pengaman BearerAuth (token JWT) secara default untuk semua endpoint
     security: [
       {
         bearerAuth: [],
@@ -491,29 +507,31 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
 
 import path from 'path';
 
+// Melakukan inisialisasi modul swagger-jsdoc untuk membaca anotasi JSDoc pada file routes
 export const specs = swaggerJsdoc({
   ...options,
   apis: [path.join(__dirname, '../routes/*.ts'), path.join(__dirname, '../routes/*.js')],
 });
 
+// Opsi kustomisasi antarmuka (UI) Swagger Express
 export const swaggerOptions = {
-  explorer: true,
-  customCssUrl: '/swagger-custom.css',
-  customSiteTitle: 'Finger API • Technical Reference',
-  customfavIcon: 'https://cdn-icons-png.flaticon.com/512/3064/3064155.png',
+  explorer: true, // Menampilkan bilah pencarian endpoint di UI
+  customCssUrl: '/swagger-custom.css', // Menyematkan berkas CSS kustom untuk mempercantik UI
+  customSiteTitle: 'Finger API • Technical Reference', // Mengubah judul tab browser
+  customfavIcon: 'https://cdn-icons-png.flaticon.com/512/3064/3064155.png', // Mengubah icon tab browser
   swaggerOptions: {
-    persistAuthorization: true,
-    displayRequestDuration: true,
-    docExpansion: 'none',
-    filter: true,
+    persistAuthorization: true, // Menyimpan token otorisasi agar tidak hilang saat halaman di-refresh
+    displayRequestDuration: true, // Menampilkan durasi eksekusi request (dalam milidetik)
+    docExpansion: 'none', // Menyembunyikan seluruh modul secara bawaan agar rapi
+    filter: true, // Mengaktifkan pencarian teks di dalam dokumen
     showExtensions: true,
     showCommonExtensions: true,
     syntaxHighlight: {
       activate: true,
-      theme: 'nord',
+      theme: 'nord', // Tema penyorotan sintaks (nord)
     },
-    tryItOutEnabled: true,
-    requestSnippetsEnabled: true,
+    tryItOutEnabled: true, // Mengizinkan pencobaan request langsung dari browser
+    requestSnippetsEnabled: true, // Menampilkan potongan kode (code snippets) untuk memanggil API
     defaultModelsExpandDepth: 2,
     defaultModelExpandDepth: 2,
     displayOperationId: false,

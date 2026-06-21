@@ -7,10 +7,10 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
-// Load environment variables
+// Memuat variabel lingkungan dari file .env
 dotenv.config();
 
-// Import routes
+// Mengimpor router untuk masing-masing modul endpoint API
 import authRoutes from './routes/auth.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import dashboardRoutes from './routes/dashboard.routes';
@@ -20,44 +20,44 @@ import healthRoutes from './routes/health.routes';
 import metricsRoutes from './routes/metrics.routes';
 import employeeRoutes from './routes/employee.routes';
 
-// Import middleware
+// Mengimpor middleware kustom untuk logging request, correlation ID, dan Prometheus metrics
 import { requestLogger } from './middlewares/auth.middleware';
 import { requestCorrelation } from './middlewares/correlation';
 import { metricsMiddleware } from './middlewares/metrics.middleware';
 
-// Import Swagger & Scalar config
+// Mengimpor spesifikasi dokumentasi OpenAPI (Swagger) dan Scalar UI
 import { specs } from './config/swagger';
 import { generateScalarHTML } from './config/scalar.config';
 import { translateTags, translateDescription, getTranslation } from './config/i18n.translations';
 
-// Import logger & prisma
+// Mengimpor modul logger (Pino) dan Prisma client untuk interaksi database
 import logger from './utils/logger';
 import prisma from './config/prisma';
 
-// Import rate limit configurations
+// Mengimpor batasan rate limiting untuk mengamankan API dari serangan brute force/spam
 import { RATE_LIMITS } from './constants/rateLimits';
 
-// Initialize Express app
+// Menginisialisasi aplikasi Express
 const app = express();
 
-// Make logger available to correlation middleware / templates
+// Menyediakan logger ke level lokal aplikasi Express agar bisa diakses oleh middleware lain
 app.locals['logger'] = logger;
 
-// EJS Template Engine Configuration
+// Mengatur template engine EJS (Embedded JavaScript) untuk merender halaman view (jika ada)
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../public/finger-api/docs/views'));
 
-// Trust proxy for secure cookies
+// Memberitahu Express untuk mempercayai proxy (penting jika dideploy di balik Nginx/Load Balancer untuk cookie aman)
 app.set('trust proxy', 1);
 
-// Create rate limiters for different endpoint types
+// Membuat instance rate limiter berdasarkan batas (limit) masing-masing endpoint
 const generalLimiter = rateLimit(RATE_LIMITS.GENERAL_API);
 const authLimiter = rateLimit(RATE_LIMITS.AUTH_LOGIN);
 const exportLimiter = rateLimit(RATE_LIMITS.EXPORT_API);
 const summaryLimiter = rateLimit(RATE_LIMITS.SUMMARY_API);
 const dashboardLimiter = rateLimit(RATE_LIMITS.DASHBOARD_API);
 
-// Middleware keamanan dengan Helmet (Dinonaktifkan sementara atas permintaan user)
+// Middleware keamanan Helmet (dinonaktifkan sementara atas permintaan pengguna untuk mempermudah integrasi frontend lokal)
 /*
 app.use(
   helmet({
@@ -98,7 +98,7 @@ app.use(
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     hsts: {
-      maxAge: 31536000, // 1 year
+      maxAge: 31536000, // 1 tahun
       includeSubDomains: true,
       preload: true,
     },
@@ -107,7 +107,7 @@ app.use(
 );
 */
 
-// Konfigurasi CORS dengan multi-origin support
+// Mendefinisikan asal request (Origins) yang diizinkan mengakses backend lewat CORS
 const allowedOrigins = process.env['CORS_ORIGINS']
   ? process.env['CORS_ORIGINS'].split(',').map((origin) => origin.trim())
   : [
@@ -120,78 +120,78 @@ const allowedOrigins = process.env['CORS_ORIGINS']
 
 const isDevelopment = process.env['NODE_ENV'] !== 'production';
 
+// Menerapkan konfigurasi CORS
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+      // Mengizinkan request tanpa origin (seperti aplikasi mobile, Postman, curl)
       if (!origin) return callback(null, true);
 
-      // In development, allow all localhost origins
+      // Pada mode development, izinkan semua origin localhost dinamis
       if (isDevelopment && origin.startsWith('http://localhost')) {
         return callback(null, true);
       }
 
-      // In production or for non-localhost, check whitelist
+      // Memeriksa apakah origin ada dalam daftar putih (whitelist)
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        logger.warn('CORS blocked request', { origin, allowedOrigins });
-        callback(new Error('Not allowed by CORS'));
+        logger.warn('Request diblokir oleh CORS', { origin, allowedOrigins });
+        callback(new Error('Akses diblokir oleh aturan CORS'));
       }
     },
-    credentials: true,
+    credentials: true, // Mengizinkan pengiriman cookie / header otorisasi
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
-    maxAge: 600, // 10 minutes preflight cache
+    maxAge: 600, // Cache preflight request selama 10 menit
   })
 );
 
-// Request Correlation - Apply EARLY for distributed tracing
+// Menerapkan middleware Correlation ID sedini mungkin untuk penelusuran logs (Distributed Tracing)
 app.use(requestCorrelation);
 
-// Prometheus Metrics - Track all requests
+// Menerapkan middleware pengumpul metrik Prometheus untuk memantau performa request
 app.use(metricsMiddleware);
 
-// Compression — explicitly disabled for SSE (text/event-stream) routes.
-// zlib buffers small writes indefinitely, which silently swallows SSE events
-// and leaves the browser stuck in a "Connecting..." state forever.
+// Konfigurasi Kompresi Gzip - Sengaja dinonaktifkan khusus untuk endpoint Server-Sent Events (SSE)
+// karena kompresi bawaan zlib akan menahan (buffer) data SSE sehingga event live feed tidak akan terkirim
 app.use(
   compression({
     filter: (req, res) => {
-      if (req.headers['accept'] === 'text/event-stream') return false;
+      if (req.headers['accept'] === 'text/event-stream') return false; // Jangan kompres jika SSE
       return compression.filter(req, res);
     },
   })
 );
 
-// Body parsing dengan batas ukuran
+// Konfigurasi parsing body request dengan pembatasan ukuran payload maksimal 10MB
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging
+// Mencatat log untuk setiap incoming HTTP request
 app.use(requestLogger);
 
-// Apply rate limiting to routes
+// Menerapkan rate limiter pada endpoint API tertentu
 app.use('/api/auth', authLimiter);
 app.use('/api/export', exportLimiter);
 app.use('/api/dashboard', dashboardLimiter);
 app.use('/api/attendance/summary', summaryLimiter);
-app.use('/api', generalLimiter); // Catch-all for other API endpoints
+app.use('/api', generalLimiter); // Pembatasan umum untuk endpoint API lainnya
 
-// Serve static files
+// Menyajikan file statis (HTML, CSS, gambar) dari folder public
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Health check routes (no auth required, for monitoring systems)
+// Menyambungkan rute pemeriksaan kesehatan (health check) sistem
 app.use(healthRoutes);
 
-// Metrics endpoint (no auth required, for Prometheus scraper)
+// Menyambungkan rute metrik Prometheus (untuk dimonitor oleh Prometheus scraper)
 app.use(metricsRoutes);
 
-// Readiness check (database connectivity via Prisma)
+// Endpoint kesiapan sistem (Readiness check - menguji apakah database MySQL aktif dan siap menerima query)
 app.get('/ready', async (req: Request, res: Response) => {
   try {
-    // Verify active DB connection with a minimal query
+    // Menjalankan query minimal untuk memastikan koneksi database menyala
     await prisma.$queryRaw`SELECT 1`;
 
     res.json({
@@ -201,7 +201,7 @@ app.get('/ready', async (req: Request, res: Response) => {
       database: 'mysql-connected',
     });
   } catch (error: any) {
-    logger.error('Readiness check failed', { error: error.message });
+    logger.error('Pemeriksaan kesiapan (Readiness check) gagal:', { error: error.message });
     res.status(503).json({
       success: false,
       status: 'not ready',
@@ -212,40 +212,38 @@ app.get('/ready', async (req: Request, res: Response) => {
   }
 });
 
-// Custom minimalist docs landing page (redirect / to docs)
+// Mengalihkan rute beranda utama '/' ke halaman dokumentasi API minimalis
 app.get('/', (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/api-docs.html'));
 });
 
-// ==================== SCALAR API DOCUMENTATION (MODERN UI) ====================
-// Modern, beautiful API documentation with dark teal-purple gradient
+// ==================== DOKUMENTASI API SCALAR (UI MODERN) ====================
+// Menampilkan dokumentasi API interaktif dengan Scalar UI bertema gradien teal-purple
 app.get('/finger-api/docs', (req: Request, res: Response) => {
   const html = generateScalarHTML(specs);
   res.setHeader('Content-Type', 'text/html');
   res.send(html);
 });
 
-// Alternative URL for Scalar docs
+// URL alternatif untuk dokumentasi Scalar
 app.get('/api-docs', (req: Request, res: Response) => {
   const html = generateScalarHTML(specs);
   res.setHeader('Content-Type', 'text/html');
   res.send(html);
 });
 
-// OpenAPI JSON spec endpoint - with language support
+// Endpoint OpenAPI JSON spec - Mendukung lokalisasi/terjemahan bahasa (Indonesian / English)
 app.get('/finger-api/docs-json', (req: Request, res: Response) => {
   const lang = (req.query['lang'] as string) || 'en';
 
-  // Clone specs for modification
+  // Menyalin spesifikasi OpenAPI agar tidak memodifikasi objek asli secara global
   const localizedSpecs = JSON.parse(JSON.stringify(specs));
 
-  // Apply translations if language is Indonesian
+  // Jika parameter bahasa adalah bahasa Indonesia ('id'), terjemahkan deskripsi Swagger
   if (lang === 'id') {
-    // Translate main info
     localizedSpecs.info.title = getTranslation(lang, 'title');
     localizedSpecs.info.description = translateDescription(localizedSpecs.info.description, lang);
 
-    // Translate tags
     if (localizedSpecs.tags) {
       localizedSpecs.tags = translateTags(localizedSpecs.tags, lang);
     }
@@ -255,9 +253,10 @@ app.get('/finger-api/docs-json', (req: Request, res: Response) => {
   res.send(localizedSpecs);
 });
 
+// Mengimpor rute pengoperasian mesin fingerprint
 import deviceRoutes from './routes/device.routes';
 
-// Routes API
+// Menyambungkan semua rute utama API aplikasi backend
 app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -266,13 +265,13 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/device', deviceRoutes);
 
-// Import centralized error handlers
+// Mengimpor middleware penanganan error tersentralisasi
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler.middleware';
 
-// 404 handler - must be after all routes
+// Penanganan rute tidak ditemukan (404 Handler) - Harus diletakkan setelah semua rute terdaftar
 app.use(notFoundHandler);
 
-// Global error handler - must be last
+// Penanganan error global aplikasi (500 Handler) - Harus diletakkan di baris paling akhir
 app.use(errorHandler);
 
 export default app;
