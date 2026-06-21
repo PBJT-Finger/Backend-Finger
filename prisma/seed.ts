@@ -67,14 +67,19 @@ async function main() {
       if (line.startsWith('INSERT INTO')) {
         const match = line.match(/INSERT INTO `([^`]+)`/);
         if (match && match[1]) {
-          if (!inserts[match[1]]) inserts[match[1]] = [];
+          const tableName = match[1];
+          let tableInserts = inserts[tableName];
+          if (!tableInserts) {
+            tableInserts = [];
+            inserts[tableName] = tableInserts;
+          }
           
           let finalLine = line.replace('INSERT INTO', 'INSERT IGNORE INTO');
-          if (match[1] === 'employees') {
+          if (tableName === 'employees') {
             finalLine = line.replace(';', ' ON DUPLICATE KEY UPDATE jabatan=VALUES(jabatan), is_active=VALUES(is_active);');
           }
           
-          inserts[match[1]].push(finalLine);
+          tableInserts.push(finalLine);
         }
       }
     }
