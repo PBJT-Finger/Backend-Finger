@@ -1,144 +1,146 @@
 /**
- * src/config/env.ts — Environment Variable Validation (TypeScript)
+ * src/config/env.ts — Validasi Variabel Lingkungan / Environment Variables (TypeScript)
  *
- * Single source of truth for all runtime configuration.
- * Uses `envalid` to validate at startup — the process will exit with a clear
- * error message if any required variable is missing or malformed.
+ * File ini bertindak sebagai sumber kebenaran tunggal (single source of truth) untuk seluruh
+ * konfigurasi runtime aplikasi. Menggunakan pustaka `envalid` untuk memvalidasi variabel
+ * lingkungan saat server dinyalakan. Jika ada variabel yang wajib diisi namun kosong atau
+ * formatnya salah, server akan langsung berhenti (exit) dengan pesan kesalahan yang jelas.
  *
- * Why envalid over dotenv alone: dotenv just loads values as strings.
- * envalid enforces types, provides defaults, and produces descriptive errors
- * before the application can enter an inconsistent state.
+ * Mengapa menggunakan envalid daripada dotenv saja: dotenv hanya memuat nilai sebagai string biasa.
+ * envalid memaksa tipe data (angka, port, boolean, string), menyediakan nilai default, dan menghasilkan
+ * log error yang deskriptif sebelum aplikasi memasuki kondisi tidak konsisten di lingkungan produksi.
  */
 import dotenv from 'dotenv';
 import { cleanEnv, str, port, num, bool } from 'envalid';
 
-// Load environment variables from .env file
+// Memuat variabel lingkungan dari berkas .env
 dotenv.config();
 
+// Melakukan validasi dan pembersihan (sanitasi) terhadap process.env
 export const env = cleanEnv(process.env, {
-  // ─── Database ────────────────────────────────────────────────────────────────
+  // ─── Database MySQL ──────────────────────────────────────────────────────────
   DB_HOST: str({
-    desc: 'Database host address',
+    desc: 'Alamat host database MySQL',
     default: 'localhost',
   }),
   DB_PORT: port({
-    desc: 'Database port',
+    desc: 'Port database MySQL',
     default: 3306,
   }),
   DB_NAME: str({
-    desc: 'Database name',
+    desc: 'Nama database MySQL yang digunakan',
     example: 'finger_attendance',
   }),
   DB_USERNAME: str({
-    desc: 'Database username',
+    desc: 'Username akses database',
     example: 'finger_user',
   }),
   DB_PASSWORD: str({
-    desc: 'Database password',
+    desc: 'Password akses database',
   }),
 
-  // ─── JWT ─────────────────────────────────────────────────────────────────────
+  // ─── JSON Web Token (JWT) ────────────────────────────────────────────────────
   JWT_ACCESS_SECRET: str({
-    desc: 'Secret key for access token',
+    desc: 'Kunci rahasia untuk menandatangani access token JWT',
   }),
   JWT_REFRESH_SECRET: str({
-    desc: 'Secret key for refresh token',
+    desc: 'Kunci rahasia untuk menandatangani refresh token JWT',
   }),
   JWT_ACCESS_EXPIRES_IN: str({
-    desc: 'Access token expiry time',
+    desc: 'Masa kedaluwarsa access token JWT',
     default: '15m',
   }),
   JWT_REFRESH_EXPIRES_IN: str({
-    desc: 'Refresh token expiry time',
+    desc: 'Masa kedaluwarsa refresh token JWT',
     default: '7d',
   }),
 
-  // ─── Server ──────────────────────────────────────────────────────────────────
+  // ─── Server Express ──────────────────────────────────────────────────────────
   PORT: port({
-    desc: 'Server port number',
+    desc: 'Port server HTTP Express',
     default: 3001,
   }),
   NODE_ENV: str({
-    desc: 'Node environment',
+    desc: 'Mode lingkungan jalannya aplikasi',
     choices: ['development', 'production', 'test'],
     default: 'development',
   }),
 
-  // ─── Security ────────────────────────────────────────────────────────────────
+  // ─── Keamanan Keamanan ───────────────────────────────────────────────────────
   API_KEY_SECRET: str({
-    desc: 'Secret for API key hashing',
+    desc: 'Kunci rahasia untuk hashing/enkripsi API key',
   }),
   CORS_ORIGINS: str({
-    desc: 'Comma-separated list of allowed CORS origins',
+    desc: 'Daftar origin web yang diizinkan melakukan CORS (dipisah koma)',
     default:
       'http://localhost:5555,http://localhost:3000,http://localhost:3333,https://finger.pbjt.web.id,https://finger-be.pbjt.web.id',
   }),
 
-  // ─── Logging ─────────────────────────────────────────────────────────────────
+  // ─── Logging System ──────────────────────────────────────────────────────────
   LOG_LEVEL: str({
-    desc: 'Logging level',
+    desc: 'Tingkatan pencatatan log (logging level)',
     choices: ['error', 'warn', 'info', 'debug'],
     default: 'info',
   }),
 
-  // ─── SMTP / Email ────────────────────────────────────────────────────────────
+  // ─── SMTP / Email (Pengiriman Email Notifikasi) ──────────────────────────────
   SMTP_HOST: str({
-    desc: 'SMTP host server address',
+    desc: 'Alamat server SMTP email',
     default: 'smtp.gmail.com',
   }),
   SMTP_PORT: port({
-    desc: 'SMTP port number',
+    desc: 'Port server SMTP email',
     default: 587,
   }),
   SMTP_SECURE: bool({
-    desc: 'Use secure connection (SSL/TLS)',
+    desc: 'Gunakan koneksi aman SSL/TLS untuk SMTP',
     default: false,
   }),
   SMTP_USER: str({
-    desc: 'SMTP username/auth email',
+    desc: 'Username / email pengirim SMTP',
     default: '',
   }),
   SMTP_PASSWORD: str({
-    desc: 'SMTP authentication password',
+    desc: 'Password aplikasi / password SMTP',
     default: '',
   }),
   EMAIL_FROM: str({
-    desc: 'Sender email address',
+    desc: 'Alamat email pengirim default',
     default: 'noreply@fingerattendance.com',
   }),
   EMAIL_FROM_NAME: str({
-    desc: 'Sender displayed name',
+    desc: 'Nama pengirim default yang ditampilkan di email',
     default: 'Finger Attendance System',
   }),
 
-  // ─── ZKTeco Device (Anti-Corruption Layer) ───────────────────────────────────
+  // ─── Perangkat Fisik ZKTeco (Anti-Corruption Layer) ─────────────────────────
   FINGERPRINT_IP: str({
-    desc: 'IP address of the ZKTeco biometric device on the local network. Must be set in .env — no default allowed.',
+    desc: 'IP address mesin fingerprint ZKTeco di jaringan lokal. Wajib diatur di .env (tidak ada default).',
   }),
   FINGERPRINT_PORT: port({
-    desc: 'UDP port of the ZKTeco device (ZKTeco proprietary protocol)',
+    desc: 'Port komunikasi UDP mesin ZKTeco (protokol bawaan/proprietari ZKTeco)',
     default: 4370,
   }),
   FINGERPRINT_TIMEOUT: num({
-    desc: 'Socket connection timeout in milliseconds',
+    desc: 'Batas waktu koneksi socket ke mesin sidik jari dalam milidetik',
     default: 10_000,
   }),
   POLLING_INTERVAL_MS: num({
-    desc: 'Interval between each ZK device polling cycle in milliseconds. 30s = 2 polls/min — keeps embedded device cool while still feeling real-time for attendance dashboards.',
+    desc: 'Jeda waktu antar siklus polling data mesin dalam milidetik. 30 detik = menjaga perangkat keras tetap dingin sambil tetap terasa realtime untuk dashboard.',
     default: 30_000,
   }),
   RECONNECT_DELAY_MS: num({
-    desc: 'Delay before reconnect attempt after a failed poll cycle in milliseconds. Equal to POLLING_INTERVAL_MS so a failed cycle simply waits one full interval before retrying.',
+    desc: 'Jeda waktu untuk mencoba menghubungkan kembali mesin setelah gagal polling (dalam milidetik).',
     default: 30_000,
   }),
   IN_PORT_TIMEOUT_MS: num({
-    desc: 'Internal ZKLib in-port timeout in milliseconds.',
+    desc: 'Timeout internal soket ZKLib dalam milidetik.',
     default: 5_000,
   }),
 });
 
 /**
- * Typed interface exported for consumers that need explicit typings.
- * Prefer importing `env` directly for most use cases.
+ * Interface bertipe data kuat (strongly typed) untuk kebutuhan di modul lain.
+ * Disarankan mengimpor objek `env` langsung daripada instansi tipe ini.
  */
 export type AppEnv = typeof env;

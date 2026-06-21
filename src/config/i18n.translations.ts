@@ -1,12 +1,14 @@
-// src/config/i18n.translations.ts - Translation Module
+// src/config/i18n.translations.ts - Modul Penerjemah (Lokalisasi / Internationalization) untuk OpenAPI Docs
 
+// Struktur data kontrak untuk objek terjemahan
 interface Translations {
-  title: string;
-  subtitle: string;
-  tags: Record<string, string>;
-  descriptions?: Record<string, string>;
+  title: string; // Judul API
+  subtitle: string; // Subjudul
+  tags: Record<string, string>; // Kamus terjemahan untuk kategori/tag API
+  descriptions?: Record<string, string>; // Kamus terjemahan untuk deskripsi teks API
 }
 
+// Data kamus kata kunci terjemahan untuk bahasa Inggris ('en') dan bahasa Indonesia ('id')
 export const translations: Record<string, Translations> = {
   en: {
     title: 'Finger API',
@@ -41,6 +43,7 @@ export const translations: Record<string, Translations> = {
       'ZK Devices': 'Perangkat ZK',
       'Health & Monitoring': 'Kesehatan & Monitoring',
     },
+    // Pemetaan frasa bahasa Inggris ke padanan bahasa Indonesia agar Scalar UI dapat menampilkan teks berbahasa lokal
     descriptions: {
       'Enterprise Attendance Management System': 'Sistem Manajemen Absensi Enterprise',
       'Finger API': 'API Finger',
@@ -64,7 +67,10 @@ export const translations: Record<string, Translations> = {
 };
 
 /**
- * Get translation for a given key
+ * Mengambil kata/frasa terjemahan berdasarkan parameter bahasa, kata kunci, dan kategori
+ * @param lang Kode bahasa ('en' atau 'id')
+ * @param key Kata kunci yang ingin diterjemahkan
+ * @param category Kategori terjemahan ('tags' atau 'descriptions')
  */
 export function getTranslation(
   lang: string,
@@ -72,7 +78,7 @@ export function getTranslation(
   category: 'tags' | 'descriptions' | null = null
 ): string {
   const langData = translations[lang];
-  if (!langData) return key;
+  if (!langData) return key; // Kembalikan kata kunci asli jika data bahasa tidak ditemukan
 
   if (category) {
     if (category === 'tags') {
@@ -90,6 +96,7 @@ export function getTranslation(
   return key;
 }
 
+// Struktur data tag bawaan spesifikasi OpenAPI
 interface OpenAPITag {
   name: string;
   description: string;
@@ -97,13 +104,15 @@ interface OpenAPITag {
 }
 
 /**
- * Translate OpenAPI spec tags
+ * Menerjemahkan seluruh daftar Kategori/Tag pada spesifikasi OpenAPI ke bahasa sasaran
+ * @param tags Array objek tag OpenAPI
+ * @param lang Bahasa tujuan ('en' / 'id')
  */
 export function translateTags(tags: OpenAPITag[], lang: string): OpenAPITag[] {
-  if (lang === 'en') return tags;
+  if (lang === 'en') return tags; // Tidak perlu menerjemahkan jika bahasa adalah Inggris
 
   return tags.map((tag) => {
-    // Remove emoji from name
+    // Menghilangkan simbol emoji dari nama kategori agar proses pencocokan kamus berjalan lancar
     const cleanName = tag.name.replace(/[^\w\s&-]/g, '').trim();
     const translatedName = getTranslation(lang, cleanName, 'tags');
     const translatedDesc = getTranslation(lang, tag.description, 'descriptions');
@@ -117,7 +126,9 @@ export function translateTags(tags: OpenAPITag[], lang: string): OpenAPITag[] {
 }
 
 /**
- * Translate spec description
+ * Menerjemahkan paragraf deskripsi spesifikasi API dengan cara mencari dan mengganti frasa bahasa Inggris dengan bahasa Indonesia
+ * @param description Teks deskripsi asli dalam bahasa Inggris
+ * @param lang Bahasa tujuan ('en' / 'id')
  */
 export function translateDescription(description: string, lang: string): string {
   if (lang === 'en') return description;
@@ -126,6 +137,7 @@ export function translateDescription(description: string, lang: string): string 
   const langData = translations[lang];
   const descs = langData ? langData.descriptions : null;
 
+  // Melakukan iterasi untuk mengganti seluruh frasa yang cocok menggunakan regular expression global
   if (descs) {
     for (const [key, value] of Object.entries(descs)) {
       translated = translated.replace(new RegExp(key, 'g'), value);
