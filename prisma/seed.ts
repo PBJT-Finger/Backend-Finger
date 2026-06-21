@@ -45,9 +45,9 @@ async function main() {
   console.log(`Upserted device: ${device.device_name}`);
 
   // 3. Import SQL Dump safely (DO THIS FIRST to preserve DOSEN roles)
-  const sqlPath = path.join(process.cwd(), 'fingerprint_db_local.sql');
+  const sqlPath = path.join(process.cwd(), 'fingerprint_db.sql');
   if (fs.existsSync(sqlPath)) {
-    console.log('Found fingerprint_db_local.sql. Extracting and running INSERT statements safely...');
+    console.log('Found fingerprint_db.sql. Extracting and running INSERT statements safely...');
     
     const buffer = fs.readFileSync(sqlPath);
     let sqlContent = '';
@@ -112,7 +112,7 @@ async function main() {
     }
     console.log(`Successfully executed ${insertCount} bulk INSERT blocks from SQL dump.`);
   } else {
-    console.log('No fingerprint_db_local.sql found. Skipping SQL import.');
+    console.log('No fingerprint_db.sql found. Skipping SQL import.');
   }
 
   // 4. Import Users from Device JSON
