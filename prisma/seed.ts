@@ -61,16 +61,37 @@ async function main() {
     // Split the file by newlines
     const lines = sqlContent.split(/\r?\n/);
     
-    let insertCount = 0;
+    // Group INSERT statements by table name
+    const inserts: Record<string, string> = {};
     for (const line of lines) {
       if (line.startsWith('INSERT INTO')) {
-        // Convert 'INSERT INTO' to 'INSERT IGNORE INTO' to prevent duplicate primary key errors
-        const safeQuery = line.replace('INSERT INTO', 'INSERT IGNORE INTO');
+        const match = line.match(/INSERT INTO `([^`]+)`/);
+        if (match && match[1]) {
+          inserts[match[1]] = line.replace('INSERT INTO', 'INSERT IGNORE INTO');
+        }
+      }
+    }
+
+    // Execute in dependency order
+    const tableOrder = [
+      'shifts',
+      'devices',
+      'admins',
+      'employees',
+      'holidays',
+      'password_resets',
+      'attendance'
+    ];
+
+    let insertCount = 0;
+    for (const table of tableOrder) {
+      if (inserts[table]) {
         try {
-          await prisma.$executeRawUnsafe(safeQuery);
+          console.log(`Inserting data for table: ${table}...`);
+          await prisma.$executeRawUnsafe(inserts[table]);
           insertCount++;
         } catch (err: any) {
-          console.error(`Failed to execute an INSERT statement:`, err.message);
+          console.error(`Failed to execute INSERT for ${table}:`, err.message);
         }
       }
     }
