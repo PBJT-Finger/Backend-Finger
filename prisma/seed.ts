@@ -62,12 +62,19 @@ async function main() {
     const lines = sqlContent.split(/\r?\n/);
     
     // Group INSERT statements by table name
-    const inserts: Record<string, string> = {};
+    const inserts: Record<string, string[]> = {};
     for (const line of lines) {
       if (line.startsWith('INSERT INTO')) {
         const match = line.match(/INSERT INTO `([^`]+)`/);
         if (match && match[1]) {
-          inserts[match[1]] = line.replace('INSERT INTO', 'INSERT IGNORE INTO');
+          if (!inserts[match[1]]) inserts[match[1]] = [];
+          
+          let finalLine = line.replace('INSERT INTO', 'INSERT IGNORE INTO');
+          if (match[1] === 'employees') {
+            finalLine = line.replace(';', ' ON DUPLICATE KEY UPDATE jabatan=VALUES(jabatan), is_active=VALUES(is_active);');
+          }
+          
+          inserts[match[1]].push(finalLine);
         }
       }
     }
@@ -87,15 +94,17 @@ async function main() {
     for (const table of tableOrder) {
       if (inserts[table]) {
         try {
-          console.log(`Inserting data for table: ${table}...`);
-          await prisma.$executeRawUnsafe(inserts[table]);
+          console.log(`Inserting data for table: ${table} (${inserts[table].length} batches)...`);
+          for (const sqlLine of inserts[table]) {
+            await prisma.$executeRawUnsafe(sqlLine);
+          }
           insertCount++;
         } catch (err: any) {
           console.error(`Failed to execute INSERT for ${table}:`, err.message);
         }
       }
     }
-    console.log(`Successfully executed ${insertCount} bulk INSERT statements from SQL dump.`);
+    console.log(`Successfully executed ${insertCount} bulk INSERT blocks from SQL dump.`);
   } else {
     console.log('No finger_db_local.sql found. Skipping SQL import.');
   }
