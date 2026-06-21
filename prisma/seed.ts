@@ -85,7 +85,41 @@ async function main() {
   console.log(`Upserted ${employees.length} employees from device.`);
 
   // 4. Generate Mock Attendance for the last 30 days
-  console.log('Skipping mock attendance generation for production.');
+  // 5. Import SQL Dump safely
+  const sqlPath = path.join(__dirname, '../finger_db_local.sql');
+  if (fs.existsSync(sqlPath)) {
+    console.log('Found finger_db_local.sql. Extracting and running INSERT statements safely...');
+    
+    const buffer = fs.readFileSync(sqlPath);
+    let sqlContent = '';
+    // Check for UTF-16 LE BOM (FF FE)
+    if (buffer[0] === 0xff && buffer[1] === 0xfe) {
+      sqlContent = buffer.toString('utf16le');
+    } else {
+      sqlContent = buffer.toString('utf-8');
+    }
+    
+    // Split the file by newlines
+    const lines = sqlContent.split(/\r?\n/);
+    
+    let insertCount = 0;
+    for (const line of lines) {
+      if (line.startsWith('INSERT INTO')) {
+        // Convert 'INSERT INTO' to 'INSERT IGNORE INTO' to prevent duplicate primary key errors
+        const safeQuery = line.replace('INSERT INTO', 'INSERT IGNORE INTO');
+        try {
+          await prisma.$executeRawUnsafe(safeQuery);
+          insertCount++;
+        } catch (err: any) {
+          console.error(`Failed to execute an INSERT statement:`, err.message);
+        }
+      }
+    }
+    console.log(`Successfully executed ${insertCount} bulk INSERT statements from SQL dump.`);
+  } else {
+    console.log('No finger_db_local.sql found. Skipping SQL import.');
+  }
+
   console.log('Seed completed successfully!');
 }
 
