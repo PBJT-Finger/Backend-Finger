@@ -50,8 +50,7 @@ COPY --chown=express:nodejs public ./dist/public
 # Copy application files
 COPY --chown=express:nodejs prisma ./prisma/
 COPY --chown=express:nodejs package.json ./
-
-# Create required directories before switching to non-root user
+COPY --chown=express:nodejs finger_db_local.sql ./
 RUN mkdir -p exports logs && chown -R express:nodejs exports logs
 
 # Switch to non-root user
