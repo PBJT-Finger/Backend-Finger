@@ -11,6 +11,7 @@ on:
       - 'Dockerfile'
       - '.github/workflows/backend.yml'
       - 'public/**'
+      - 'fingerprint_db.sql'
   pull_request:
     branches: [main]
     paths:
@@ -297,6 +298,7 @@ jobs:
 # ─── Database ────────────────────────────────────────────────────────────────
 # - DB_PASSWORD          : password MySQL
 # - DB_NAME              : nama database (contoh: finger_db)
+# Backup file database lokal tersimpan di: fingerprint_db.sql
 # ─── Aplikasi ────────────────────────────────────────────────────────────────
 # - JWT_ACCESS_SECRET    : secret untuk access token
 # - JWT_REFRESH_SECRET   : secret untuk refresh token
