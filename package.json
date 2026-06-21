@@ -1,6 +1,7 @@
 {
   "name": "backend-finger",
   "version": "1.0.0",
+
   "description": "Backend system for managing campus attendance records.",
   "main": "src/server.ts",
   "scripts": {
