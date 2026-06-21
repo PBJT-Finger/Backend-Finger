@@ -4,7 +4,7 @@
   "description": "Backend system for managing campus attendance records.",
   "main": "src/server.ts",
   "scripts": {
-    "start": "node dist/src/server.js",
+    "start": "npx prisma db seed && node dist/src/server.js",
     "dev": "tsx watch src/server.ts",
     "build": "rimraf dist && tsc --project tsconfig.json",
     "type-check": "tsc --noEmit",
