@@ -92,10 +92,11 @@ async function main() {
 
     let insertCount = 0;
     for (const table of tableOrder) {
-      if (inserts[table]) {
+      const tableInserts = inserts[table];
+      if (tableInserts) {
         try {
-          console.log(`Inserting data for table: ${table} (${inserts[table].length} batches)...`);
-          for (const sqlLine of inserts[table]) {
+          console.log(`Inserting data for table: ${table} (${tableInserts.length} batches)...`);
+          for (const sqlLine of tableInserts) {
             await prisma.$executeRawUnsafe(sqlLine);
           }
           insertCount++;
