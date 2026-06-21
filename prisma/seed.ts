@@ -45,7 +45,7 @@ async function main() {
   console.log(`Upserted device: ${device.device_name}`);
 
   // 3. Import SQL Dump safely (DO THIS FIRST to preserve DOSEN roles)
-  const sqlPath = path.join(__dirname, '../finger_db_local.sql');
+  const sqlPath = path.join(process.cwd(), 'finger_db_local.sql');
   if (fs.existsSync(sqlPath)) {
     console.log('Found finger_db_local.sql. Extracting and running INSERT statements safely...');
     
@@ -101,7 +101,7 @@ async function main() {
   }
 
   // 4. Import Users from Device JSON
-  const jsonPath = path.join(__dirname, '../seeds/employees_from_device.json');
+  const jsonPath = path.join(process.cwd(), 'seeds/employees_from_device.json');
   let rawUsers: { userId: string; name: string }[] = [];
   if (fs.existsSync(jsonPath)) {
     const rawData = fs.readFileSync(jsonPath, 'utf-8');
