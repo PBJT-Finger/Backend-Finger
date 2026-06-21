@@ -12,7 +12,7 @@ async function checkDatabase() {
     const totalShifts = await prisma.shifts.count();
     const totalAdmins = await prisma.admins.count();
 
-    console.log('\n--- Status Database (finger_db) ---');
+    console.log('\n--- Status Database (fingerprint_db) ---');
     console.log(`- Jumlah Pegawai/Karyawan : ${totalEmployees}`);
     console.log(`- Jumlah Data Absensi     : ${totalAttendance}`);
     console.log(`- Jumlah Data Shift       : ${totalShifts}`);
@@ -21,10 +21,10 @@ async function checkDatabase() {
 
     if (totalEmployees === 0 && totalAttendance === 0) {
       console.log('\n❌ KESIMPULAN: Database masih kosong.');
-      console.log('Data dari finger_db_local.sql BELUM masuk ke server MySQL Anda.');
+      console.log('Data dari fingerprint_db_local.sql BELUM masuk ke server MySQL Anda.');
     } else {
       console.log('\n✅ KESIMPULAN: Database sudah terisi.');
-      console.log('Data dari finger_db_local.sql KEMUNGKINAN BESAR SUDAH masuk ke server Anda.');
+      console.log('Data dari fingerprint_db_local.sql KEMUNGKINAN BESAR SUDAH masuk ke server Anda.');
     }
 
   } catch (error) {

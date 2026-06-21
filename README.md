@@ -119,12 +119,12 @@ Salin `.env.example` ke `.env` lalu isi:
 # DATABASE — sesuaikan dengan MySQL kamu (Untuk Laragon biarkan DB_PASSWORD kosong)
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=finger_db
+DB_NAME=fingerprint_db
 DB_USERNAME=root
 DB_PASSWORD=
 
 # DATABASE URL
-DATABASE_URL=mysql://root:@localhost:3306/finger_db
+DATABASE_URL=mysql://root:@localhost:3306/fingerprint_db
 
 # JWT & KEY
 JWT_ACCESS_SECRET=isi_dengan_kalimat_sandi_yang_panjang_dan_rumit
@@ -138,7 +138,7 @@ FINGERPRINT_PORT=4370
 
 ### 3. Setup Database (Pastikan MySQL Menyala!)
 
-1. Buat database: `CREATE DATABASE finger_db;` di Laragon/phpMyAdmin.
+1. Buat database: `CREATE DATABASE fingerprint_db;` di Laragon/phpMyAdmin.
 2. Push skema: `npx prisma db push`
 3. Masukkan data dummy/awal: `npm run db:setup`
 
@@ -242,7 +242,7 @@ Memanajemen hak akses dashboard web.
 | Variabel | Wajib | Default | Keterangan |
 |---|---|---|---|
 | `DB_HOST` | ✅ | `localhost` | Host MySQL |
-| `DATABASE_URL` | ✅ | — | Prisma connection string (mysql://root:@localhost:3306/finger_db) |
+| `DATABASE_URL` | ✅ | — | Prisma connection string (mysql://root:@localhost:3306/fingerprint_db) |
 | `PORT` | ❌ | `3333` | Port server API |
 | `JWT_ACCESS_SECRET` | ✅ | — | Secret token akses (min. 32 char) |
 | `FINGERPRINT_IP` | ✅ | `175.17.5.50` | IP perangkat ZKTeco di LAN |

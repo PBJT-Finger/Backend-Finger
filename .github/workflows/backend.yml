@@ -297,7 +297,7 @@ jobs:
 # - GHCR_USERNAME        : GitHub username pemilik package
 # ─── Database ────────────────────────────────────────────────────────────────
 # - DB_PASSWORD          : password MySQL
-# - DB_NAME              : nama database (contoh: finger_db)
+# - DB_NAME              : nama database (contoh: fingerprint_db)
 # Backup file database lokal tersimpan di: fingerprint_db.sql
 # ─── Aplikasi ────────────────────────────────────────────────────────────────
 # - JWT_ACCESS_SECRET    : secret untuk access token

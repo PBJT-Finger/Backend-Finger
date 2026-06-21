@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME:-finger_db}
+      MYSQL_DATABASE: ${DB_NAME:-fingerprint_db}
       MYSQL_USER: ${DB_USERNAME:-finger_user}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:

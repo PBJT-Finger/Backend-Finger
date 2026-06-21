@@ -158,10 +158,10 @@ async function main(): Promise<void> {
     console.log(`[✓] SQL seed tersimpan   : ${OUTPUT_FILE}`);
 
     console.log('\n[SELESAI] Untuk import ke MySQL jalankan:');
-    console.log(`  mysql -u root -p finger_db < ${OUTPUT_FILE}`);
+    console.log(`  mysql -u root -p fingerprint_db < ${OUTPUT_FILE}`);
     console.log('\nAtau dari dalam container Docker:');
     console.log(
-      '  docker exec -i finger-be_mysql mysql -uroot -p<password> finger_db < seeds/employees_from_device.sql'
+      '  docker exec -i finger-be_mysql mysql -uroot -p<password> fingerprint_db < seeds/employees_from_device.sql'
     );
   } catch (err) {
     console.error('\n[ERROR] Gagal terhubung ke alat fingerprint:');
