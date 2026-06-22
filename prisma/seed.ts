@@ -139,12 +139,12 @@ async function main() {
     const emp = await prisma.employees.upsert({
       where: { user_id: u.userId },
       update: {
-        nama: u.name,
+        ...(u.name && u.name.trim() !== '' ? { nama: u.name } : {}),
         is_active: true,
       },
       create: {
         user_id: u.userId,
-        nama: u.name,
+        nama: (u.name && u.name.trim() !== '') ? u.name : `Karyawan_${u.userId}`,
         jabatan: employees_jabatan.KARYAWAN,
         shift_id: shift.id,
         status: employees_status.AKTIF,
