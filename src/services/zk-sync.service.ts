@@ -171,30 +171,23 @@ export class ZkSyncService {
     // so that when Prisma returns it and we call getUTCHours(), it returns the exact local time.
     const timePart = new Date(Date.UTC(1970, 0, 1, localHour, localMinute, localSecond));
 
-    // ─── Determine masuk/keluar from device attendanceType ───────────────────
-    // ZKTeco punch type (byte 26 of 40-byte record):
-    //   0=Check-In, 1=Check-Out, 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out
-    // Type 1 and 5 are "keluar" variants; all others treated as masuk.
-    const isKeluar = record.attendanceType === 1 || record.attendanceType === 5;
+    // ─── Logika Pencegahan Duplikasi (Pak Dani) ───────────────────
+    // Aturan: Maksimal 1 scan untuk sesi pagi (Check-In) dan 1 scan untuk sesi sore (Check-Out).
+    // Implementasi:
+    // 1. Scan pertama di hari tersebut selalu menjadi jam_masuk.
+    // 2. Scan berikutnya yang berjarak kurang dari 2 jam (120 menit) dianggap duplikat (Abaikan).
+    // 3. Scan yang berjarak lebih dari 2 jam mengisi jam_keluar.
+    // 4. Jika jam_keluar sudah terisi, abaikan scan selanjutnya.
 
-    const existingExact = await prisma.attendance.findFirst({
+    const existingRecord = await prisma.attendance.findFirst({
       where: {
         user_id: resolvedUserId,
         tanggal: tanggal,
-        OR: [
-          { jam_masuk: timePart },
-          { jam_keluar: timePart }
-        ]
       }
     });
 
-    if (existingExact) {
-      // Prevent exact duplicate processing (replay from ZKTeco memory)
-      return;
-    }
-
-    if (!isKeluar) {
-      // It's a Check-In scan
+    if (!existingRecord) {
+      // Belum ada data hari ini -> Buat sebagai Check-In (jam_masuk)
       const shiftStartHour = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCHours() : 8;
       const shiftStartMinute = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCMinutes() : 0;
       const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
@@ -216,28 +209,42 @@ export class ZkSyncService {
           status_keluar: 'HADIR',
         },
       });
-    } else {
-      // It's a Check-Out scan
+      return;
+    }
+
+    // Jika data sudah ada, cek rentang waktu dengan jam_masuk
+    if (existingRecord.jam_masuk) {
+      const existingMasuk = new Date(existingRecord.jam_masuk);
+      const existingScanMinutes = existingMasuk.getUTCHours() * 60 + existingMasuk.getUTCMinutes();
+      const currentScanMinutes = localHour * 60 + localMinute;
+      const diffMinutes = Math.abs(currentScanMinutes - existingScanMinutes);
+
+      // Jika scan berjarak kurang dari 2 jam (120 menit), anggap sebagai duplikasi dari sesi yang sama (Abaikan)
+      if (diffMinutes < 120) {
+        return;
+      }
+    }
+
+    // Jika lebih dari 2 jam, maka ini adalah scan sesi akhir (Check-Out)
+    if (!existingRecord.jam_keluar) {
       const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
       const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
-      const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
+      const scanMinutes = localHour * 60 + localMinute;
       const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
       const afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
 
-      await prisma.attendance.create({
+      await prisma.attendance.update({
+        where: { id: existingRecord.id },
         data: {
-          user_id: resolvedUserId,
-          nama: resolvedName,
-          jabatan: resolvedJabatan,
-          tanggal: tanggal,
-          jam_masuk: null,
           jam_keluar: timePart,
-          device_id: record.ip,
-          verification_method: 'SIDIK_JARI',
-          status: 'HADIR',
           status_keluar: afternoonStatus,
+          device_id: record.ip,
         },
       });
+    } else {
+      // jam_keluar sudah terisi, artinya sudah ada 1 rekam pagi dan 1 rekam sore.
+      // Scan ketiga, keempat, dst pada sesi sore akan diabaikan.
+      return;
     }
   }
 }
