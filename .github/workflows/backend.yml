@@ -147,22 +147,30 @@ jobs:
           : "${DB_NAME:?❌ Secret DB_NAME is not set!}"
           : "${SSH_PORT:?❌ Secret SSH_PORT is not set!}"
 
+          # Base64 encode secrets to prevent shell injection
+          B64_DEPLOY_PATH=$(echo -n "${DEPLOY_PATH}" | base64 -w 0)
+          B64_DB_PASSWORD=$(echo -n "${DB_PASSWORD}" | base64 -w 0)
+          B64_DB_NAME=$(echo -n "${DB_NAME}" | base64 -w 0)
+
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
             -p "${SSH_PORT}" \
             "${SSH_USER}@${SSH_HOST}" \
             "set -e
-             DEPLOY_PATH='${DEPLOY_PATH}'
-             DB_PASSWORD='${DB_PASSWORD}'
-             DB_NAME='${DB_NAME}'
+             DEPLOY_PATH=\$(echo '${B64_DEPLOY_PATH}' | base64 -d)
+             DB_PASSWORD=\$(echo '${B64_DB_PASSWORD}' | base64 -d)
+             DB_NAME=\$(echo '${B64_DB_NAME}' | base64 -d)
+             
              echo '🔍 Preflight checks started...'
 
              [ -d \"\$DEPLOY_PATH\" ] || { echo '❌ Deploy dir not found: '\$DEPLOY_PATH; exit 1; }
              cd \"\$DEPLOY_PATH\"
 
              echo '🔐 Generating .env.docker...'
-             echo \"DATABASE_URL=mysql://root:\${DB_PASSWORD}@mysql:3306/\${DB_NAME}\" > .env.docker
+             ENCODED_DB_PASS=\$(jq -nr --arg v \"\$DB_PASSWORD\" '\$v|@uri')
+             DATABASE_URL=\"mysql://root:\${ENCODED_DB_PASS}@mysql:3306/\${DB_NAME}\"
+             echo \"DATABASE_URL=\$DATABASE_URL\" > .env.docker
              echo \"DB_PASSWORD=\${DB_PASSWORD}\" >> .env.docker
              echo \"DB_NAME=\${DB_NAME}\" >> .env.docker
              echo \"DB_USERNAME=root\" >> .env.docker
@@ -206,29 +214,48 @@ jobs:
           IMG_REPO=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
           BACKEND_IMAGE="${IMG_REPO}:${IMAGE_TAG}"
 
+          # Base64 encode secrets to prevent shell injection
+          B64_DEPLOY_PATH=$(echo -n "${DEPLOY_PATH}" | base64 -w 0)
+          B64_BACKEND_IMAGE=$(echo -n "${BACKEND_IMAGE}" | base64 -w 0)
+          B64_GHCR_PAT=$(echo -n "${GHCR_PAT}" | base64 -w 0)
+          B64_GHCR_USER=$(echo -n "${GHCR_USER}" | base64 -w 0)
+          B64_IMG_REPO=$(echo -n "${IMG_REPO}" | base64 -w 0)
+          B64_IMAGE_TAG=$(echo -n "${IMAGE_TAG}" | base64 -w 0)
+          B64_DB_PASSWORD=$(echo -n "${DB_PASSWORD}" | base64 -w 0)
+          B64_DB_NAME=$(echo -n "${DB_NAME}" | base64 -w 0)
+          B64_REDIS_PASSWORD=$(echo -n "${REDIS_PASSWORD}" | base64 -w 0)
+          B64_JWT_ACCESS_SECRET=$(echo -n "${JWT_ACCESS_SECRET}" | base64 -w 0)
+          B64_JWT_REFRESH_SECRET=$(echo -n "${JWT_REFRESH_SECRET}" | base64 -w 0)
+          B64_API_KEY_SECRET=$(echo -n "${API_KEY_SECRET}" | base64 -w 0)
+          B64_FINGERPRINT_IP=$(echo -n "${FINGERPRINT_IP}" | base64 -w 0)
+          B64_ADMIN_REGISTRATION_KEY=$(echo -n "${ADMIN_REGISTRATION_KEY}" | base64 -w 0)
+          B64_TZ=$(echo -n "${TZ:-Asia/Jakarta}" | base64 -w 0)
+          B64_POLLING_INTERVAL_MS=$(echo -n "${POLLING_INTERVAL_MS:-30000}" | base64 -w 0)
+          B64_RECONNECT_DELAY_MS=$(echo -n "${RECONNECT_DELAY_MS:-30000}" | base64 -w 0)
+
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
             -p "${SSH_PORT}" \
             "${SSH_USER}@${SSH_HOST}" \
             "set -e
-             DEPLOY_PATH='${DEPLOY_PATH}'
-             BACKEND_IMAGE='${BACKEND_IMAGE}'
-             GHCR_PAT='${GHCR_PAT}'
-             GHCR_USER='${GHCR_USER}'
-             IMG_REPO='${IMG_REPO}'
-             IMAGE_TAG='${IMAGE_TAG}'
-             DB_PASSWORD='${DB_PASSWORD}'
-             DB_NAME='${DB_NAME}'
-             REDIS_PASSWORD='${REDIS_PASSWORD}'
-             JWT_ACCESS_SECRET='${JWT_ACCESS_SECRET}'
-             JWT_REFRESH_SECRET='${JWT_REFRESH_SECRET}'
-             API_KEY_SECRET='${API_KEY_SECRET}'
-             FINGERPRINT_IP='${FINGERPRINT_IP}'
-             ADMIN_REGISTRATION_KEY='${ADMIN_REGISTRATION_KEY}'
-             TZ='${TZ:-Asia/Jakarta}'
-             POLLING_INTERVAL_MS='${POLLING_INTERVAL_MS:-30000}'
-             RECONNECT_DELAY_MS='${RECONNECT_DELAY_MS:-30000}'
+             DEPLOY_PATH=\$(echo '${B64_DEPLOY_PATH}' | base64 -d)
+             BACKEND_IMAGE=\$(echo '${B64_BACKEND_IMAGE}' | base64 -d)
+             GHCR_PAT=\$(echo '${B64_GHCR_PAT}' | base64 -d)
+             GHCR_USER=\$(echo '${B64_GHCR_USER}' | base64 -d)
+             IMG_REPO=\$(echo '${B64_IMG_REPO}' | base64 -d)
+             IMAGE_TAG=\$(echo '${B64_IMAGE_TAG}' | base64 -d)
+             DB_PASSWORD=\$(echo '${B64_DB_PASSWORD}' | base64 -d)
+             DB_NAME=\$(echo '${B64_DB_NAME}' | base64 -d)
+             REDIS_PASSWORD=\$(echo '${B64_REDIS_PASSWORD}' | base64 -d)
+             JWT_ACCESS_SECRET=\$(echo '${B64_JWT_ACCESS_SECRET}' | base64 -d)
+             JWT_REFRESH_SECRET=\$(echo '${B64_JWT_REFRESH_SECRET}' | base64 -d)
+             API_KEY_SECRET=\$(echo '${B64_API_KEY_SECRET}' | base64 -d)
+             FINGERPRINT_IP=\$(echo '${B64_FINGERPRINT_IP}' | base64 -d)
+             ADMIN_REGISTRATION_KEY=\$(echo '${B64_ADMIN_REGISTRATION_KEY}' | base64 -d)
+             TZ=\$(echo '${B64_TZ}' | base64 -d)
+             POLLING_INTERVAL_MS=\$(echo '${B64_POLLING_INTERVAL_MS}' | base64 -d)
+             RECONNECT_DELAY_MS=\$(echo '${B64_RECONNECT_DELAY_MS}' | base64 -d)
 
              cd \"\$DEPLOY_PATH\"
 
@@ -252,28 +279,33 @@ jobs:
                || echo '⚠️ Warning: Failed to update redis service'
 
              echo '🚀 Updating swarm service finger-be_backend...'
-              docker service update --image \"\$BACKEND_IMAGE\" \
-                --env-add PORT=3333 \
-                --env-add TZ=\"\$TZ\" \
-                --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
-                --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
-                --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
-                --env-add REDIS_PASSWORD=\"\$REDIS_PASSWORD\" \
-                --env-add DB_PASSWORD=\"\$DB_PASSWORD\" \
-                --env-add DB_NAME=\"\$DB_NAME\" \
-                --env-add DATABASE_URL=\"mysql://root:\${DB_PASSWORD}@mysql:3306/\${DB_NAME}\" \
-                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
-                --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
-                --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
-                --env-add ADMIN_REGISTRATION_KEY=\"\$ADMIN_REGISTRATION_KEY\" \
-                --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
-                --with-registry-auth finger-be_backend
+             ENCODED_DB_PASS=\$(jq -nr --arg v \"\$DB_PASSWORD\" '\$v|@uri')
+             DATABASE_URL=\"mysql://root:\${ENCODED_DB_PASS}@mysql:3306/\${DB_NAME}\"
+             
+             docker service update --image \"\$BACKEND_IMAGE\" \
+               --env-add PORT=3333 \
+               --env-add TZ=\"\$TZ\" \
+               --env-add JWT_ACCESS_SECRET=\"\$JWT_ACCESS_SECRET\" \
+               --env-add JWT_REFRESH_SECRET=\"\$JWT_REFRESH_SECRET\" \
+               --env-add API_KEY_SECRET=\"\$API_KEY_SECRET\" \
+               --env-add REDIS_PASSWORD=\"\$REDIS_PASSWORD\" \
+               --env-add DB_PASSWORD=\"\$DB_PASSWORD\" \
+               --env-add DB_NAME=\"\$DB_NAME\" \
+               --env-add DATABASE_URL=\"\$DATABASE_URL\" \
+               --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
+               --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
+               --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
+               --env-add ADMIN_REGISTRATION_KEY=\"\$ADMIN_REGISTRATION_KEY\" \
+               --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
+               --with-registry-auth finger-be_backend
 
              echo '✅ Service update stabilized and converged successfully!'
 
              docker images \"\$IMG_REPO\" --format '{{.Tag}}' | grep '^main-' | sort -r | tail -n +6 | \
                xargs -r -I {} docker rmi \"\${IMG_REPO}:{}\" || true
-             docker image prune -f || true
+             
+             echo '🧹 Running Deep Garbage Collection...'
+             docker system prune -af --volumes --filter \"until=168h\" || true
 
              echo \"🎉 Deployed: \$BACKEND_IMAGE\""
 
