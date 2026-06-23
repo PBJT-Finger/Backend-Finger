@@ -288,22 +288,18 @@ export class AttendanceImportService {
       let jam_masuk: Date | null = null;
       let jam_keluar: Date | null = null;
 
-      if (group.entries.length === 1) {
-        const single = group.entries[0];
-        if (single) {
-          if (single.isCheckIn) {
-            jam_masuk = single.waktu;
-            jam_keluar = null;
-          } else {
-            jam_masuk = null;
-            jam_keluar = single.waktu;
-          }
-        }
-      } else if (group.entries.length >= 2) {
+      if (group.entries.length > 0) {
+        // Logika Pencegahan Duplikasi (Konsisten dengan zk-sync)
+        // Ambil elemen pertama sebagai jam_masuk terlepas dari jam berapapun
         const first = group.entries[0];
-        const last = group.entries[group.entries.length - 1];
-        if (first && last) {
+        if (first) {
           jam_masuk = first.waktu;
+        }
+
+        // Cari elemen terakhir yang berjarak minimal 2 jam (120 menit) dari jam_masuk
+        // Jika semua scan dalam rentang 2 jam, maka tidak ada jam_keluar (mencegah duplikat sesi pagi jadi jam pulang)
+        const last = group.entries[group.entries.length - 1];
+        if (last && first && (last.waktu.getTime() - first.waktu.getTime() >= 120 * 60 * 1000)) {
           jam_keluar = last.waktu;
         }
       }
