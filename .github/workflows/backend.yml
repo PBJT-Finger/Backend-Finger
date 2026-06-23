@@ -151,6 +151,10 @@ jobs:
           B64_DEPLOY_PATH=$(echo -n "${DEPLOY_PATH}" | base64 -w 0)
           B64_DB_PASSWORD=$(echo -n "${DB_PASSWORD}" | base64 -w 0)
           B64_DB_NAME=$(echo -n "${DB_NAME}" | base64 -w 0)
+          
+          # Encode DB_PASSWORD on GitHub Runner which has jq installed
+          ENCODED_DB_PASS=$(jq -nr --arg v "$DB_PASSWORD" '$v|@uri')
+          B64_ENCODED_DB_PASS=$(echo -n "${ENCODED_DB_PASS}" | base64 -w 0)
 
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
@@ -161,6 +165,7 @@ jobs:
              DEPLOY_PATH=\$(echo '${B64_DEPLOY_PATH}' | base64 -d)
              DB_PASSWORD=\$(echo '${B64_DB_PASSWORD}' | base64 -d)
              DB_NAME=\$(echo '${B64_DB_NAME}' | base64 -d)
+             ENCODED_DB_PASS=\$(echo '${B64_ENCODED_DB_PASS}' | base64 -d)
              
              echo '🔍 Preflight checks started...'
 
@@ -168,7 +173,6 @@ jobs:
              cd \"\$DEPLOY_PATH\"
 
              echo '🔐 Generating .env.docker...'
-             ENCODED_DB_PASS=\$(jq -nr --arg v \"\$DB_PASSWORD\" '\$v|@uri')
              DATABASE_URL=\"mysql://root:\${ENCODED_DB_PASS}@mysql:3306/\${DB_NAME}\"
              echo \"DATABASE_URL=\$DATABASE_URL\" > .env.docker
              echo \"DB_PASSWORD=\${DB_PASSWORD}\" >> .env.docker
@@ -233,6 +237,10 @@ jobs:
           B64_POLLING_INTERVAL_MS=$(echo -n "${POLLING_INTERVAL_MS:-30000}" | base64 -w 0)
           B64_RECONNECT_DELAY_MS=$(echo -n "${RECONNECT_DELAY_MS:-30000}" | base64 -w 0)
 
+          # Encode DB_PASSWORD on GitHub Runner which has jq installed
+          ENCODED_DB_PASS=$(jq -nr --arg v "$DB_PASSWORD" '$v|@uri')
+          B64_ENCODED_DB_PASS=$(echo -n "${ENCODED_DB_PASS}" | base64 -w 0)
+
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=15 \
@@ -247,6 +255,7 @@ jobs:
              IMAGE_TAG=\$(echo '${B64_IMAGE_TAG}' | base64 -d)
              DB_PASSWORD=\$(echo '${B64_DB_PASSWORD}' | base64 -d)
              DB_NAME=\$(echo '${B64_DB_NAME}' | base64 -d)
+             ENCODED_DB_PASS=\$(echo '${B64_ENCODED_DB_PASS}' | base64 -d)
              REDIS_PASSWORD=\$(echo '${B64_REDIS_PASSWORD}' | base64 -d)
              JWT_ACCESS_SECRET=\$(echo '${B64_JWT_ACCESS_SECRET}' | base64 -d)
              JWT_REFRESH_SECRET=\$(echo '${B64_JWT_REFRESH_SECRET}' | base64 -d)
@@ -279,7 +288,6 @@ jobs:
                || echo '⚠️ Warning: Failed to update redis service'
 
              echo '🚀 Updating swarm service finger-be_backend...'
-             ENCODED_DB_PASS=\$(jq -nr --arg v \"\$DB_PASSWORD\" '\$v|@uri')
              DATABASE_URL=\"mysql://root:\${ENCODED_DB_PASS}@mysql:3306/\${DB_NAME}\"
              
              docker service update --image \"\$BACKEND_IMAGE\" \
