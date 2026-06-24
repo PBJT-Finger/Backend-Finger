@@ -205,7 +205,6 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
-          ADMIN_REGISTRATION_KEY: ${{ secrets.ADMIN_REGISTRATION_KEY }}
         run: |
           # Fail loudly if any critical secret is missing
           : "${DEPLOY_PATH:?❌ Secret DEPLOY_PATH is not set!}"
@@ -232,7 +231,6 @@ jobs:
           B64_JWT_REFRESH_SECRET=$(echo -n "${JWT_REFRESH_SECRET}" | base64 -w 0)
           B64_API_KEY_SECRET=$(echo -n "${API_KEY_SECRET}" | base64 -w 0)
           B64_FINGERPRINT_IP=$(echo -n "${FINGERPRINT_IP}" | base64 -w 0)
-          B64_ADMIN_REGISTRATION_KEY=$(echo -n "${ADMIN_REGISTRATION_KEY}" | base64 -w 0)
           B64_TZ=$(echo -n "${TZ:-Asia/Jakarta}" | base64 -w 0)
           B64_POLLING_INTERVAL_MS=$(echo -n "${POLLING_INTERVAL_MS:-30000}" | base64 -w 0)
           B64_RECONNECT_DELAY_MS=$(echo -n "${RECONNECT_DELAY_MS:-30000}" | base64 -w 0)
@@ -261,7 +259,6 @@ jobs:
              JWT_REFRESH_SECRET=\$(echo '${B64_JWT_REFRESH_SECRET}' | base64 -d)
              API_KEY_SECRET=\$(echo '${B64_API_KEY_SECRET}' | base64 -d)
              FINGERPRINT_IP=\$(echo '${B64_FINGERPRINT_IP}' | base64 -d)
-             ADMIN_REGISTRATION_KEY=\$(echo '${B64_ADMIN_REGISTRATION_KEY}' | base64 -d)
              TZ=\$(echo '${B64_TZ}' | base64 -d)
              POLLING_INTERVAL_MS=\$(echo '${B64_POLLING_INTERVAL_MS}' | base64 -d)
              RECONNECT_DELAY_MS=\$(echo '${B64_RECONNECT_DELAY_MS}' | base64 -d)
@@ -303,7 +300,6 @@ jobs:
                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
                --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
                --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
-               --env-add ADMIN_REGISTRATION_KEY=\"\$ADMIN_REGISTRATION_KEY\" \
                --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
                --with-registry-auth finger-be_backend
 
@@ -343,7 +339,6 @@ jobs:
 # - JWT_ACCESS_SECRET    : secret untuk access token
 # - JWT_REFRESH_SECRET   : secret untuk refresh token
 # - API_KEY_SECRET       : secret untuk API key
-# - ADMIN_REGISTRATION_KEY : key registrasi untuk admin (contoh: baja2026)
 # ─── Perangkat Fingerprint ───────────────────────────────────────────────────
 # - FINGERPRINT_IP       : IP pintu depan Router Biru (contoh: 172.17.40.214)
 # - POLLING_INTERVAL_MS  : interval polling ZKTeco dalam ms (contoh: 30000)

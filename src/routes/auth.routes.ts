@@ -119,47 +119,7 @@ router.post('/refresh', AuthController.refreshToken);
  */
 router.post('/logout', authenticateToken, AuthController.logout);
 
-/**
- * @swagger
- * /api/auth/register:
- *   post:
- *     summary: Buat (register) admin baru
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - username
- *               - email
- *               - password
- *             properties:
- *               username:
- *                 type: string
- *                 description: Username admin (3-50 karakter)
- *               email:
- *                 type: string
- *                 format: email
- *                 description: Alamat email admin
- *               password:
- *                 type: string
- *                 format: password
- *                 description: Password admin (min 8 karakter, ada huruf besar, kecil, dan angka)
- *               role:
- *                 type: string
- *                 enum: [admin, pimpinan]
- *                 description: Peran akun admin (default admin)
- *     responses:
- *       201:
- *         description: Admin berhasil didaftarkan
- *       400:
- *         description: Validasi gagal, email sudah terdaftar, atau username digunakan
- *       500:
- *         description: Terjadi kesalahan server
- */
-router.post('/register', AuthController.register);
+
 /**
  * @swagger
  * /api/auth/forgot-password:

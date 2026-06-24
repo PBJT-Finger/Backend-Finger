@@ -8,14 +8,12 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import {
   loginResponse,
-  registerResponse,
   passwordResetResponse,
   successResponse,
   errorResponse,
 } from '../utils/responseFormatter';
 import {
   sendPasswordResetEmail,
-  sendWelcomeEmail,
   sendPasswordResetConfirmation,
 } from '../services/email.service';
 
@@ -84,102 +82,7 @@ export class AuthController {
     },
   ];
 
-  public static register = [
-    body('username')
-      .trim()
-      .isLength({ min: 3, max: 50 })
-      .withMessage('Username harus 3-50 karakter')
-      .matches(/^[a-zA-Z0-9_]+$/)
-      .withMessage('Username hanya boleh huruf, angka, dan underscore'),
-    body('email').trim().isEmail().withMessage('Email tidak valid').normalizeEmail(),
-    body('password')
-      .isLength({ min: 8 })
-      .withMessage('Password minimal 8 karakter')
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('Password harus mengandung huruf besar, huruf kecil, dan angka'),
 
-    async (req: Request, res: Response): Promise<Response> => {
-      try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-          const firstErr = errors.array()[0];
-          return errorResponse(res, firstErr ? firstErr.msg : 'Validasi gagal', 400);
-        }
-
-        const { username, email, password, role, regCode } = req.body;
-
-        // Verify registration secret code if role is admin
-        const targetRole = role?.toLowerCase() || 'admin';
-        if (targetRole === 'admin') {
-          const expectedKey = process.env.ADMIN_REGISTRATION_KEY || 'baja2026';
-          if (regCode !== expectedKey) {
-            logger.warn('Admin registration blocked: invalid secret key', { ip: req.ip, username });
-            return errorResponse(res, 'Kode Registrasi Admin tidak valid atau salah!', 400);
-          }
-        }
-
-        // Check if username exists
-        const existingUsername = await prisma.admins.findFirst({
-          where: { username },
-          select: { id: true },
-        });
-        if (existingUsername) {
-          return errorResponse(res, 'Username sudah digunakan', 400);
-        }
-
-        // Check if email exists
-        const existing = await prisma.admins.findFirst({
-          where: { email },
-          select: { id: true },
-        });
-        if (existing) {
-          return errorResponse(res, 'Email sudah terdaftar', 400);
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 12);
-
-        // Insert new admin
-        const newAdmin = await prisma.admins.create({
-          data: {
-            username,
-            email,
-            password_hash: hashedPassword,
-            role: role && ['admin', 'pimpinan'].includes(role.toLowerCase()) ? role.toLowerCase() : 'admin',
-            is_active: true,
-            created_at: new Date(),
-            updated_at: new Date(),
-          },
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            role: true,
-            is_active: true,
-          },
-        });
-
-        try {
-          await sendWelcomeEmail(email, username);
-        } catch (emailError) {
-          logger.warn('Failed to send welcome email', {
-            email,
-            error: emailError instanceof Error ? emailError.message : String(emailError),
-          });
-        }
-
-        logger.audit('ADMIN_REGISTERED', newAdmin.id, { username, email, ip: req.ip });
-
-        return registerResponse(res, newAdmin);
-      } catch (error) {
-        logger.error('Register error', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          ip: req.ip,
-        });
-        return errorResponse(res, 'Gagal mendaftar. Silakan coba lagi.', 500);
-      }
-    },
-  ];
 
   /**
    * Forgot Password
