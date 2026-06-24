@@ -98,25 +98,6 @@ export const paginatedResponse = (
   });
 };
 
-/**
- * Send registration response
- */
-
-export const registerResponse = (
-  res: Response,
-  user: any,
-  message = 'Registrasi berhasil. Silakan login.'
-): Response => {
-  return res.status(201).json({
-    success: true,
-    message,
-    user: {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-    },
-  });
-};
 
 /**
  * Send password reset related responses
