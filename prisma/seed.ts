@@ -100,6 +100,10 @@ async function main() {
       const tableInserts = inserts[table];
       if (tableInserts) {
         try {
+          if (table === 'admins') {
+            console.log('Cleaning up existing admins table before seeding...');
+            await prisma.$executeRawUnsafe('DELETE FROM `admins`');
+          }
           console.log(`Inserting data for table: ${table} (${tableInserts.length} batches)...`);
           for (const sqlLine of tableInserts) {
             await prisma.$executeRawUnsafe(sqlLine);
