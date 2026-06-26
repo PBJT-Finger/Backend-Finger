@@ -1,10 +1,14 @@
+// src/routes/export.routes.ts
+// Mengatur perutean (routing) endpoint API untuk mengekspor data absensi pegawai,
+// mendukung format dokumen Excel (Ringkasan/Summary), Excel Detail Harian, PDF Resmi, dan CSV.
+
 import { Router } from 'express';
-import ExportController from '../controllers/export.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import ExportController from '../controllers/export.controller'; // Kontroler logika ekspor file
+import { authenticateToken } from '../middlewares/auth.middleware'; // Middleware verifikasi token JWT
 
 const router = Router();
 
-// All routes require authentication
+// Seluruh rute ekspor memerlukan token autentikasi login admin JWT yang valid
 router.use(authenticateToken);
 
 /**
@@ -42,6 +46,7 @@ router.use(authenticateToken);
  *               type: string
  *               format: binary
  */
+// Endpoint ekspor ringkasan absensi ke file Excel (GET /api/export/excel)
 router.get('/excel', ExportController.exportToExcel);
 
 /**
@@ -79,6 +84,7 @@ router.get('/excel', ExportController.exportToExcel);
  *               type: string
  *               format: binary
  */
+// Endpoint ekspor log detail harian absensi ke file Excel (GET /api/export/excel-detail)
 router.get('/excel-detail', ExportController.exportToExcelDetail);
 
 /**
@@ -116,6 +122,7 @@ router.get('/excel-detail', ExportController.exportToExcelDetail);
  *               type: string
  *               format: binary
  */
+// Endpoint ekspor laporan rekapitulasi kehadiran ke dokumen PDF Resmi (GET /api/export/pdf)
 router.get('/pdf', ExportController.exportToPDF);
 
 /**
@@ -147,6 +154,7 @@ router.get('/pdf', ExportController.exportToPDF);
  *             schema:
  *               type: string
  */
+// Endpoint ekspor ringkasan rekapitulasi ke file CSV (GET /api/export/csv)
 router.get('/csv', ExportController.exportToCSV);
 
 export default router;

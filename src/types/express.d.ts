@@ -1,26 +1,26 @@
 /**
- * Express Request Augmentation
+ * Augmentasi Tipe Request Express
  *
- * Extends the default Express Request type with application-specific properties.
- * This file must be included in tsconfig's `include` glob so TypeScript picks
- * it up automatically across all controllers and middlewares.
+ * Memperluas tipe bawaan Request Express dengan properti spesifik aplikasi.
+ * File ini harus masuk dalam pencarian tsconfig `include` agar TypeScript dapat mengenalnya
+ * secara otomatis di seluruh controller dan middleware.
  *
- * Why: Without this, `req.user` and `req.correlationId` would be typed as `any`
- * or trigger TypeScript errors in strict mode, hiding real type violations.
+ * Mengapa: Tanpa modifikasi ini, properti `req.user` dan `req.correlationId` akan bertipe `any`
+ * atau memicu error TypeScript di mode strict, menyembunyikan pelanggaran tipe data sesungguhnya.
  */
 
 declare global {
   namespace Express {
     interface Request {
       /**
-       * Populated by `authenticateToken` middleware after JWT verification.
-       * Undefined on unauthenticated routes.
+       * Diisi oleh middleware `authenticateToken` setelah verifikasi token JWT berhasil.
+       * Bernilai undefined pada rute yang tidak membutuhkan autentikasi.
        */
       user?: AuthenticatedUser;
 
       /**
-       * Unique request identifier injected by `requestCorrelation` middleware.
-       * Used for distributed tracing and structured log correlation.
+       * Pengidentifikasi unik request yang disuntikkan oleh middleware `requestCorrelation`.
+       * Digunakan untuk pelacakan terdistribusi (tracing) dan korelasi log terstruktur.
        */
       correlationId?: string;
     }
@@ -28,15 +28,15 @@ declare global {
 }
 
 /**
- * Represents the authenticated user payload extracted from the JWT token.
- * Mirrors the fields encoded during token signing in `auth.service.ts`.
+ * Merepresentasikan data user terautentikasi yang diekstrak dari payload token JWT.
+ * Mencerminkan field yang dienkode saat pembuatan token di `auth.service.ts`.
  */
 export interface AuthenticatedUser {
-  /** Primary key from the `admins` table */
+  /** ID utama (primary key) dari tabel `admins` */
   id: number;
-  /** Login username */
+  /** Nama pengguna untuk login */
   username: string;
-  /** Role-based access control: 'admin' | 'viewer' */
+  /** Kontrol akses berbasis peran (role): 'admin' | 'viewer' */
   role: string;
 }
 

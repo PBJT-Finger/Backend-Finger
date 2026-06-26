@@ -1,14 +1,19 @@
+// src/routes/admin.routes.ts
+// Mengatur perutean (routing) endpoint API untuk manajemen Admin.
+// Semua rute di sini memerlukan autentikasi token JWT (authenticateToken) 
+// dan menerapkan pembatasan laju permintaan (rate limiting) tingkat sedang.
+
 import { Router } from 'express';
-import AdminController from '../controllers/admin.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
-import { userRateLimits } from '../middlewares/userRateLimit';
+import AdminController from '../controllers/admin.controller'; // Kontroler logika admin
+import { authenticateToken } from '../middlewares/auth.middleware'; // Middleware verifikasi token JWT
+import { userRateLimits } from '../middlewares/userRateLimit'; // Middleware pencegah spam request
 
 const router = Router();
 
-// Apply authentication to all admin routes
+// Terapkan middleware autentikasi token di seluruh rute admin
 router.use(authenticateToken);
 
-// Apply moderate rate limiting
+// Terapkan rate limiter level 'moderate' di seluruh rute admin
 router.use(userRateLimits.moderate);
 
 /**
@@ -50,6 +55,7 @@ router.use(userRateLimits.moderate);
  *       409:
  *         description: Username atau email sudah ada
  */
+// Endpoint untuk membuat admin baru (POST /api/admin)
 router.post('/', AdminController.createAdmin);
 
 /**
@@ -85,6 +91,7 @@ router.post('/', AdminController.createAdmin);
  *       401:
  *         description: Password saat ini salah
  */
+// Endpoint untuk mengganti password admin sendiri (PUT /api/admin/password)
 router.put('/password', AdminController.changePassword);
 
 /**
@@ -121,6 +128,7 @@ router.put('/password', AdminController.changePassword);
  *       404:
  *         description: Admin tidak ditemukan
  */
+// Endpoint untuk memperbarui data admin lain berdasarkan ID (PUT /api/admin/:id)
 router.put('/:id', AdminController.updateAdmin);
 
 /**
@@ -145,6 +153,7 @@ router.put('/:id', AdminController.updateAdmin);
  *       404:
  *         description: Admin tidak ditemukan
  */
+// Endpoint untuk menghapus admin berdasarkan ID (DELETE /api/admin/:id)
 router.delete('/:id', AdminController.deleteAdmin);
 
 export default router;

@@ -1,3 +1,7 @@
+// src/utils/responseFormatter.ts
+// Format respons HTTP standar (Success, Error, Pagination, Login, Register) untuk API.
+// Memastikan semua endpoint mengembalikan struktur envelope JSON yang seragam untuk frontend.
+
 import { Response } from 'express';
 
 export interface PaginationMeta {
@@ -8,7 +12,7 @@ export interface PaginationMeta {
 }
 
 /**
- * Send success response
+ * Mengirim respons sukses standar (Success Response).
  */
 export const successResponse = (
   res: Response,
@@ -29,11 +33,11 @@ export const successResponse = (
 };
 
 /**
- * Send error response
+ * Mengirim respons eror standar (Error Response).
  */
 export const errorResponse = (
   res: Response,
-  message = 'An error occurred',
+  message = 'Terjadi kesalahan',
   statusCode = 400
 ): Response => {
   return res.status(statusCode).json({
@@ -43,9 +47,8 @@ export const errorResponse = (
 };
 
 /**
- * Send login/authentication response
+ * Mengirim respons khusus setelah login / autentikasi berhasil.
  */
-
 export const loginResponse = (
   res: Response,
   user: any,
@@ -68,7 +71,7 @@ export const loginResponse = (
         access_token: token,
         refresh_token: refreshToken,
         token_type: 'Bearer',
-        expires_in: 15 * 60,
+        expires_in: 15 * 60, // Durasi 15 menit dalam detik
       },
     },
   };
@@ -77,13 +80,13 @@ export const loginResponse = (
 };
 
 /**
- * Send paginated response
+ * Mengirim respons data list dengan pagination (Paginated Response).
  */
 export const paginatedResponse = (
   res: Response,
   data: unknown[],
   pagination: PaginationMeta,
-  message = 'Data retrieved successfully'
+  message = 'Data berhasil diambil'
 ): Response => {
   return res.status(200).json({
     success: true,
@@ -99,8 +102,9 @@ export const paginatedResponse = (
 };
 
 
+
 /**
- * Send password reset related responses
+ * Mengirim respons untuk alur reset password.
  */
 export const passwordResetResponse = (
   res: Response,

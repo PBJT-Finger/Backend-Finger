@@ -1,10 +1,14 @@
+// src/routes/dashboard.routes.ts
+// Mengatur perutean (routing) untuk endpoint statistik dashboard backend,
+// seperti melihat data ringkasan kehadiran pegawai bulanan untuk grafik dan widget statistik.
+
 import { Router } from 'express';
-import DashboardController from '../controllers/dashboard.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import DashboardController from '../controllers/dashboard.controller'; // Kontroler logika dashboard
+import { authenticateToken } from '../middlewares/auth.middleware'; // Middleware verifikasi token JWT
 
 const router = Router();
 
-// All routes require authentication
+// Terapkan middleware autentikasi token JWT di seluruh rute dashboard
 router.use(authenticateToken);
 
 /**
@@ -79,6 +83,7 @@ router.use(authenticateToken);
  *                         karyawan:
  *                           type: integer
  */
+// Endpoint mengambil rekap statistik dashboard bulanan (GET /api/dashboard/summary)
 router.get('/summary', DashboardController.getSummary);
 
 export default router;

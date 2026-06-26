@@ -13,7 +13,7 @@
     "postinstall": "prisma generate",
     "db:setup": "prisma db push && prisma db seed",
     "db:reset": "prisma db push --force-reset && prisma db seed",
-    "db:import-today": "mysql -u root -pRafly19 fingerprint_db < seeds/insert_today_data.sql",
+    "db:import-today": "mysql -u root -pYOUR_DB_PASSWORD finger_db < seeds/insert_today_data.sql",
     "seed:device-mapping": "tsx scripts/seed-device-mapping.ts",
     "employee:add": "tsx scripts/add-new-employee.ts",
     "sync:attendance": "tsx scripts/sync-attendance.ts",

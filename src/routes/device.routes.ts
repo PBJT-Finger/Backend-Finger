@@ -1,18 +1,22 @@
+// src/routes/device.routes.ts
+// Mengatur rute API untuk manajemen perangkat sidik jari, monitoring streaming event (SSE),
+// manajemen user mesin (pulling & registration), serta daftar shift jam kerja yang tersedia.
+
 import { Router, Request, Response } from 'express';
-import DeviceController from '../controllers/device.controller';
-import DeviceUsersController from '../controllers/device.users.controller';
-import { authenticateToken, requireAdmin } from '../middlewares/auth.middleware';
-import { userRateLimits } from '../middlewares/userRateLimit';
-import prisma from '../config/prisma';
-import { successResponse, errorResponse } from '../utils/responseFormatter';
+import DeviceController from '../controllers/device.controller'; // Kontroler CRUD mesin sidik jari
+import DeviceUsersController from '../controllers/device.users.controller'; // Kontroler user mesin sidik jari
+import { authenticateToken, requireAdmin } from '../middlewares/auth.middleware'; // Middleware otorisasi JWT & Admin
+import { userRateLimits } from '../middlewares/userRateLimit'; // Middleware pembatas laju request
+import prisma from '../config/prisma'; // Prisma client untuk query database shift
+import { successResponse, errorResponse } from '../utils/responseFormatter'; // Util format response API
 
 const router = Router();
 
-import { streamDeviceEvents } from '../controllers/device.stream.controller';
+import { streamDeviceEvents } from '../controllers/device.stream.controller'; // Handler untuk event streaming (SSE)
 
-// GET /api/device/stream - Public SSE endpoint for real-time dashboard
-// Wrapped in an explicit async error boundary because Express ≤4 does not
-// automatically catch rejected Promises from async route handlers.
+// GET /api/device/stream - Endpoint Publik SSE untuk update real-time dashboard.
+// Dibungkus secara eksplisit dengan catch(next) karena Express ≤ 4 tidak menangkap error
+// Promise reject di handler async secara otomatis.
 /**
  * @swagger
  * /api/device/stream:
@@ -27,7 +31,7 @@ router.get('/stream', (req, res, next) => {
   streamDeviceEvents(req, res).catch(next);
 });
 
-// ── Device User Management (authenticated) ───────────────────────────────────
+// ── Manajemen User Perangkat (Memerlukan Token & Role Admin) ─────────────────
 
 /**
  * @swagger
@@ -41,6 +45,7 @@ router.get('/stream', (req, res, next) => {
  *       200:
  *         description: Berhasil mengambil data user dari device
  */
+// Menarik data user dari memori cache mesin sidik jari (GET /api/device/users/pull)
 router.get('/users/pull', authenticateToken, requireAdmin, (req, res, next) => {
   DeviceUsersController.pullDeviceUsers(req, res).catch(next);
 });
@@ -78,6 +83,7 @@ router.get('/users/pull', authenticateToken, requireAdmin, (req, res, next) => {
  *       200:
  *         description: Berhasil mendaftarkan user
  */
+// Mendaftarkan user mesin sidik jari ke tabel pegawai database (POST /api/device/users/register)
 router.post('/users/register', authenticateToken, requireAdmin, (req, res, next) => {
   DeviceUsersController.registerDeviceUser(req, res).catch(next);
 });
@@ -94,6 +100,7 @@ router.post('/users/register', authenticateToken, requireAdmin, (req, res, next)
  *       200:
  *         description: Daftar shift berhasil diambil
  */
+// Mengambil daftar shift aktif di database (GET /api/device/shifts)
 router.get('/shifts', authenticateToken, async (req: Request, res: Response) => {
   try {
     const shifts = await prisma.shifts.findMany({
@@ -101,16 +108,16 @@ router.get('/shifts', authenticateToken, async (req: Request, res: Response) => 
       select: { id: true, nama_shift: true, jam_masuk: true, jam_keluar: true },
       orderBy: { id: 'asc' },
     });
-    return successResponse(res, shifts, 'Shifts retrieved successfully');
+    return successResponse(res, shifts, 'Berhasil mengambil daftar shift aktif');
   } catch (_error) {
     return errorResponse(res, 'Gagal mengambil data shift', 500);
   }
 });
 
-// Apply authentication to all device routes
+// Mulai menerapkan autentikasi Bearer JWT untuk seluruh rute di bawah ini
 router.use(authenticateToken);
 
-// Apply moderate rate limiting
+// Terapkan rate limiter level 'moderate' untuk seluruh rute di bawah ini
 router.use(userRateLimits.moderate);
 
 /**
@@ -125,6 +132,7 @@ router.use(userRateLimits.moderate);
  *       200:
  *         description: Daftar device berhasil diambil
  */
+// Mengambil seluruh data perangkat sidik jari yang aktif (GET /api/device)
 router.get('/', DeviceController.getDevices);
 
 /**
@@ -145,6 +153,7 @@ router.get('/', DeviceController.getDevices);
  *       200:
  *         description: Detail device berhasil diambil
  */
+// Mengambil detail satu perangkat berdasarkan ID (GET /api/device/:id)
 router.get('/:id', DeviceController.getDeviceById);
 
 /**
@@ -177,6 +186,7 @@ router.get('/:id', DeviceController.getDeviceById);
  *       201:
  *         description: Device berhasil dibuat
  */
+// Mendaftarkan perangkat baru (POST /api/device)
 router.post('/', DeviceController.createDevice);
 
 /**
@@ -212,6 +222,7 @@ router.post('/', DeviceController.createDevice);
  *       200:
  *         description: Device berhasil diperbarui
  */
+// Mengupdate data perangkat (PUT /api/device/:id)
 router.put('/:id', DeviceController.updateDevice);
 
 /**
@@ -232,6 +243,7 @@ router.put('/:id', DeviceController.updateDevice);
  *       200:
  *         description: Device berhasil dihapus
  */
+// Menghapus perangkat secara logis/soft-delete (DELETE /api/device/:id)
 router.delete('/:id', DeviceController.deleteDevice);
 
 /**
@@ -252,6 +264,7 @@ router.delete('/:id', DeviceController.deleteDevice);
  *       200:
  *         description: Proses sinkronisasi berhasil dijalankan
  */
+// Memicu sinkronisasi log mesin sidik jari ke server secara manual (POST /api/device/:id/sync)
 router.post('/:id/sync', DeviceController.syncDevice);
 
 export default router;

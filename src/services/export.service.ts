@@ -1,9 +1,14 @@
-import ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
+// src/services/export.service.ts
+// Layanan (Service) pembantu untuk menulis data absensi ke berkas fisik di server
+// sebelum diunduh oleh client. Mendukung pembuatan berkas Excel (menggunakan exceljs),
+// PDF (menggunakan pdfkit), dan berkas teks CSV standar.
 
-// Ensure exports directory exists
+import ExcelJS from 'exceljs'; // Library pembuat lembar kerja Excel (.xlsx)
+import PDFDocument from 'pdfkit'; // Library pembuat dokumen PDF
+import fs from 'fs'; // Modul bawaan Node.js untuk manipulasi berkas/sistem file
+import path from 'path'; // Modul bawaan Node.js untuk manipulasi path direktori
+
+// Memastikan folder penyimpanan berkas ekspor exists di root project
 const exportsDir = path.join(__dirname, '../../exports');
 if (!fs.existsSync(exportsDir)) {
   fs.mkdirSync(exportsDir, { recursive: true });
@@ -11,6 +16,13 @@ if (!fs.existsSync(exportsDir)) {
 
 export type ExportFormatType = 'excel' | 'pdf' | 'csv';
 
+/**
+ * Fungsi pembungkus utama ekspor log absensi detail.
+ * @param data - Kumpulan data absensi
+ * @param format - Format keluaran (excel/pdf/csv)
+ * @param filename - Nama berkas
+ * @returns Path absolute lokasi file yang berhasil dibuat
+ */
 export async function exportData(
   data: Record<string, unknown>[],
   format: ExportFormatType,
@@ -26,10 +38,17 @@ export async function exportData(
     case 'csv':
       return await exportToCSV(data, filePath);
     default:
-      throw new Error('Unsupported format');
+      throw new Error('Format ekspor tidak didukung');
   }
 }
 
+/**
+ * Fungsi pembungkus utama ekspor rekapitulasi/summary absensi.
+ * @param data - Kumpulan data rekapitulasi
+ * @param format - Format keluaran (excel/pdf/csv)
+ * @param filename - Nama berkas
+ * @returns Path lokasi file
+ */
 export async function exportSummaryData(
   data: Record<string, unknown>[],
   format: ExportFormatType,
@@ -45,17 +64,21 @@ export async function exportSummaryData(
     case 'csv':
       return await exportSummaryToCSV(data, filePath);
     default:
-      throw new Error('Unsupported format');
+      throw new Error('Format ekspor tidak didukung');
   }
 }
 
+/**
+ * Menulis data absensi detail ke file Excel (.xlsx).
+ */
 export async function exportToExcel(
   data: Record<string, unknown>[],
   filePath: string
 ): Promise<string> {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Attendance Data');
+  const sheet = workbook.addWorksheet('Data Absensi');
 
+  // Menentukan nama kolom header dan lebar kolom masing-masing
   sheet.columns = [
     { header: 'Cloud ID', key: 'cloud_id', width: 15 },
     { header: 'Device ID', key: 'device_id', width: 15 },
@@ -69,38 +92,47 @@ export async function exportToExcel(
     { header: 'Kategori User', key: 'kategori_user', width: 15 },
   ];
 
-  // Bold header row
+  // Mengubah font baris header (baris pertama) menjadi tebal (bold)
   const row1 = sheet.getRow(1);
   row1.font = { bold: true };
 
+  // Memasukkan seluruh data absen ke baris lembar kerja
   data.forEach((record) => sheet.addRow(record));
 
+  // Menulis isi workbook ke file fisik
   await workbook.xlsx.writeFile(filePath);
   return filePath;
 }
 
+/**
+ * Menulis data absensi detail ke dokumen PDF.
+ */
 export async function exportToPDF(
   data: Record<string, unknown>[],
   filePath: string
 ): Promise<string> {
   const doc = new PDFDocument();
-  doc.pipe(fs.createWriteStream(filePath));
+  doc.pipe(fs.createWriteStream(filePath)); // Stream data PDF ke file tujuan
 
+  // Judul Halaman PDF
   doc.fontSize(20).text('Laporan Absensi Kampus', { align: 'center' });
   doc.moveDown();
-  doc.fontSize(12).text(`Total Records: ${data.length}`, { align: 'left' });
+  doc.fontSize(12).text(`Total Baris Data: ${data.length}`, { align: 'left' });
   doc.moveDown();
 
   const headers = ['No', 'Nama', 'User ID', 'Tanggal', 'Waktu', 'Tipe'];
   let yPosition = doc.y + 20;
 
+  // Render header tabel PDF
   headers.forEach((header, index) => {
     doc.fontSize(10).text(header, 50 + index * 80, yPosition, { width: 70, align: 'center' });
   });
 
   doc.moveDown();
 
+  // Iterasi data absensi dan menggambarnya baris per baris ke PDF
   data.forEach((record, index) => {
+    // Tambahkan halaman baru jika koordinat y melebihi batas bawah halaman (700)
     if (yPosition > 700) {
       doc.addPage();
       yPosition = 50;
@@ -122,12 +154,15 @@ export async function exportToPDF(
     yPosition += 15;
   });
 
-  doc.end();
+  doc.end(); // Menyelesaikan penulisan dokumen PDF
   return new Promise((resolve) => {
     doc.on('end', () => resolve(filePath));
   });
 }
 
+/**
+ * Menulis data absensi detail ke berkas teks CSV (Comma Separated Values).
+ */
 export async function exportToCSV(
   data: Record<string, unknown>[],
   filePath: string
@@ -157,16 +192,22 @@ export async function exportToCSV(
     'Kategori User',
   ];
 
+  // Menyusun baris header CSV
   const rows = [headerLabels.join(',')];
   data.forEach((record) => {
+    // Membungkus nilai sel dengan tanda kutip ganda dan meloloskan tanda kutip di dalamnya
     const row = headers.map((h) => `"${String(record[h] ?? '').replace(/"/g, '""')}"`);
     rows.push(row.join(','));
   });
 
+  // Tulis dengan penambahan karakter Byte Order Mark (\uFEFF) UTF-8 agar Excel dapat membaca tanda aksen
   fs.writeFileSync(filePath, '\uFEFF' + rows.join('\n'), 'utf8');
   return filePath;
 }
 
+/**
+ * Menulis rekapitulasi/summary absensi pegawai ke file Excel (.xlsx).
+ */
 export async function exportSummaryToExcel(
   data: Record<string, unknown>[],
   filePath: string
@@ -196,6 +237,9 @@ export async function exportSummaryToExcel(
   return filePath;
 }
 
+/**
+ * Menulis rekapitulasi/summary absensi pegawai ke dokumen PDF sederhana.
+ */
 export async function exportSummaryToPDF(
   data: Record<string, unknown>[],
   filePath: string
@@ -224,6 +268,9 @@ export async function exportSummaryToPDF(
   return filePath;
 }
 
+/**
+ * Menulis rekapitulasi/summary absensi pegawai ke file CSV.
+ */
 export async function exportSummaryToCSV(
   data: Record<string, unknown>[],
   filePath: string

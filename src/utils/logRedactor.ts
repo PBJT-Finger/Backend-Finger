@@ -1,27 +1,25 @@
 /**
  * Log Redactor Utility
- * Redacts sensitive information from log objects
- * Prevents PII, passwords, tokens from appearing in logs
+ * Menyensor (redact) informasi sensitif dari objek log aplikasi.
+ * Mencegah data pribadi (PII), password, dan token JWT bocor ke dalam file log/konsol.
  *
- * Phase 3 - P1 Enhancement for GDPR/PCI-DSS compliance
+ * Sesuai kepatuhan regulasi perlindungan data pribadi (GDPR / UU PDP).
  */
 
 /**
- * Redact sensitive fields from log objects
- * @param obj - Object to redact
- * @returns Redacted copy of object
+ * Menyensor field sensitif dari objek data log secara rekursif.
+ * @param obj - Objek yang akan disensor
+ * @returns Salinan objek yang telah disensor
  */
-
 export function redactSensitiveData(obj: any): any {
   if (!obj || typeof obj !== 'object') {
     return obj;
   }
 
-  // Create shallow copy (array or object)
-
+  // Buat salinan dangkal (shallow copy) untuk array atau objek
   const redacted: any = Array.isArray(obj) ? [...obj] : { ...obj };
 
-  // Sensitive key patterns to redact
+  // Daftar pola kata kunci sensitif yang wajib disensor
   const sensitiveKeys = [
     'password',
     'password_hash',
@@ -47,20 +45,20 @@ export function redactSensitiveData(obj: any): any {
     if (Object.prototype.hasOwnProperty.call(redacted, key)) {
       const lowerKey = key.toLowerCase();
 
-      // Check if key matches sensitive pattern
+      // Periksa apakah nama properti kunci mengandung salah satu pola sensitif
       const isSensitive = sensitiveKeys.some((sensitive) => lowerKey.includes(sensitive));
 
       if (isSensitive) {
-        // Redact based on value type
+        // Sensor berdasarkan tipe nilainya
         if (typeof redacted[key] === 'string') {
           const value = redacted[key] as string;
-          // Show first 4 chars for debugging, rest redacted
+          // Tampilkan 4 karakter pertama untuk memudahkan debugging, sisanya disensor
           redacted[key] = value.length > 4 ? `${value.substring(0, 4)}...[REDACTED]` : '[REDACTED]';
         } else {
           redacted[key] = '[REDACTED]';
         }
       }
-      // Recursively redact nested objects
+      // Lakukan rekursi jika properti berupa objek bersarang (nested object)
       else if (typeof redacted[key] === 'object' && redacted[key] !== null) {
         redacted[key] = redactSensitiveData(redacted[key]);
       }
@@ -71,18 +69,19 @@ export function redactSensitiveData(obj: any): any {
 }
 
 /**
- * Redact sensitive URL parameters
- * @param url - URL to redact
- * @returns Redacted URL
+ * Menyensor parameter URL sensitif (seperti token/password di query string).
+ * @param url - Alamat URL input
+ * @returns URL yang sudah disensor query string sensitifnya
  */
 export function redactUrl(url: string): string {
   if (!url || typeof url !== 'string') return url;
 
-  // Redact sensitive query parameters
+  // Nama parameter query string yang wajib disensor
   const sensitiveParams = ['token', 'key', 'password', 'secret'];
   let redactedUrl = url;
 
   sensitiveParams.forEach((param) => {
+    // Regex pencocokan parameter query string case-insensitive
     const regex = new RegExp(`(${param}=)[^&]*`, 'gi');
     redactedUrl = redactedUrl.replace(regex, `$1[REDACTED]`);
   });

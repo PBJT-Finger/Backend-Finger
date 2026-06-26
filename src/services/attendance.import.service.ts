@@ -1,25 +1,31 @@
-import * as xlsx from 'xlsx';
-import prisma from '../config/prisma';
-import logger from '../utils/logger';
+// src/services/attendance.import.service.ts
+// Layanan (Service) ini menangani parsing, validasi, pendeteksian format,
+// dan pemrosesan impor berkas absensi sidik jari (dari format asli ekspor Fingerspot
+// maupun format berkas template manual Excel/CSV).
+// Layanan ini memproses data secara berurutan dan menyimpannya ke database via Prisma transaction.
+
+import * as xlsx from 'xlsx'; // Library untuk parsing format lembar kerja Excel/CSV
+import prisma from '../config/prisma'; // Prisma client untuk manipulasi data DB
+import logger from '../utils/logger'; // Logger aplikasi
 
 export interface ImportOptions {
-  skipDuplicates?: boolean;
+  skipDuplicates?: boolean; // Pilihan apakah baris data duplikat dilewati atau menghasilkan error
 }
 
 export interface ParsedRow {
-  user_id: string;
+  user_id: string; // ID pegawai/NIK
   nama: string;
   tanggal: Date;
   waktu: string;
-  isCheckIn: boolean;
-  verifikasi: string;
+  isCheckIn: boolean; // Menandakan apakah aksi masuk (check-in) atau pulang (check-out)
+  verifikasi: string; // Metode verifikasi (FINGER, FACE, PASSWORD, dll)
 }
 
 export interface FingerspotGroupedRecord {
   user_id: string;
   nama: string;
   tanggal: Date;
-  entries: { waktu: Date; isCheckIn: boolean }[];
+  entries: { waktu: Date; isCheckIn: boolean }[]; // Daftar log absensi pada tanggal yang sama
   verification_method: string;
   status: string;
 }
@@ -36,33 +42,32 @@ export interface GroupedImportResult {
 
 export interface ImportResultReport {
   success: boolean;
-  message: string;
-  total: number;
-  imported: number;
-  skipped: number;
-  duplicates: number;
-  errors: string[];
-  warnings?: string[] | undefined;
-
-  duplicateDetails?: any[] | undefined;
+  message: string; // Deskripsi hasil ringkasan impor
+  total: number; // Total data yang masuk untuk diproses
+  imported: number; // Jumlah log yang berhasil masuk ke database
+  skipped: number; // Jumlah baris yang dilewati (karena error atau duplikat)
+  duplicates: number; // Jumlah baris duplikat terdeteksi
+  errors: string[]; // Daftar pesan kesalahan detail
+  warnings?: string[] | undefined; // Daftar peringatan (misal pegawai baru dibuat otomatis)
+  duplicateDetails?: any[] | undefined; // Cuplikan detail log yang duplikat
 }
 
 export class AttendanceImportService {
   /**
-   * Parse Excel/CSV file buffer to array of objects
-   * @param buffer - File buffer
-   * @param filename - Original filename
-   * @returns Array of row objects
+   * Mengurai buffer file Excel/CSV menjadi array of objects.
+   * @param buffer - Buffer file dari request upload
+   * @param filename - Nama asli berkas
+   * @returns Array objek baris data
    */
   public static async parseImportFile(
     buffer: Buffer,
     filename: string
   ): Promise<Record<string, string | null>[]> {
     try {
-      // Read workbook from buffer using xlsx (SheetJS)
+      // Membaca berkas workbook dari buffer memori menggunakan library xlsx
       const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
 
-      // Get first sheet
+      // Mengambil nama sheet pertama
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) {
         throw new Error('File tidak memiliki sheet yang valid');
@@ -72,9 +77,9 @@ export class AttendanceImportService {
         throw new Error('File tidak memiliki sheet yang valid');
       }
 
-      // Convert sheet to json array
+      // Mengonversi isi sheet ke array JSON
       const rawData = xlsx.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-        defval: null,
+        defval: null, // Nilai default untuk sel kosong adalah null
       });
       const data: Record<string, string | null>[] = [];
 
@@ -85,7 +90,7 @@ export class AttendanceImportService {
           if (val === null || val === undefined) {
             strVal = null;
           } else if (val instanceof Date) {
-            // Format date as YYYY-MM-DD
+            // Memformat objek tanggal dari Excel secara aman ke format YYYY-MM-DD
             const y = val.getFullYear();
             const m = String(val.getMonth() + 1).padStart(2, '0');
             const d = String(val.getDate()).padStart(2, '0');
@@ -93,21 +98,21 @@ export class AttendanceImportService {
           } else {
             strVal = String(val);
           }
-          // The key might have leading/trailing spaces
+          // Bersihkan spasi berlebih pada nama kolom/key
           const cleanKey = key.trim();
           rowObj[cleanKey] = strVal;
         }
 
-        // Only push rows that have at least one value
+        // Hanya masukkan baris yang memiliki minimal satu sel berisi data
         if (Object.values(rowObj).some((v) => v !== null && v !== '')) {
           data.push(rowObj);
         }
       }
 
-      logger.info(`Parsed ${data.length} rows from ${filename}`);
+      logger.info(`Berhasil membaca ${data.length} baris dari berkas ${filename}`);
       return data;
     } catch (error) {
-      logger.error('File parsing error:', {
+      logger.error('Error saat parsing file:', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new Error(
@@ -117,8 +122,8 @@ export class AttendanceImportService {
   }
 
   /**
-   * Detect file format (Fingerspot export vs Template manual)
-   * @param rows - Parsed rows from Excel
+   * Mendeteksi format file impor (Format ekspor mesin Fingerspot vs Format Template Absensi Manual).
+   * @param rows - Array baris mentah yang telah diparsing
    * @returns 'FINGERSPOT' | 'TEMPLATE' | 'UNKNOWN'
    */
   public static detectFileFormat(
@@ -132,9 +137,9 @@ export class AttendanceImportService {
     if (!firstRow) return 'UNKNOWN';
     const columns = Object.keys(firstRow);
 
-    logger.info('Detecting file format', { columns });
+    logger.info('Mendeteksi format berkas', { columns });
 
-    // Fingerspot format: has specific columns from device export
+    // Kolom-kolom penanda format ekspor dari Fingerspot
     const fingerspotColumns = [
       'Cloud ID',
       'Tipe Absen',
@@ -148,28 +153,28 @@ export class AttendanceImportService {
     const hasFingerspotColumns = fingerspotColumns.some((col) => columns.includes(col));
 
     if (hasFingerspotColumns) {
-      logger.info('Detected Fingerspot format');
+      logger.info('Format terdeteksi sebagai format FINGERSPOT');
       return 'FINGERSPOT';
     }
 
-    // Template format: has our standard columns
+    // Kolom-kolom penanda format template manual sistem
     const templateColumns = ['user_id', 'tanggal', 'jam_masuk'];
     const hasTemplateColumns = templateColumns.every((col) => columns.includes(col));
 
     if (hasTemplateColumns) {
-      logger.info('Detected Template format');
+      logger.info('Format terdeteksi sebagai TEMPLATE manual');
       return 'TEMPLATE';
     }
 
-    logger.warn('Unknown file format', { columns });
+    logger.warn('Format berkas tidak dikenali', { columns });
     return 'UNKNOWN';
   }
 
   /**
-   * Parse Fingerspot row to standard format
-   * @param row - Fingerspot row data
-   * @param index - Row index
-   * @returns Parsed data
+   * Mengurai baris data format ekspor Fingerspot menjadi objek terstandarisasi.
+   * @param row - Baris data Fingerspot
+   * @param index - Index baris
+   * @returns Hasil parse atau null jika tidak valid
    */
   public static parseFingerspotRow(
     row: Record<string, string | null>,
@@ -183,11 +188,12 @@ export class AttendanceImportService {
       const tipeAbsen = String(row['Tipe Absensi'] || row['Tipe Absen'] || '').trim();
       const verifikasi = String(row['Verifikasi'] || 'Sidik Jari').trim();
 
+      // Baris tidak valid jika data penting kosong
       if (!user_id || !tanggalStr || !waktuStr) {
-        return null; // Invalid row
+        return null;
       }
 
-      // Parse date - handle various formats
+      // Mengurai string tanggal
       let tanggal: Date;
       try {
         const cleanDateStr = tanggalStr.split(' ')[0] || '';
@@ -199,20 +205,21 @@ export class AttendanceImportService {
           tanggal = new Date(Date.UTC(temp.getFullYear(), temp.getMonth(), temp.getDate()));
         }
       } catch (_e) {
-        logger.warn(`Invalid date at row ${index + 2}:`, { tanggalStr });
+        logger.warn(`Format tanggal tidak valid pada baris ${index + 2}:`, { tanggalStr });
         return null;
       }
 
-      // Parse time - Fingerspot outputs: 17:20 or 08:05
+      // Mengurai format waktu
       let waktu = waktuStr.trim();
       if (waktu && !waktu.includes(':')) {
         return null;
       }
       if (waktu.split(':').length === 2) {
-        waktu += ':00';
+        waktu += ':00'; // Tambahkan detik default jika hanya ada jam:menit
       }
 
       const tipeNormalized = tipeAbsen.toLowerCase();
+      // Mengklasifikasikan tipe scan (jika mengandung kata pulang maka check-out, selain itu check-in masuk)
       const isCheckIn = tipeNormalized.includes('masuk') || !tipeNormalized.includes('pulang');
 
       return {
@@ -224,7 +231,7 @@ export class AttendanceImportService {
         verifikasi: verifikasi.toUpperCase().replace(' ', '_'),
       };
     } catch (error) {
-      logger.error(`Error parsing Fingerspot row ${index + 2}:`, {
+      logger.error(`Error parsing baris Fingerspot ${index + 2}:`, {
         error: error instanceof Error ? error.message : String(error),
       });
       return null;
@@ -232,7 +239,8 @@ export class AttendanceImportService {
   }
 
   /**
-   * Group Fingerspot data by NIP and date.
+   * Mengelompokkan log scan mentah Fingerspot berdasarkan NIP pegawai dan Tanggal,
+   * untuk menentukan jam masuk (scan pertama) dan jam keluar (scan terakhir) dalam hari tersebut.
    */
   public static groupFingerspotData(parsedRows: ParsedRow[]): GroupedImportResult[] {
     const grouped: Record<string, FingerspotGroupedRecord> = {};
@@ -244,7 +252,7 @@ export class AttendanceImportService {
       const m = String(row.tanggal.getUTCMonth() + 1).padStart(2, '0');
       const d = String(row.tanggal.getUTCDate()).padStart(2, '0');
       const dateStr = `${y}-${m}-${d}`;
-      const key = `${row.user_id}_${dateStr}`;
+      const key = `${row.user_id}_${dateStr}`; // Kunci pengelompokan (NIP_Tanggal)
 
       if (!grouped[key]) {
         grouped[key] = {
@@ -261,6 +269,7 @@ export class AttendanceImportService {
         grouped[key].nama = row.nama;
       }
 
+      // Menggabungkan tanggal dan jam scan
       const combineDateTime = (date: Date, timeStr: string): Date => {
         const [hours, minutes, seconds] = timeStr.split(':');
         return new Date(
@@ -282,7 +291,7 @@ export class AttendanceImportService {
     });
 
     return Object.values(grouped).map((group) => {
-      // Sort entries ascending by time
+      // Urutkan entri scan dari waktu terkecil ke terbesar
       group.entries.sort((a, b) => a.waktu.getTime() - b.waktu.getTime());
 
       let jam_masuk: Date | null = null;
@@ -317,20 +326,19 @@ export class AttendanceImportService {
   }
 
   /**
-   * Validate single row data
-   * @param row - Row data
-   * @param index - Row index (for error reporting)
-   * @returns { valid: boolean, errors: Array, data: Object }
+   * Memvalidasi kebenaran data pada satu baris template manual Excel.
+   * @param row - Baris data
+   * @param index - Index baris
+   * @returns Kelayakan validasi beserta data ter-format
    */
-
   public static async validateRow(
     row: Record<string, string | null>,
     index: number
   ): Promise<{ valid: boolean; errors: string[]; data: any }> {
     const errors: string[] = [];
-    const rowNum = index + 2; // +2 because: 1-indexed + header row
+    const rowNum = index + 2; // Baris Excel (1-based + baris header)
 
-    // Required: user_id
+    // Validasi input NIDN/NIP (user_id)
     if (!row['user_id'] || String(row['user_id']).trim() === '') {
       errors.push(`Baris ${rowNum}: User ID wajib diisi`);
       return { valid: false, errors, data: null };
@@ -338,15 +346,14 @@ export class AttendanceImportService {
 
     const user_id = String(row['user_id']).trim();
 
-    // Check employee exists
-
+    // Pastikan pegawai terdaftar di database
     let employee: any;
     try {
       employee = await prisma.employees.findUnique({
         where: { user_id },
       });
     } catch (error) {
-      logger.error('Error looking up employee:', {
+      logger.error('Error saat mencari data pegawai:', {
         user_id,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -361,13 +368,13 @@ export class AttendanceImportService {
       return { valid: false, errors, data: null };
     }
 
-    // Required: Tanggal
+    // Validasi keberadaan kolom tanggal
     if (!row['tanggal'] || String(row['tanggal']).trim() === '') {
       errors.push(`Baris ${rowNum}: Tanggal wajib diisi`);
       return { valid: false, errors, data: null };
     }
 
-    // Validate date format (YYYY-MM-DD or DD/MM/YYYY)
+    // Validasi kesesuaian format tanggal
     let tanggal: Date;
     try {
       const tanggalStr = String(row['tanggal']).trim();
@@ -386,7 +393,7 @@ export class AttendanceImportService {
       } else {
         const temp = new Date(tanggalStr);
         if (isNaN(temp.getTime())) {
-          throw new Error('Invalid date');
+          throw new Error('Tanggal tidak valid');
         }
         y = temp.getFullYear();
         m = temp.getMonth() + 1;
@@ -394,11 +401,11 @@ export class AttendanceImportService {
       }
       tanggal = new Date(Date.UTC(y, m - 1, day));
     } catch (_error) {
-      errors.push(`Baris ${rowNum}: Format tanggal tidak valid (gunakan YYYY-MM-DD)`);
+      errors.push(`Baris ${rowNum}: Format tanggal tidak valid (gunakan format YYYY-MM-DD)`);
       return { valid: false, errors, data: null };
     }
 
-    // Required: Jam Masuk
+    // Validasi jam masuk
     if (!row['jam_masuk'] || String(row['jam_masuk']).trim() === '') {
       errors.push(`Baris ${rowNum}: Jam masuk wajib diisi`);
       return { valid: false, errors, data: null };
@@ -415,7 +422,7 @@ export class AttendanceImportService {
         ? `${jamMasukStr}:00`
         : jamMasukStr;
 
-    // Optional: Jam Keluar
+    // Validasi jam keluar (opsional)
     let jamKeluar: string | null = null;
     if (row['jam_keluar'] && String(row['jam_keluar']).trim() !== '') {
       const jamKeluarStr = String(row['jam_keluar']).trim();
@@ -441,7 +448,7 @@ export class AttendanceImportService {
     const jamMasukDate = parseTimeToUtcDate(jamMasuk);
     const jamKeluarDate = parseTimeToUtcDate(jamKeluar);
 
-    // Optional: Jabatan
+    // Jabatan opsional di excel, jika kosong ambil dari DB pegawai
     let jabatan = employee.jabatan;
     if (row['jabatan'] && String(row['jabatan']).trim() !== '') {
       const jabatanStr = String(row['jabatan']).trim().toUpperCase();
@@ -485,7 +492,7 @@ export class AttendanceImportService {
   }
 
   /**
-   * Check if attendance record is an exact duplicate.
+   * Memeriksa apakah log absensi yang diimpor sudah ada (duplikat) di DB.
    */
   public static async isDuplicate(
     user_id: string,
@@ -505,7 +512,7 @@ export class AttendanceImportService {
 
       return existing !== null;
     } catch (error) {
-      logger.error('Error checking duplicate:', {
+      logger.error('Error saat memeriksa duplikasi log:', {
         user_id,
         tanggal,
         jamMasuk,
@@ -516,7 +523,7 @@ export class AttendanceImportService {
   }
 
   /**
-   * Process Fingerspot import file
+   * Memproses dan menyimpan data impor khusus format Fingerspot.
    */
   public static async processFingerspotImport(
     rows: Record<string, string | null>[],
@@ -525,13 +532,13 @@ export class AttendanceImportService {
     const { skipDuplicates = true } = options;
 
     try {
-      logger.info(`Processing Fingerspot import with ${rows.length} rows`);
+      logger.info(`Memulai pemrosesan impor Fingerspot dengan ${rows.length} baris`);
 
       const parsedRows = rows
-        .map((row, index) => this.parseFingerspotRow(row, index))
-        .filter((row): row is ParsedRow => row !== null);
+          .map((row, index) => this.parseFingerspotRow(row, index))
+          .filter((row): row is ParsedRow => row !== null);
 
-      logger.info(`Parsed ${parsedRows.length} valid rows from Fingerspot format`);
+      logger.info(`Berhasil mem-parsing ${parsedRows.length} baris valid format Fingerspot`);
 
       if (parsedRows.length === 0) {
         return {
@@ -546,7 +553,7 @@ export class AttendanceImportService {
       }
 
       const grouped = this.groupFingerspotData(parsedRows);
-      logger.info(`Grouped into ${grouped.length} attendance records`);
+      logger.info(`Dikelompokkan menjadi ${grouped.length} rekaman absensi harian`);
 
       const results = {
         total: grouped.length,
@@ -558,23 +565,22 @@ export class AttendanceImportService {
       };
 
       const validRecords: any[] = [];
-
       const duplicateRecords: any[] = [];
 
       for (let i = 0; i < grouped.length; i++) {
         const record = grouped[i];
         if (!record) continue;
 
-        // Check employee exists
-
+        // Cek data master pegawai
         let employee: any;
         try {
           employee = await prisma.employees.findUnique({
             where: { user_id: record.user_id },
           });
 
+          // Jika pegawai belum ada di database, buat otomatis demi kelancaran impor
           if (!employee) {
-            logger.info(`Auto-creating employee User ID ${record.user_id} from import data`);
+            logger.info(`Auto-creating employee User ID ${record.user_id} dari data import`);
             employee = await prisma.employees.upsert({
               where: { user_id: record.user_id },
               update: {},
@@ -587,11 +593,11 @@ export class AttendanceImportService {
               },
             });
             results.warnings.push(
-              `User ID ${record.user_id} (${String(employee.nama)}) dibuat otomatis sebagai KARYAWAN - perbarui jabatan via menu Pegawai`
+              `User ID ${record.user_id} (${String(employee.nama)}) dibuat otomatis sebagai KARYAWAN - silakan sesuaikan jabatannya nanti`
             );
           }
         } catch (error) {
-          logger.error('Error looking up/creating employee:', {
+          logger.error('Error saat menelusuri/membuat pegawai:', {
             user_id: record.user_id,
             error: error instanceof Error ? error.message : String(error),
           });
@@ -642,7 +648,7 @@ export class AttendanceImportService {
           status: record.status,
         };
 
-        // Check duplicate
+        // Cek duplikasi record di database
         if (mappedRecord.jam_masuk) {
           const isDupe = await this.isDuplicate(
             mappedRecord.user_id,
@@ -667,7 +673,7 @@ export class AttendanceImportService {
         validRecords.push(mappedRecord);
       }
 
-      // Batch insert valid records
+      // Memasukkan data valid ke database secara massal (batch insert) menggunakan prisma transaction
       if (validRecords.length > 0) {
         try {
           await prisma.$transaction(async (tx) => {
@@ -681,9 +687,9 @@ export class AttendanceImportService {
           });
 
           results.imported = validRecords.length;
-          logger.info(`Successfully imported ${validRecords.length} Fingerspot records`);
+          logger.info(`Berhasil mengimpor ${validRecords.length} log absensi Fingerspot`);
         } catch (error) {
-          logger.error('Database insert error:', {
+          logger.error('Error saat menyimpan batch ke database:', {
             error: error instanceof Error ? error.message : String(error),
           });
           throw new Error(
@@ -700,7 +706,7 @@ export class AttendanceImportService {
         warnings: results.warnings.length > 0 ? results.warnings.slice(0, 10) : undefined,
       };
     } catch (error) {
-      logger.error('Fingerspot import processing error:', {
+      logger.error('Error pemrosesan impor Fingerspot:', {
         error: error instanceof Error ? error.message : String(error),
       });
       return {
@@ -716,7 +722,7 @@ export class AttendanceImportService {
   }
 
   /**
-   * Process import file and save to database
+   * Titik masuk utama (entry point) pemrosesan impor berkas.
    */
   public static async processImport(
     fileBuffer: Buffer,
@@ -738,8 +744,9 @@ export class AttendanceImportService {
         };
       }
 
+      // Deteksi format berkas
       const format = this.detectFileFormat(rows);
-      logger.info(`Detected format: ${format}`);
+      logger.info(`Format berkas terdeteksi: ${format}`);
 
       if (format === 'FINGERSPOT') {
         return await this.processFingerspotImport(rows, options);
@@ -758,7 +765,7 @@ export class AttendanceImportService {
         };
       }
     } catch (error) {
-      logger.error('Import processing error:', {
+      logger.error('Error saat pemrosesan impor file:', {
         error: error instanceof Error ? error.message : String(error),
       });
       return {
@@ -774,7 +781,7 @@ export class AttendanceImportService {
   }
 
   /**
-   * Process template format import (original logic)
+   * Memproses data impor dalam format Template Absensi Manual.
    */
   public static async processTemplateImport(
     rows: Record<string, string | null>[],
@@ -792,22 +799,23 @@ export class AttendanceImportService {
       };
 
       const validRecords: any[] = [];
-
       const duplicateRecords: any[] = [];
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         if (!row) continue;
 
+        // Validasi kebenaran struktur data baris
         const validation = await this.validateRow(row, i);
 
         if (!validation.valid) {
-          logger.warn(`Row ${i + 2} validation failed:`, { errors: validation.errors });
+          logger.warn(`Validasi baris ${i + 2} gagal:`, { errors: validation.errors });
           results.errors.push(...validation.errors);
           results.skipped++;
           continue;
         }
 
+        // Cek duplikasi di DB
         const isDuplicate = await this.isDuplicate(
           validation.data.user_id,
           validation.data.tanggal,
@@ -827,7 +835,7 @@ export class AttendanceImportService {
             continue;
           } else {
             results.errors.push(
-              `Baris ${i + 2}: Data duplikat ditemukan (update belum diimplementasi)`
+              `Baris ${i + 2}: Data duplikat ditemukan (pembaruan data belum didukung)`
             );
             results.skipped++;
             continue;
@@ -837,6 +845,7 @@ export class AttendanceImportService {
         validRecords.push(validation.data);
       }
 
+      // Batch insert ke database
       if (validRecords.length > 0) {
         try {
           await prisma.$transaction(async (tx) => {
@@ -851,10 +860,10 @@ export class AttendanceImportService {
 
           results.imported = validRecords.length;
           logger.info(
-            `Successfully imported ${validRecords.length} attendance records from template import`
+            `Berhasil mengimpor ${validRecords.length} log absensi dari template manual`
           );
         } catch (error) {
-          logger.error('Database insert error:', {
+          logger.error('Error saat melakukan batch insert ke DB:', {
             error: error instanceof Error ? error.message : String(error),
           });
           throw new Error(
@@ -870,7 +879,7 @@ export class AttendanceImportService {
         duplicateDetails: duplicateRecords.length > 0 ? duplicateRecords : undefined,
       };
     } catch (error) {
-      logger.error('Import processing error:', {
+      logger.error('Error saat memproses template impor:', {
         error: error instanceof Error ? error.message : String(error),
       });
       return {
@@ -886,7 +895,7 @@ export class AttendanceImportService {
   }
 
   /**
-   * Generate import summary message
+   * Menghasilkan string kesimpulan/summary hasil impor.
    */
   public static generateImportMessage(results: {
     total: number;

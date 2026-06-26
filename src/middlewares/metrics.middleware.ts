@@ -1,28 +1,32 @@
+// src/middlewares/metrics.middleware.ts
+// Middleware pengumpul metrik kinerja Prometheus untuk memantau durasi request,
+// jumlah total request, serta request aktif (in-flight) secara real-time.
+
 import { Request, Response, NextFunction } from 'express';
-import { httpRequestDuration, httpRequestTotal, activeRequests } from '../utils/metrics';
+import { httpRequestDuration, httpRequestTotal, activeRequests } from '../utils/metrics'; // Klien metrik Prometheus
 
 /**
- * Prometheus metrics middleware
- * Tracks request duration, count, and active requests
+ * Middleware Prometheus metrics.
+ * Memantau dan mencatat durasi, jumlah hits, serta status request HTTP.
  */
 export function metricsMiddleware(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
 
-  // Increment active requests
+  // Naikkan jumlah hitungan request aktif (in-flight requests)
   activeRequests.inc();
 
-  // Sanitize route path
+  // Menentukan jalur rute (path), gunakan pola path Express jika ada (misal /users/:id)
   let route = req.route ? req.route.path : req.path;
 
-  // Replace dynamic params with placeholder
+  // Bersihkan parameter dinamis agar tidak memecah metrik menjadi baris-baris tak terbatas di Prometheus
   route = route.replace(/:[^\s/]+/g, ':id');
 
-  // On response finish
+  // Ketika proses respons selesai dikirim ke client (finish event)
   res.on('finish', () => {
-    const duration = (Date.now() - start) / 1000;
+    const duration = (Date.now() - start) / 1000; // Hitung durasi request dalam satuan detik
     const statusCode = res.statusCode.toString();
 
-    // Record request duration
+    // Rekam durasi request ke histogram metrik Prometheus
     httpRequestDuration.observe(
       {
         method: req.method,
@@ -32,14 +36,14 @@ export function metricsMiddleware(req: Request, res: Response, next: NextFunctio
       duration
     );
 
-    // Increment request counter
+    // Naikkan counter total hit request HTTP dengan label terkait
     httpRequestTotal.inc({
       method: req.method,
       route: route,
       status_code: statusCode,
     });
 
-    // Decrement active requests
+    // Turunkan jumlah hitungan request aktif setelah selesai diproses
     activeRequests.dec();
   });
 

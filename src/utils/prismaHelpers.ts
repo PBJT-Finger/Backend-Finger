@@ -1,25 +1,26 @@
 /**
  * Prisma Helper Utilities
  *
- * Common utility functions for Prisma queries and transformations
+ * Kumpulan fungsi utilitas pembantu umum untuk query Prisma ORM, manipulasi koneksi,
+ * serta transformasi format tanggal/waktu yang dikembalikan dari database MySQL.
  */
 
-import prisma from '../config/prisma';
-import logger from './logger';
+import prisma from '../config/prisma'; // Prisma client
+import logger from './logger'; // Logger aplikasi
 
 /**
- * Test Database Connection
- * Verify Prisma can connect to the database
+ * Menguji Koneksi Database.
+ * Memastikan Prisma berhasil terhubung dengan server MySQL.
  *
- * @returns Connection status
+ * @returns Status keberhasilan koneksi (true/false)
  */
 export async function testConnection(): Promise<boolean> {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    logger.info('✅ Prisma database connection successful');
+    logger.info('✅ Koneksi database Prisma sukses dilakukan');
     return true;
   } catch (error) {
-    logger.error('❌ Prisma database connection failed:', {
+    logger.error('❌ Koneksi database Prisma gagal dilakukan:', {
       error: error instanceof Error ? error.message : String(error),
     });
     return false;
@@ -36,10 +37,10 @@ interface DatabaseStats {
 }
 
 /**
- * Get Database Statistics
- * Retrieve counts for all main tables
+ * Mengambil Statistik Database.
+ * Menarik jumlah baris data (count) dari semua tabel utama sistem absensi.
  *
- * @returns Table counts
+ * @returns Jumlah record per-tabel
  */
 export async function getDatabaseStats(): Promise<DatabaseStats> {
   try {
@@ -60,7 +61,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
       total: employees + attendance + devices + shifts + admins,
     };
   } catch (error) {
-    logger.error('Error getting database stats:', {
+    logger.error('Error saat mengambil statistik database:', {
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
@@ -68,35 +69,34 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
 }
 
 /**
- * Safely disconnect Prisma
- * Graceful shutdown helper
+ * Memutus koneksi Prisma secara aman.
+ * Digunakan saat server menerima sinyal shutdown (Graceful Shutdown).
  */
 export async function disconnect(): Promise<void> {
   try {
     await prisma.$disconnect();
-    logger.info('Prisma disconnected successfully');
+    logger.info('Koneksi Prisma berhasil diputus secara aman');
   } catch (error) {
-    logger.error('Error disconnecting Prisma:', {
+    logger.error('Error saat memutuskan koneksi Prisma:', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
 }
 
 /**
- * Execute raw SQL query
- * Wrapper for $queryRaw with error handling
+ * Mengeksekusi Query SQL Mentah (Raw Query).
+ * Pembungkus (wrapper) untuk $queryRawUnsafe dengan penanganan error.
  *
- * @param query - SQL query
- * @param params - Query parameters
- * @returns Query results
+ * @param query - String SQL query mentah
+ * @param params - Parameter query array
+ * @returns Hasil query database
  */
-
 export async function executeRawQuery(query: string, params: any[] = []): Promise<any> {
   try {
     const result = await prisma.$queryRawUnsafe(query, ...params);
     return result;
   } catch (error) {
-    logger.error('Raw query error:', {
+    logger.error('Eror pada eksekusi raw query:', {
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
@@ -104,11 +104,11 @@ export async function executeRawQuery(query: string, params: any[] = []): Promis
 }
 
 /**
- * Format TIME field from Prisma
- * Convert DateTime to HH:MM:SS string
+ * Memformat kolom tipe TIME dari database.
+ * Mengonversi objek DateTime dari Prisma menjadi format string HH:MM:SS lokal murni.
  *
- * @param dateTime - Prisma TIME field (returned as DateTime)
- * @returns Time in HH:MM:SS format
+ * @param dateTime - Nilai kolom TIME dari Prisma (dikembalikan sebagai objek Date)
+ * @returns String waktu format HH:MM:SS atau null
  */
 export function formatTime(dateTime: Date | string | null | undefined): string | null {
   if (!dateTime) return null;
@@ -120,11 +120,11 @@ export function formatTime(dateTime: Date | string | null | undefined): string |
 }
 
 /**
- * Format DATE field from Prisma
- * Convert Date to YYYY-MM-DD string
+ * Memformat kolom tipe DATE dari database.
+ * Mengonversi objek Date dari Prisma menjadi format string YYYY-MM-DD.
  *
- * @param date - Prisma DATE field
- * @returns Date in YYYY-MM-DD format
+ * @param date - Kolom DATE dari Prisma
+ * @returns String tanggal format YYYY-MM-DD atau null
  */
 export function formatDate(date: Date | null | undefined): string | null {
   if (!date) return null;

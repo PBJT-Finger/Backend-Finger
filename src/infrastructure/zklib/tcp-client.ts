@@ -1,3 +1,8 @@
+// src/infrastructure/zklib/tcp-client.ts
+// Klien TCP tingkat rendah untuk berkomunikasi langsung dengan perangkat biometrik ZKTeco
+// menggunakan soket TCP murni (node net). Menangani jabat tangan (handshake), pengiriman perintah,
+// penerimaan fragmen data besar (chunks), decoding respon, dan pemutusan koneksi yang aman.
+
 import net from 'net';
 import { MAX_CHUNK, COMMANDS, REQUEST_DATA } from './constants';
 import {
@@ -12,18 +17,18 @@ import {
 } from './utils';
 
 export interface DeviceInfo {
-  userCounts: number;
-  logCounts: number;
-  logCapacity: number;
+  userCounts: number; // Jumlah user terdaftar di perangkat
+  logCounts: number; // Jumlah log transaksi kehadiran yang tersimpan di perangkat
+  logCapacity: number; // Kapasitas penyimpanan log maksimal perangkat
 }
 
 export class ZkTcpClient {
-  private readonly ip: string;
-  private readonly port: number;
-  private readonly timeout: number;
-  private sessionId: number | null = null;
-  private replyId = 0;
-  private socket: net.Socket | null = null;
+  private readonly ip: string; // IP Address perangkat target
+  private readonly port: number; // Port TCP (default 4370)
+  private readonly timeout: number; // Batas waktu tunggu soket (dalam milidetik)
+  private sessionId: number | null = null; // ID Sesi komunikasi yang diberikan perangkat setelah terhubung
+  private replyId = 0; // ID Balasan paket transmisi berjalan
+  private socket: net.Socket | null = null; // Instansi Soket koneksi TCP
 
   constructor(ip: string, port: number, timeout: number) {
     this.ip = ip;
@@ -31,6 +36,11 @@ export class ZkTcpClient {
     this.timeout = timeout;
   }
 
+  /**
+   * Membuat soket TCP baru dan menginisialisasi koneksi fisik ke mesin.
+   * @param cbError Callback penanganan error socket
+   * @param cbClose Callback penanganan penutupan socket
+   */
   public createSocket(
     cbError?: (err: Error) => void,
     cbClose?: (type: string) => void
@@ -38,28 +48,36 @@ export class ZkTcpClient {
     return new Promise((resolve, reject) => {
       this.socket = new net.Socket();
 
+      // Tangani event error socket sekali saja saat awal
       this.socket.once('error', (err) => {
         reject(err);
         if (cbError) cbError(err);
       });
 
+      // Tangani sukses koneksi socket
       this.socket.once('connect', () => {
         resolve(this.socket!);
       });
 
+      // Bersihkan referensi socket saat koneksi ditutup
       this.socket.once('close', () => {
         this.socket = null;
         if (cbClose) cbClose('tcp');
       });
 
+      // Atur timeout socket jika disediakan
       if (this.timeout) {
         this.socket.setTimeout(this.timeout);
       }
 
+      // Mulai koneksi TCP ke perangkat
       this.socket.connect(this.port, this.ip);
     });
   }
 
+  /**
+   * Mengirimkan perintah koneksi (CMD_CONNECT) untuk menginisialisasi sesi komunikasi.
+   */
   public connect(): Promise<boolean> {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
@@ -68,7 +86,7 @@ export class ZkTcpClient {
         if (reply) {
           resolve(true);
         } else {
-          reject(new Error('NO_REPLY_ON_CMD_CONNECT'));
+          reject(new Error('Perangkat tidak membalas perintah CMD_CONNECT'));
         }
       } catch (err) {
         reject(err);
@@ -76,24 +94,34 @@ export class ZkTcpClient {
     });
   }
 
+  /**
+   * Menutup soket koneksi TCP secara bersih.
+   */
   public closeSocket(): Promise<boolean> {
     return new Promise((resolve) => {
       if (!this.socket) {
         resolve(true);
         return;
       }
+      // Hapus semua listener untuk mencegah kebocoran memori sebelum menutup socket
       this.socket.removeAllListeners('data');
       this.socket.end(() => {
         clearTimeout(timer);
         resolve(true);
       });
 
+      // Pengaman jika socket.end menggantung terlalu lama (maksimal 2 detik)
       const timer = setTimeout(() => {
         resolve(true);
       }, 2000);
     });
   }
 
+  /**
+   * Menulis paket perintah biner ke soket TCP dan menunggu respon balasan (single-packet exchange).
+   * @param msg Buffer pesan perintah terenkapsulasi
+   * @param connectMode Menandakan apakah sedang dalam mode jabat tangan awal (CMD_CONNECT / CMD_EXIT)
+   */
   private writeMessage(msg: Buffer, connectMode: boolean): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       let timer: NodeJS.Timeout | null = null;
@@ -111,21 +139,26 @@ export class ZkTcpClient {
             if (this.socket) this.socket.removeListener('data', handleData);
             reject(err);
           } else if (this.timeout) {
+            // Berikan batas waktu tunggu respon dari alat
             timer = setTimeout(
               () => {
                 if (this.socket) this.socket.removeListener('data', handleData);
-                reject(new Error('TIMEOUT_ON_WRITING_MESSAGE'));
+                reject(new Error('Batas waktu tunggu penulisan pesan habis (TIMEOUT_ON_WRITING_MESSAGE)'));
               },
               connectMode ? 2000 : this.timeout
             );
           }
         });
       } else {
-        reject(new Error('Socket is not initialized'));
+        reject(new Error('Soket belum diinisialisasi'));
       }
     });
   }
 
+  /**
+   * Mengirimkan perintah pembacaan data dan menampung aliran paket data masuk (multi-packet streaming).
+   * @param msg Buffer perintah permintaan data
+   */
   private requestData(msg: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       let timer: NodeJS.Timeout | null = null;
@@ -139,18 +172,21 @@ export class ZkTcpClient {
 
       const handleOnData = (data: Buffer) => {
         replyBuffer = Buffer.concat([replyBuffer, data]);
+        // Abaikan jika data masuk adalah event realtime, bukan respon perintah
         if (checkNotEventTCP(data)) return;
         if (timer) clearTimeout(timer);
         const header = decodeTCPHeader(replyBuffer.subarray(0, 16));
 
         if (header.commandId === COMMANDS.CMD_DATA) {
+          // Jika masih menerima fragmen data, tunggu 1 detik lagi untuk paket berikutnya
           timer = setTimeout(() => {
             internalCallback(replyBuffer);
           }, 1000);
         } else {
+          // Pengaman timeout jika transmisi terhenti
           timer = setTimeout(() => {
             if (this.socket) this.socket.removeListener('data', handleOnData);
-            reject(new Error('TIMEOUT_ON_RECEIVING_REQUEST_DATA'));
+            reject(new Error('Batas waktu penerimaan permintaan data habis (TIMEOUT_ON_RECEIVING_REQUEST_DATA)'));
           }, this.timeout);
 
           const packetLength = data.readUIntLE(4, 2);
@@ -171,15 +207,20 @@ export class ZkTcpClient {
 
           timer = setTimeout(() => {
             if (this.socket) this.socket.removeListener('data', handleOnData);
-            reject(new Error('TIMEOUT_IN_RECEIVING_RESPONSE_AFTER_REQUESTING_DATA'));
+            reject(new Error('Batas waktu tunggu respon setelah mengirimkan perintah habis'));
           }, this.timeout);
         });
       } else {
-        reject(new Error('Socket is not initialized'));
+        reject(new Error('Soket belum diinisialisasi'));
       }
     });
   }
 
+  /**
+   * Mengeksekusi perintah ZK dengan melakukan pemaketan header secara otomatis.
+   * @param command Kode perintah ZK
+   * @param data Payload data biner atau string
+   */
   public executeCmd(command: number, data: string | Buffer): Promise<Buffer> {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
@@ -201,6 +242,7 @@ export class ZkTcpClient {
         const rReply = removeTcpHeader(reply);
         if (rReply && rReply.length >= 6) {
           if (command === COMMANDS.CMD_CONNECT) {
+            // Simpan ID sesi komunikasi yang diberikan mesin ke memori klien
             this.sessionId = rReply.readUInt16LE(4);
           }
         }
@@ -211,6 +253,11 @@ export class ZkTcpClient {
     });
   }
 
+  /**
+   * Mengirim permintaan pembacaan satu fragmen data (chunk request) dari memori perangkat.
+   * @param start Posisi index offset awal data di memori alat
+   * @param size Ukuran byte data yang diminta
+   */
   private sendChunkRequest(start: number, size: number): void {
     this.replyId++;
     const reqData = Buffer.alloc(8);
@@ -221,12 +268,17 @@ export class ZkTcpClient {
     if (this.socket) {
       this.socket.write(buf, undefined, (err) => {
         if (err) {
-          console.error(`[TCP][SEND_CHUNK_REQUEST] Error:`, err);
+          console.error(`[TCP][SEND_CHUNK_REQUEST] Gagal mengirim paket chunk request:`, err);
         }
       });
     }
   }
 
+  /**
+   * Membaca sekumpulan data besar (seperti seluruh tabel user atau tabel log) dengan sistem buffer fragmen.
+   * @param reqData Buffer perintah inisialisasi pembacaan data
+   * @param cb Callback pelacak kemajuan unduhan (progress callback)
+   */
   private readWithBuffer(
     reqData: Buffer,
     cb?: (loaded: number, total: number) => void
@@ -258,7 +310,7 @@ export class ZkTcpClient {
         case COMMANDS.CMD_ACK_OK:
         case COMMANDS.CMD_PREPARE_DATA: {
           const recvData = reply.subarray(16);
-          const size = recvData.readUIntLE(1, 4);
+          const size = recvData.readUIntLE(1, 4); // Dapatkan total byte data yang akan ditransfer
 
           const remain = size % MAX_CHUNK;
           const numberChunks = Math.round(size - remain) / MAX_CHUNK;
@@ -271,7 +323,7 @@ export class ZkTcpClient {
           const timeout = 10000;
 
           const handleClose = () => {
-            internalCallback(replyData, new Error('Socket is disconnected unexpectedly'));
+            internalCallback(replyData, new Error('Soket terputus secara tidak terduga saat transfer data'));
           };
 
           const internalCallback = (repData: Buffer, err: Error | null = null) => {
@@ -284,7 +336,7 @@ export class ZkTcpClient {
           };
 
           let timer = setTimeout(() => {
-            internalCallback(replyData, new Error('TIMEOUT WHEN RECEIVING PACKET'));
+            internalCallback(replyData, new Error('Batas waktu tunggu penerimaan paket data habis (TIMEOUT)'));
           }, timeout);
 
           const handleOnData = (rep: Buffer) => {
@@ -293,7 +345,7 @@ export class ZkTcpClient {
             timer = setTimeout(() => {
               internalCallback(
                 replyData,
-                new Error(`TIME OUT !! ${totalPackets} PACKETS REMAIN !`)
+                new Error(`Batas waktu transfer habis! Sisa paket yang belum terkirim: ${totalPackets}`)
               );
             }, timeout);
 
@@ -329,6 +381,7 @@ export class ZkTcpClient {
             this.socket.on('data', handleOnData);
           }
 
+          // Lakukan pengiriman sinyal chunk request berurutan untuk memicu alat mengirim fragmen data
           for (let i = 0; i <= numberChunks; i++) {
             if (i === numberChunks) {
               this.sendChunkRequest(numberChunks * MAX_CHUNK, remain);
@@ -340,16 +393,19 @@ export class ZkTcpClient {
           break;
         }
         default: {
-          reject(new Error('ERROR_IN_UNHANDLE_CMD'));
+          reject(new Error('Respon perintah tidak terduga saat inisialisasi transfer data'));
         }
       }
     });
   }
 
+  /**
+   * Menarik daftar seluruh user terdaftar yang tersimpan di dalam mesin.
+   */
   public async getUsers(): Promise<{ data: DecodedUser[]; err: Error | null }> {
     if (this.socket) {
       try {
-        await this.freeData();
+        await this.freeData(); // Bebaskan cache buffer transmisi alat terlebih dahulu
       } catch (err) {
         return Promise.reject(err);
       }
@@ -370,10 +426,11 @@ export class ZkTcpClient {
       }
     }
 
-    const USER_PACKET_SIZE = 72;
+    const USER_PACKET_SIZE = 72; // Ukuran biner satu user ZK adalah 72 bytes
     let userData = data.data.subarray(4);
     const users: DecodedUser[] = [];
 
+    // Loop decode user data per 72 bytes
     while (userData.length >= USER_PACKET_SIZE) {
       const user = decodeUserData72(userData.subarray(0, USER_PACKET_SIZE));
       users.push(user);
@@ -383,6 +440,10 @@ export class ZkTcpClient {
     return { data: users, err: data.err };
   }
 
+  /**
+   * Menarik daftar seluruh log transaksi kehadiran pegawai yang ada di memori perangkat.
+   * @param callbackInProcess Callback pelacak progres sinkronisasi data
+   */
   public async getAttendances(
     callbackInProcess = () => {}
   ): Promise<{ data: (DecodedRecord & { ip: string })[]; err: Error | null }> {
@@ -412,10 +473,11 @@ export class ZkTcpClient {
       }
     }
 
-    const RECORD_PACKET_SIZE = 40;
+    const RECORD_PACKET_SIZE = 40; // Ukuran biner satu log absensi ZK adalah 40 bytes
     let recordData = data.data.subarray(4);
     const records: (DecodedRecord & { ip: string })[] = [];
 
+    // Loop decode log data per 40 bytes
     while (recordData.length >= RECORD_PACKET_SIZE) {
       const record = decodeRecordData40(recordData.subarray(0, RECORD_PACKET_SIZE));
       records.push({ ...record, ip: this.ip });
@@ -425,10 +487,16 @@ export class ZkTcpClient {
     return { data: records, err: data.err };
   }
 
+  /**
+   * Membebaskan alokasi memori buffer pengiriman data di perangkat ZK.
+   */
   public async freeData(): Promise<Buffer> {
     return await this.executeCmd(COMMANDS.CMD_FREE_DATA, '');
   }
 
+  /**
+   * Menonaktifkan/mengunci input perangkat biometrik (layar & mesin pemindai).
+   */
   public async disableDevice(): Promise<Buffer> {
     return await this.executeCmd(
       COMMANDS.CMD_DISABLEDEVICE,
@@ -436,19 +504,28 @@ export class ZkTcpClient {
     );
   }
 
+  /**
+   * Mengaktifkan kembali input perangkat biometrik yang terkunci.
+   */
   public async enableDevice(): Promise<Buffer> {
     return await this.executeCmd(COMMANDS.CMD_ENABLEDEVICE, '');
   }
 
+  /**
+   * Memutus koneksi dari perangkat dan menutup socket.
+   */
   public async disconnect(): Promise<boolean> {
     try {
       await this.executeCmd(COMMANDS.CMD_EXIT, '');
     } catch (_err) {
-      // Ignored
+      // Abaikan jika error pengiriman perintah keluar
     }
     return await this.closeSocket();
   }
 
+  /**
+   * Meminta informasi sisa ruang kapasitas penyimpanan data memori internal mesin.
+   */
   public async getInfo(): Promise<DeviceInfo> {
     try {
       const data = await this.executeCmd(COMMANDS.CMD_GET_FREE_SIZES, '');
@@ -463,6 +540,10 @@ export class ZkTcpClient {
     }
   }
 
+  /**
+   * Menghapus seluruh log transaksi absensi yang tersimpan di dalam memori mesin biometrik.
+   * ⚠️ CAUTION: Operasi ini destruktif dan akan membersihkan log kehadiran fisik pada alat.
+   */
   public async clearAttendanceLog(): Promise<Buffer> {
     return await this.executeCmd(COMMANDS.CMD_CLEAR_ATTLOG, '');
   }

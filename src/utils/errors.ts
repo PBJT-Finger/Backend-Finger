@@ -1,28 +1,28 @@
 /**
- * src/utils/errors.ts — Typed Application Error Hierarchy
+ * src/utils/errors.ts — Hirarki Kelas Eror Terstruktur (Typed Application Error Hierarchy)
  *
- * All errors extend AppError, which extends native Error.
- * Controllers and middlewares should ONLY throw subclasses of AppError —
- * never throw raw Error objects or return error strings manually.
+ * Semua kelas eror mewarisi kelas dasar AppError, yang mewarisi kelas Error bawaan JavaScript.
+ * Controller dan Service HARUS melemparkan subclass AppError saja —
+ * jangan melemparkan objek Error mentah untuk menjaga konsistensi tipe eror.
  *
- * The errorHandler middleware (errorHandler.middleware.ts) catches all AppError
- * subclasses and maps them to the standard API error envelope.
+ * Middleware errorHandler (errorHandler.middleware.ts) akan menangkap semua subclass AppError ini
+ * dan memetakannya menjadi respons JSON terstandarisasi.
  *
- * Design: isOperational flag distinguishes expected business errors (4xx)
- * from programming bugs (5xx). Non-operational errors trigger full stack
- * logging and alert escalation in production.
+ * Desain: Bendera (flag) isOperational digunakan untuk membedakan antara kesalahan bisnis yang wajar (4xx)
+ * dengan bug pemrograman (5xx). Eror non-operational (isOperational = false) akan memicu pencatatan
+ * stack trace lengkap untuk keperluan audit/debugging.
  */
 
-import { HTTP_STATUS, type HttpStatusCode } from '../constants/app';
+import { HTTP_STATUS, type HttpStatusCode } from '../constants/app'; // Kode status HTTP dan tipe datanya
 
-// ─── Base Error ──────────────────────────────────────────────────────────────
+// ─── Kelas Dasar Eror (Base Error Class) ──────────────────────────────────────
 
 export class AppError extends Error {
-  public readonly statusCode: HttpStatusCode;
-  /** Operational = expected by the domain (user input errors, not found, etc.) */
+  public readonly statusCode: HttpStatusCode; // Kode status HTTP respons
+  /** isOperational = true menandakan kesalahan input pengguna, data tidak ada, dsb (tidak merusak server) */
   public readonly isOperational: boolean;
-  public readonly timestamp: string;
-  /** Machine-readable error code for API clients to act on programmatically */
+  public readonly timestamp: string; // Waktu terjadinya eror
+  /** Kode error berupa string unik yang mudah dibaca oleh client pengonsumsi API */
   public readonly code: string;
 
   constructor(
@@ -38,16 +38,16 @@ export class AppError extends Error {
     this.timestamp = new Date().toISOString();
     this.code = code;
 
-    // Maintains proper stack trace in V8 (Node.js)
+    // Mempertahankan stack trace asli di runtime V8 (Node.js)
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
-// ─── 400 Validation ──────────────────────────────────────────────────────────
+// ─── Eror Validasi 400 (Bad Request) ──────────────────────────────────────────
 
 /**
- * Thrown when request input fails validation (missing fields, wrong types, etc.)
- * `details` carries the per-field validation messages for the API response.
+ * Dilemparkan jika data request input dari client tidak valid (misal field kosong, tipe data salah).
+ * Properti `details` menampung detail kesalahan validasi per-field.
  */
 export class ValidationError extends AppError {
   public readonly details: Record<string, unknown>[];
@@ -59,77 +59,77 @@ export class ValidationError extends AppError {
   }
 }
 
-// ─── 401 Authentication ───────────────────────────────────────────────────────
+// ─── Eror Autentikasi 401 (Unauthorized) ──────────────────────────────────────
 
 /**
- * Thrown when a JWT token is missing, expired, or revoked.
- * Never expose internal JWT error details to the caller.
+ * Dilemparkan jika token JWT tidak ada, kadaluarsa, atau telah dicabut.
  */
 export class AuthenticationError extends AppError {
-  constructor(message = 'Authentication required') {
+  constructor(message = 'Autentikasi diperlukan') {
     super(message, HTTP_STATUS.UNAUTHORIZED, true, 'AUTHENTICATION_FAILED');
     this.name = 'AuthenticationError';
   }
 }
 
-// ─── 403 Authorization ───────────────────────────────────────────────────────
+// ─── Eror Otorisasi 403 (Forbidden) ───────────────────────────────────────────
 
 /**
- * Thrown when a valid user attempts an action beyond their role permissions.
+ * Dilemparkan jika user yang sah mencoba mengakses fitur atau melakukan tindakan
+ * yang di luar hak akses role miliknya.
  */
 export class AuthorizationError extends AppError {
-  constructor(message = 'Insufficient permissions') {
+  constructor(message = 'Hak akses tidak mencukupi') {
     super(message, HTTP_STATUS.FORBIDDEN, true, 'AUTHORIZATION_FAILED');
     this.name = 'AuthorizationError';
   }
 }
 
-// ─── 404 Not Found ───────────────────────────────────────────────────────────
+// ─── Eror Data Tidak Ditemukan 404 (Not Found) ────────────────────────────────
 
 /**
- * Thrown when a requested resource does not exist.
- * `resource` should be the entity name (e.g. 'Employee', 'Device').
+ * Dilemparkan jika data/sumber daya yang diminta tidak ada di database.
+ * @param resource - Nama entitas data yang dicari (misal: 'Pegawai', 'Mesin')
  */
 export class NotFoundError extends AppError {
   constructor(resource = 'Resource') {
-    super(`${resource} not found`, HTTP_STATUS.NOT_FOUND, true, 'NOT_FOUND');
+    super(`${resource} tidak ditemukan`, HTTP_STATUS.NOT_FOUND, true, 'NOT_FOUND');
     this.name = 'NotFoundError';
   }
 }
 
-// ─── 409 Conflict ────────────────────────────────────────────────────────────
+// ─── Eror Konflik Data 409 (Conflict) ─────────────────────────────────────────
 
 /**
- * Thrown on unique constraint violations or business rule conflicts
- * (e.g. duplicate NIP, duplicate username).
+ * Dilemparkan ketika terjadi pelanggaran batasan unik database atau konflik aturan bisnis
+ * (misalnya duplicate NIP, username sudah terpakai).
  */
 export class ConflictError extends AppError {
-  constructor(message = 'Resource already exists') {
+  constructor(message = 'Resource sudah ada sebelumnya') {
     super(message, HTTP_STATUS.CONFLICT, true, 'CONFLICT');
     this.name = 'ConflictError';
   }
 }
 
-// ─── 429 Rate Limit ──────────────────────────────────────────────────────────
+// ─── Eror Batas Frekuensi Request 429 (Rate Limit) ────────────────────────────
 
 export class RateLimitError extends AppError {
-  constructor(message = 'Too many requests') {
+  constructor(message = 'Terlalu banyak permintaan') {
     super(message, HTTP_STATUS.TOO_MANY_REQUESTS, true, 'RATE_LIMIT_EXCEEDED');
     this.name = 'RateLimitError';
   }
 }
 
-// ─── 500 Database ────────────────────────────────────────────────────────────
+// ─── Eror Database 500 (Database Error) ───────────────────────────────────────
 
 /**
- * Thrown by service layer when a database operation fails unexpectedly.
- * isOperational = false → triggers full stack trace logging.
- * originalError is NOT forwarded to the API response to avoid leaking internals.
+ * Dilemparkan jika terjadi kegagalan operasi database MySQL secara tidak terduga.
+ * isOperational diatur false agar memicu pencatatan log stack trace lengkap.
+ * originalError tidak akan dikembalikan ke respons client demi faktor keamanan informasi.
  */
 export class DatabaseError extends AppError {
   public readonly originalError: Error | null;
 
-  constructor(message = 'Database operation failed', originalError: Error | null = null) {
+  constructor(message = 'Operasi database gagal dilakukan', originalError: Error | null = null) {
     super(message, HTTP_STATUS.INTERNAL_SERVER_ERROR, false, 'DATABASE_ERROR');
     this.name = 'DatabaseError';
     this.originalError = originalError;

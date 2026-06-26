@@ -1,56 +1,56 @@
 /**
  * src/services/device.users.service.ts
  *
- * Bridges the ZkDeviceClient user cache with the database registration tables.
+ * Menghubungkan cache user dari ZkDeviceClient dengan tabel registrasi database pegawai.
  *
- * Responsibilities:
- *   1. Read device user cache from ZkDeviceClient singleton (no new ZK connection)
- *   2. Cross-reference against employees tables
- *   3. Register new users: create employee
- *   4. Patch orphaned attendance records after a successful registration
+ * Tanggung Jawab:
+ *   1. Membaca cache user mesin dari singleton ZkDeviceClient (tanpa membuat koneksi ZK baru)
+ *   2. Membandingkan silang (cross-reference) data user mesin dengan tabel employees (pegawai) di DB
+ *   3. Mendaftarkan user mesin baru ke dalam database sebagai pegawai (create/update employee)
+ *   4. Memperbaiki (patching) data log absensi lama yang belum terisi nama dan jabatan setelah proses registrasi sukses
  *
- * Design decision — Cache over live connection:
- *   ZkDeviceClient maintains a deviceUserCache refreshed every poll cycle (~5s).
- *   Creating a second ZK connection would corrupt the polling loop's TCP state.
- *   The ~5s cache staleness is acceptable for an admin registration workflow.
+ * Desain Keputusan — Menggunakan Cache dibanding Live Connection langsung:
+ *   ZkDeviceClient mengelola cache user (deviceUserCache) yang diperbarui setiap siklus polling (~5 detik).
+ *   Membuat koneksi TCP ZKTeco baru akan merusak status TCP loop polling yang sedang berjalan.
+ *   Keterlambatan pembaruan cache ~5 detik dapat diterima untuk alur kerja pendaftaran admin.
  *
- * Trade-off: If device is offline and cache is empty, pull returns an empty list
- *   with a clear error signal rather than attempting a new connection.
+ * Konsekuensi: Jika perangkat offline dan cache kosong, penarikan data akan mengembalikan daftar kosong
+ * dengan pesan kesalahan yang jelas, alih-alih mencoba membuat koneksi TCP baru yang lambat/gagal.
  */
 
-import { v4 as uuidv4 } from 'uuid';
-import prisma from '../config/prisma';
-import { ZkDeviceClient } from '../infrastructure/zk-client';
-import logger from '../utils/logger';
+import { v4 as uuidv4 } from 'uuid'; // Pembuat string UUID acak untuk pelacakan transaksi audit
+import prisma from '../config/prisma'; // Prisma client untuk manipulasi data DB
+import { ZkDeviceClient } from '../infrastructure/zk-client'; // Client koneksi mesin ZKTeco
+import logger from '../utils/logger'; // Logger aplikasi
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Tipe Data ────────────────────────────────────────────────────────────────
 
-/** Registration status of a device user relative to the DB. */
+/** Status registrasi user mesin sidik jari terhadap database sistem. */
 export type RegistrationStatus = 'registered' | 'unregistered' | 'partial';
 
 /**
- * A device user enriched with its DB registration status.
- * - `registered`:   employee is active — fully operational
- * - `partial`:      employee exists BUT inactive
- * - `unregistered`: no employee at all — this user will show as a number on the web
+ * Representasi user mesin sidik jari yang diperkaya dengan status registrasi DB.
+ * - `registered`:   pegawai aktif — beroperasi penuh secara normal
+ * - `partial`:      pegawai terdaftar tetapi berstatus non-aktif di DB
+ * - `unregistered`: pegawai belum terdaftar sama sekali — hanya tampil nomor ID saja di web
  */
 export interface DeviceUserWithStatus {
-  /** Internal serial number from the ZKTeco device memory */
+  /** Nomor seri internal dari memori mesin ZKTeco */
   uid: number;
-  /** User ID used as user_id in employees */
+  /** User ID mesin yang dipetakan sebagai user_id tabel employees */
   userId: string;
-  /** Name stored on the physical device */
+  /** Nama yang tersimpan langsung di dalam memori mesin fisik */
   name: string;
-  /** ZK role: 0 = normal user, 14 = admin */
+  /** Role mesin ZK: 0 = user biasa, 14 = administrator mesin */
   role: number;
-  /** Card number (0 if not assigned) */
+  /** Nomor kartu RFID/Akses (0 jika tidak ada) */
   cardno: number;
   registrationStatus: RegistrationStatus;
-  /** Employee name from the employees table; null if unregistered */
+  /** Nama pegawai dari tabel employees; bernilai null jika belum terdaftar */
   employeeNama: string | null;
-  /** Employee jabatan; null if unregistered */
+  /** Jabatan pegawai dari tabel employees; bernilai null jika belum terdaftar */
   employeeJabatan: string | null;
-  /** Employee shift ID; null if unregistered */
+  /** ID Shift jam kerja pegawai; bernilai null jika belum terdaftar */
   employeeShiftId: number | null;
 }
 
@@ -66,13 +66,13 @@ export interface DeviceUserPullResult {
 }
 
 export interface RegisterDeviceUserDto {
-  /** device_user_id from the ZKTeco device (e.g. "12") */
+  /** ID user mesin ZKTeco (contoh: "12") */
   deviceUserId: string;
-  /** Name for the employee record */
+  /** Nama pegawai untuk didaftarkan ke tabel employees */
   nama: string;
-  /** Jabatan enum value */
+  /** Jabatan enum (DOSEN atau KARYAWAN) */
   jabatan: 'DOSEN' | 'KARYAWAN';
-  /** Shift ID from the shifts table */
+  /** ID Shift jam kerja yang dipilih */
   shiftId?: number | null;
 }
 
@@ -81,9 +81,9 @@ export interface RegisterResult {
   nama: string;
   jabatan: string;
   deviceUserId: string;
-  /** "created" = new employee; "mapping_added" = employee existed */
+  /** "created" = baru didaftarkan; "mapping_added" = pegawai sudah ada sebelumnya */
   action: 'created' | 'mapping_added';
-  /** Number of orphaned attendance records that were patched */
+  /** Jumlah log absensi lama yang diperbaiki nama & jabatannya */
   patchedAttendanceCount: number;
 }
 
@@ -93,22 +93,21 @@ export class DeviceUsersService {
   private readonly zkClient: ZkDeviceClient;
 
   constructor() {
-    // Reuse the singleton — do NOT create a new ZK connection here
+    // Menggunakan singleton ZkDeviceClient yang sudah aktif — JANGAN buat koneksi baru
     this.zkClient = ZkDeviceClient.getInstance();
   }
 
   /**
-   * Returns all users from the ZkDeviceClient cache with their DB registration status.
+   * Mengambil semua user dari cache ZkDeviceClient lengkap dengan status registrasi database mereka.
    *
-   * Uses a single batch DB query per table to avoid N+1 query problems.
+   * Menggunakan query batch tunggal untuk mencegah masalah N+1 queries.
    */
   public async getDeviceUsersWithStatus(): Promise<DeviceUserPullResult> {
-    const deviceStatus = this.zkClient.getStatus();
-
-    const cachedUsers = this.zkClient.getCachedUsers();
+    const deviceStatus = this.zkClient.getStatus(); // Cek status koneksi mesin (online/offline)
+    const cachedUsers = this.zkClient.getCachedUsers(); // Ambil cache user mesin
 
     if (cachedUsers.length === 0) {
-      logger.warn('[DeviceUsersService] Cache is empty — device may be offline or not yet polled', {
+      logger.warn('[DeviceUsersService] Cache kosong — mesin offline atau belum selesai polling', {
         deviceStatus,
       });
       return {
@@ -119,7 +118,9 @@ export class DeviceUsersService {
       };
     }
 
+    // Ambil daftar semua user ID dari mesin
     const deviceUserIds = cachedUsers.map((u) => u.userId);
+    // Cari data pegawai di DB yang NIP/NIDN nya ada di daftar user ID mesin tadi
     const employees =
       deviceUserIds.length > 0
         ? await prisma.employees.findMany({
@@ -128,10 +129,10 @@ export class DeviceUsersService {
           })
         : [];
 
-    // Build a lookup map: user_id → employee
+    // Buat map pencarian cepat (lookup map): user_id → employee
     const employeeByUserId = new Map(employees.map((e) => [e.user_id, e]));
 
-    // Merge into final result
+    // Gabungkan data cache mesin dengan status database
     const users: DeviceUserWithStatus[] = cachedUsers.map((u) => {
       const employee = employeeByUserId.get(u.userId) ?? null;
 
@@ -157,6 +158,7 @@ export class DeviceUsersService {
       };
     });
 
+    // Hitung total ringkasan per status registrasi
     const summary = users.reduce(
       (acc, u) => {
         acc[u.registrationStatus]++;
@@ -165,7 +167,7 @@ export class DeviceUsersService {
       { registered: 0, unregistered: 0, partial: 0 }
     );
 
-    logger.info('[DeviceUsersService] Pull completed', {
+    logger.info('[DeviceUsersService] Penarikan data user mesin selesai', {
       deviceStatus,
       total: users.length,
       ...summary,
@@ -180,34 +182,37 @@ export class DeviceUsersService {
   }
 
   /**
-   * Registers a device user into the system.
+   * Mendaftarkan user mesin sidik jari ke dalam tabel pegawai database.
    *
-   * @throws Error if deviceUserId not found in cache
+   * @throws Error jika ID user mesin tidak ditemukan di cache ZKTeco
    */
   public async registerDeviceUser(dto: RegisterDeviceUserDto): Promise<RegisterResult> {
     const { deviceUserId, nama, jabatan, shiftId } = dto;
 
-    // 1. Validate the device user exists in cache
-    const cachedUsers = this.zkClient.getCachedUsers();
-    const deviceUser = cachedUsers.find((u) => u.userId === deviceUserId);
-    if (!deviceUser) {
-      throw new Error(
-        `Device user ID "${deviceUserId}" tidak ditemukan di cache. ` +
-          'Pastikan alat terhubung dan coba tarik data terlebih dahulu.'
-      );
-    }
-
-    // 2. Check if employee already exists
+    // 1. Periksa apakah pegawai dengan user_id ini sudah ada di database
     const existingEmployee = await prisma.employees.findUnique({
       where: { user_id: deviceUserId },
     });
 
+    // 2. Jika pegawai belum ada di DB, barulah pastikan user mesin yang didaftarkan ada dalam cache
+    if (!existingEmployee) {
+      const cachedUsers = this.zkClient.getCachedUsers();
+      const deviceUser = cachedUsers.find((u) => u.userId === deviceUserId);
+      if (!deviceUser) {
+        throw new Error(
+          `User ID mesin "${deviceUserId}" tidak ditemukan di cache. ` +
+            'Pastikan mesin terhubung dan coba tarik data user terlebih dahulu.'
+        );
+      }
+    }
+
     const batchId = uuidv4();
     let action: 'created' | 'mapping_added';
 
+    // Bungkus pembuatan/pembaruan pegawai dalam Prisma transaction
     await prisma.$transaction(async (tx) => {
       if (!existingEmployee) {
-        // Create new employee
+        // Buat pegawai baru
         await tx.employees.create({
           data: {
             user_id: deviceUserId,
@@ -219,14 +224,14 @@ export class DeviceUsersService {
           },
         });
         action = 'created';
-        logger.info('[DeviceUsersService] Employee created', {
+        logger.info('[DeviceUsersService] Pegawai baru berhasil dibuat', {
           user_id: deviceUserId,
           nama,
           jabatan,
           batchId,
         });
       } else {
-        // Employee exists — just update
+        // Pegawai sudah terdaftar sebelumnya — lakukan update profile
         await tx.employees.update({
           where: { user_id: deviceUserId },
           data: {
@@ -237,7 +242,7 @@ export class DeviceUsersService {
           },
         });
         action = 'mapping_added';
-        logger.info('[DeviceUsersService] Employee updated', {
+        logger.info('[DeviceUsersService] Pemetaan pegawai berhasil diperbarui', {
           user_id: deviceUserId,
           existingNama: existingEmployee.nama,
           batchId,
@@ -245,13 +250,14 @@ export class DeviceUsersService {
       }
     });
 
-    // 3. Patch orphaned attendance records (outside transaction — non-fatal)
+    // 3. Perbaiki log absensi lama pegawai yang sebelumnya belum teridentifikasi (nama & jabatan kosong)
     const patchedAttendanceCount = await this.patchOrphanAttendanceRecords(
       deviceUserId,
       nama,
       jabatan
     );
 
+    // Catat log audit transaksi registrasi user mesin
     logger.audit?.('DEVICE_USER_REGISTERED', 0, {
       deviceUserId,
       user_id: deviceUserId,
@@ -273,7 +279,7 @@ export class DeviceUsersService {
   }
 
   /**
-   * Updates orphaned attendance records that were created before this employee existed.
+   * Memperbaiki catatan log absensi 'yatim' (orphaned) yang masuk sebelum data pegawai didaftarkan ke sistem.
    */
   private async patchOrphanAttendanceRecords(
     deviceUserId: string,
@@ -281,6 +287,7 @@ export class DeviceUsersService {
     jabatan: 'DOSEN' | 'KARYAWAN'
   ): Promise<number> {
     try {
+      // Cari log absensi yang memiliki user_id sama tetapi nama/jabatan masih belum diisi lengkap
       const result = await prisma.attendance.updateMany({
         where: {
           user_id: deviceUserId,
@@ -294,7 +301,7 @@ export class DeviceUsersService {
       });
 
       if (result.count > 0) {
-        logger.info('[DeviceUsersService] Orphaned attendance records patched', {
+        logger.info('[DeviceUsersService] Log absensi yatim berhasil diperbaiki', {
           deviceUserId,
           patchedCount: result.count,
         });
@@ -302,8 +309,8 @@ export class DeviceUsersService {
 
       return result.count;
     } catch (err) {
-      // Non-fatal — log and continue. The registration itself succeeded.
-      logger.error('[DeviceUsersService] Failed to patch orphaned attendance records', {
+      // Non-fatal error — catat log dan abaikan agar alur registrasi pegawai tidak ikutan gagal
+      logger.error('[DeviceUsersService] Gagal memperbaiki log absensi yatim', {
         deviceUserId,
         error: err instanceof Error ? err.message : String(err),
       });
