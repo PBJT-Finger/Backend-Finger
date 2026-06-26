@@ -1,10 +1,15 @@
+// src/routes/employee.routes.ts
+// Mengatur perutean (routing) endpoint API untuk manajemen master data Pegawai (Employees),
+// mencakup pengambilan daftar pegawai dengan filter pencarian dan paginasi, pembaruan profil data pegawai,
+// serta penonaktifan pegawai (soft delete).
+
 import { Router } from 'express';
-import EmployeeController from '../controllers/employee.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import EmployeeController from '../controllers/employee.controller'; // Kontroler logika pegawai
+import { authenticateToken } from '../middlewares/auth.middleware'; // Middleware verifikasi token JWT
 
 const router = Router();
 
-// All employee routes require authentication
+// Seluruh rute pegawai memerlukan autentikasi login token JWT
 router.use(authenticateToken);
 
 /**
@@ -49,6 +54,7 @@ router.use(authenticateToken);
  *       200:
  *         description: Daftar pegawai berhasil diambil
  */
+// Endpoint untuk mengambil daftar pegawai berpaginasi (GET /api/employees)
 router.get('/', EmployeeController.getEmployees);
 
 /**
@@ -87,6 +93,7 @@ router.get('/', EmployeeController.getEmployees);
  *       200:
  *         description: Data pegawai berhasil diperbarui
  */
+// Endpoint untuk memperbarui data pegawai berdasarkan ID (PUT /api/employees/:user_id)
 router.put('/:user_id', EmployeeController.updateEmployee);
 
 /**
@@ -107,6 +114,7 @@ router.put('/:user_id', EmployeeController.updateEmployee);
  *       200:
  *         description: Pegawai berhasil dinonaktifkan
  */
+// Endpoint untuk menonaktifkan akun pegawai (DELETE /api/employees/:user_id)
 router.delete('/:user_id', EmployeeController.deleteEmployee);
 
 export default router;

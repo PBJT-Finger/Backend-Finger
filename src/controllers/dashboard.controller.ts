@@ -1,40 +1,50 @@
-import { Request, Response } from 'express';
-import prisma from '../config/prisma';
-import { successResponse, errorResponse } from '../utils/responseFormatter';
-import logger from '../utils/logger';
+// src/controllers/dashboard.controller.ts
+// Kontroler ini bertugas mengolah statistik ringkasan dan tren data untuk ditampilkan di halaman Dashboard utama Admin.
+// Data yang ditampilkan mencakup jumlah absensi hari ini, pembagian dosen/karyawan, persentase kehadiran, 
+// data riwayat 10 absensi terbaru, serta tren absensi harian dalam periode tertentu (misal 7 hari terakhir).
 
+import { Request, Response } from 'express';
+import prisma from '../config/prisma'; // Instance Prisma Client untuk koneksi database
+import { successResponse, errorResponse } from '../utils/responseFormatter'; // Util pembantu untuk standard response format API
+import logger from '../utils/logger'; // Logger internal aplikasi
+
+// Interface untuk data statistik tren harian
 interface DailyStat {
-  date: string;
-  total: number;
-  hadir: number;
-  terlambat: number;
-  dosen: number;
-  karyawan: number;
+  date: string; // Format YYYY-MM-DD
+  total: number; // Total record absensi di hari tersebut
+  hadir: number; // Total yang hadir tepat waktu / terlambat (jam masuk terisi)
+  terlambat: number; // Total pegawai terlambat
+  dosen: number; // Jumlah dosen yang hadir
+  karyawan: number; // Jumlah karyawan yang hadir
 }
 
 export class DashboardController {
   /**
-   * Get dashboard summary statistics
+   * Mengambil statistik ringkasan dashboard (kehadiran hari ini, total pegawai, persentase kehadiran, dll).
    * GET /api/dashboard/summary
    */
   public static async getSummary(req: Request, res: Response): Promise<Response> {
     try {
+      // Menentukan batas awal tanggal hari ini (pukul 00:00:00)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      // Menentukan batas awal besok hari
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Get all active employee user IDs
+      // Mengambil daftar seluruh user_id pegawai aktif
       const activeEmployees = await prisma.employees.findMany({
         where: { is_active: true },
         select: { user_id: true }
       });
+      
+      // Filter untuk membuang ID khusus testing (ID 5, 6, 7) agar tidak mengacaukan statistik dashboard
       const activeUserIds = activeEmployees
         .map((e) => e.user_id)
         .filter((id) => !['5', '6', '7'].includes(id));
 
-      // Get today's attendance (restricted to active employees)
+      // Mengambil data log kehadiran hari ini untuk pegawai aktif yang tidak dihapus
       const todayAttendance = await prisma.attendance.findMany({
         where: {
           user_id: { in: activeUserIds },
@@ -46,43 +56,45 @@ export class DashboardController {
         },
       });
 
-      // Calculate statistics
-
+      // Menyusun objek statistik hari ini
       const stats: Record<string, any> = {
         today: {
-          total_attendance: todayAttendance.length,
+          total_attendance: todayAttendance.length, // Total scan absensi hari ini
+          // Menghitung jumlah pegawai unik yang melakukan absensi hari ini
           unique_employees: new Set(todayAttendance.map((a) => a.user_id)).size,
-          hadir: todayAttendance.filter((a) => a.jam_masuk !== null).length,
-          terlambat: todayAttendance.filter((a) => a.status === 'TERLAMBAT').length,
-          dosen: todayAttendance.filter((a) => a.jabatan === 'DOSEN').length,
-          karyawan: todayAttendance.filter((a) => a.jabatan === 'KARYAWAN').length,
+          hadir: todayAttendance.filter((a) => a.jam_masuk !== null).length, // Jumlah terisi jam masuk
+          terlambat: todayAttendance.filter((a) => a.status === 'TERLAMBAT').length, // Jumlah terlambat
+          dosen: todayAttendance.filter((a) => a.jabatan === 'DOSEN').length, // Jumlah dosen absen hari ini
+          karyawan: todayAttendance.filter((a) => a.jabatan === 'KARYAWAN').length, // Jumlah karyawan absen hari ini
         },
       };
 
-      // Get total employees
+      // Mengambil hitungan total dosen aktif, karyawan aktif, dan perangkat sidik jari yang aktif
       const [dosenCount, karyawanCount, deviceCount] = await Promise.all([
         prisma.employees.count({ where: { jabatan: 'DOSEN', is_active: true } }),
         prisma.employees.count({ where: { jabatan: 'KARYAWAN', is_active: true } }),
         prisma.devices.count({ where: { is_active: true } }),
       ]);
 
+      // Menggabungkan ke objek statistik total
       stats['total'] = {
-        employees: dosenCount + karyawanCount,
+        employees: dosenCount + karyawanCount, // Total seluruh pegawai aktif
         dosen: dosenCount,
         karyawan: karyawanCount,
         devices: deviceCount,
       };
 
-      // Calculate attendance percentage
+      // Menghitung persentase kehadiran hari ini (jumlah pegawai unik yang hadir dibanding total seluruh pegawai aktif)
       stats['today'].attendance_percentage =
         stats['total'].employees > 0
           ? Math.round((stats['today'].unique_employees / stats['total'].employees) * 100)
           : 0;
 
-      // Get this month's statistics (restricted to active employees)
+      // Menentukan tanggal awal bulan berjalan saat ini dan awal bulan berikutnya
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const firstDayOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
+      // Menghitung total transaksi absensi dalam bulan berjalan saat ini
       const monthlyCount = await prisma.attendance.count({
         where: {
           user_id: { in: activeUserIds },
@@ -100,7 +112,7 @@ export class DashboardController {
         year: today.getFullYear(),
       };
 
-      // Recent attendance (last 10, restricted to active employees)
+      // Mengambil 10 log absensi terbaru untuk ditampilkan di feed dashboard
       const recentAttendance = await prisma.attendance.findMany({
         where: {
           user_id: { in: activeUserIds },
@@ -117,19 +129,19 @@ export class DashboardController {
           recent_attendance: recentAttendance,
           timestamp: new Date().toISOString(),
         },
-        'Dashboard statistics retrieved successfully'
+        'Berhasil mengambil statistik summary dashboard'
       );
     } catch (error) {
-      logger.error('Get dashboard summary error', {
+      logger.error('Error saat mengambil summary dashboard', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-      return errorResponse(res, 'Failed to retrieve dashboard statistics', 500);
+      return errorResponse(res, 'Gagal mengambil statistik dashboard', 500);
     }
   }
 
   /**
-   * Get attendance trends
+   * Mengambil data tren grafik kehadiran harian (biasanya 7 hari terakhir).
    * GET /api/dashboard/trends?days=7
    */
   public static async getTrends(req: Request, res: Response): Promise<Response> {
@@ -137,27 +149,29 @@ export class DashboardController {
       const daysQuery = req.query['days'];
       const days = typeof daysQuery === 'string' ? parseInt(daysQuery) : 7;
 
+      // Menghitung tanggal batas awal pencarian berdasarkan parameter days
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
       startDate.setHours(0, 0, 0, 0);
 
-      // Get all active employee user IDs
+      // Mengambil daftar seluruh user_id pegawai aktif
       const activeEmployees = await prisma.employees.findMany({
         where: { is_active: true },
         select: { user_id: true }
       });
       const activeUserIds = activeEmployees.map((e) => e.user_id);
 
+      // Query data absensi dalam rentang hari tersebut
       const attendance = await prisma.attendance.findMany({
         where: {
           user_id: { in: activeUserIds },
           tanggal: { gte: startDate },
           is_deleted: false,
         },
-        orderBy: { tanggal: 'asc' },
+        orderBy: { tanggal: 'asc' }, // Urutkan kronologis dari tanggal terlama ke terbaru
       });
 
-      // Group by date
+      // Mengelompokkan data absensi per tanggal (format YYYY-MM-DD)
       const dailyStats: Record<string, DailyStat> = {};
 
       attendance.forEach((record) => {
@@ -176,9 +190,9 @@ export class DashboardController {
 
         const stat = dailyStats[day];
         if (stat) {
-          stat.total++;
-          if (record.jam_masuk) stat.hadir++;
-          if (record.status === 'TERLAMBAT') stat.terlambat++;
+          stat.total++; // Tambah total scan
+          if (record.jam_masuk) stat.hadir++; // Tambah hadir jika jam masuk ada
+          if (record.status === 'TERLAMBAT') stat.terlambat++; // Tambah terlambat
           if (record.jabatan === 'DOSEN') stat.dosen++;
           if (record.jabatan === 'KARYAWAN') stat.karyawan++;
         }
@@ -196,13 +210,13 @@ export class DashboardController {
             days,
           },
         },
-        'Attendance trends retrieved successfully'
+        'Berhasil mengambil grafik tren kehadiran'
       );
     } catch (error) {
-      logger.error('Get attendance trends error', {
+      logger.error('Error saat mengambil tren kehadiran dashboard', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return errorResponse(res, 'Failed to retrieve attendance trends', 500);
+      return errorResponse(res, 'Gagal mengambil data tren kehadiran', 500);
     }
   }
 }

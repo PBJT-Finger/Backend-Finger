@@ -1,6 +1,11 @@
+// src/routes/auth.routes.ts
+// Mengatur perutean (routing) untuk endpoint autentikasi admin,
+// mencakup login, registrasi admin baru, refresh token JWT, logout,
+// lupa password (minta OTP), verifikasi OTP, dan reset password dengan token.
+
 import { Router } from 'express';
-import { AuthController } from '../controllers/auth.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { AuthController } from '../controllers/auth.controller'; // Kontroler logika autentikasi
+import { authenticateToken } from '../middlewares/auth.middleware'; // Middleware verifikasi token JWT
 
 const router = Router();
 
@@ -77,6 +82,7 @@ const router = Router();
  *       401:
  *         description: Kredensial tidak valid
  */
+// Endpoint untuk proses login admin (POST /api/auth/login)
 router.post('/login', AuthController.login);
 
 /**
@@ -103,6 +109,7 @@ router.post('/login', AuthController.login);
  *       401:
  *         description: Refresh token tidak valid atau kadaluarsa
  */
+// Endpoint untuk memperbarui access token (POST /api/auth/refresh)
 router.post('/refresh', AuthController.refreshToken);
 
 /**
@@ -117,7 +124,10 @@ router.post('/refresh', AuthController.refreshToken);
  *       200:
  *         description: Logout berhasil
  */
+// Endpoint untuk logout admin (POST /api/auth/logout)
+// Memerlukan validasi token Bearer agar tahu token siapa yang akan dicabut
 router.post('/logout', authenticateToken, AuthController.logout);
+
 
 
 /**
@@ -145,6 +155,7 @@ router.post('/logout', authenticateToken, AuthController.logout);
  *       400:
  *         description: Format email tidak valid
  */
+// Endpoint untuk meminta kode OTP reset password (POST /api/auth/forgot-password)
 router.post('/forgot-password', AuthController.forgotPassword);
 
 /**
@@ -176,6 +187,7 @@ router.post('/forgot-password', AuthController.forgotPassword);
  *       400:
  *         description: Kode tidak valid atau kadaluarsa
  */
+// Endpoint untuk memverifikasi OTP 6 digit (POST /api/auth/verify-code)
 router.post('/verify-code', AuthController.verifyCode);
 
 /**
@@ -207,6 +219,7 @@ router.post('/verify-code', AuthController.verifyCode);
  *       400:
  *         description: Token tidak valid atau kadaluarsa
  */
+// Endpoint untuk melakukan reset password menggunakan token verifikasi (POST /api/auth/reset-password)
 router.post('/reset-password', AuthController.resetPassword);
 
 export default router;

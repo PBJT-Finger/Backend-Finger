@@ -1,53 +1,53 @@
 /**
  * src/infrastructure/zk-client.ts
  *
- * Anti-Corruption Layer (ACL) for ZKTeco X100-C biometric device.
+ * Anti-Corruption Layer (ACL) untuk perangkat biometrik ZKTeco X100-C.
  *
- * Architecture decision — Persistent Connection Polling:
- *   Connect ONCE, keep the session alive, and poll (getAttendances) on the
- *   same open TCP socket every N seconds.
+ * Keputusan Arsitektur — Polling Koneksi Persisten (Persistent Connection Polling):
+ *   Terhubung SATU KALI, jaga agar sesi tetap hidup, dan lakukan polling (getAttendances) pada
+ *   soket TCP yang sama setiap N detik.
  *
- *   ⚠️  WHY THIS MATTERS:
- *   ZKTeco firmware plays a notification beep on the physical device speaker
- *   every time a NEW TCP session is established (CMD_CONNECT). Under the old
- *   "ephemeral" strategy the device connected/disconnected every 5 s, causing
- *   a continuous beeping noise that alarmed users and staff.
+ *   ⚠️ MENGAPA INI PENTING:
+ *   Firmware ZKTeco membunyikan nada bip notifikasi pada speaker perangkat fisik
+ *   setiap kali sesi TCP BARU dibuat (CMD_CONNECT). Di bawah strategi "ephemeral" lama,
+ *   perangkat terhubung/terputus setiap 5 detik, menyebabkan suara bip terus-menerus
+ *   yang mengganggu pengguna dan staf.
  *
- *   Under persistent mode, CMD_CONNECT is sent ONCE (at startup or after an
- *   actual network failure). The socket is kept open between poll cycles.
- *   The device only beeps once on initial connection — exactly as a normal
- *   fingerprint reader should behave.
+ *   Di bawah mode persisten, CMD_CONNECT dikirimkan SATU KALI (saat startup atau setelah
+ *   kegagalan jaringan yang sebenarnya). Soket tetap terbuka di antara siklus polling.
+ *   Perangkat hanya berbunyi bip sekali pada koneksi awal — persis seperti perilaku normal
+ *   pembaca sidik jari seharusnya.
  *
- *   If the TCP socket drops unexpectedly (e.g., device reboot, network glitch)
- *   the client detects the error and schedules a full reconnect automatically.
+ *   Jika soket TCP terputus secara tidak terduga (misalnya perangkat reboot, gangguan jaringan),
+ *   klien akan mendeteksi kesalahan tersebut dan menjadwalkan koneksi ulang penuh secara otomatis.
  *
- * Trade-off: ~5s polling latency vs. 100% device compatibility.
+ * Trade-off: Latensi polling ~5 detik vs. kompatibilitas perangkat 100%.
  *
- * Singleton pattern: Only ONE connection to the physical device should exist.
- * Double-instantiation would corrupt the ZKLib internal state and produce
- * duplicate or missing attendance records.
+ * Pola Singleton: Hanya boleh ada SATU koneksi ke perangkat fisik.
+ * Instansiasi ganda akan merusak state internal ZKLib dan menghasilkan
+ * catatan kehadiran yang duplikat atau hilang.
  */
 
-// node-zklib does not provide @types — this is the ONLY permitted any boundary.
+// node-zklib tidak menyediakan @types — ini adalah satu-satunya batas 'any' yang diizinkan.
 
 import { EventEmitter } from 'events';
 import { env } from '../config/env';
 import { ZkTcpClient } from './zklib';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Tipe Data ────────────────────────────────────────────────────────────────
 
 export interface AttendanceRecord {
-  /** Raw serial number from ZKTeco device internal log */
+  /** Nomor seri mentah dari log internal perangkat ZKTeco */
   userSn: number;
-  /** User ID string as stored on the device (maps to employees.nip or user_id) */
+  /** String ID Pengguna seperti yang disimpan di perangkat (memetakan ke employees.nip atau user_id) */
   deviceUserId: string;
-  /** Timestamp of the biometric scan */
+  /** Timestamp pemindaian biometrik */
   recordTime: Date;
-  /** IP address of the device that recorded this event */
+  /** Alamat IP perangkat yang merekam kejadian ini */
   ip: string;
   /**
-   * ZKTeco punch type (0=Check-In, 1=Check-Out, 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out).
-   * Use this instead of guessing from the hour of day.
+   * Tipe punch ZKTeco (0=Check-In, 1=Check-Out, 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out).
+   * Gunakan ini alih-alih menebak dari jam waktu hari.
    */
   attendanceType: number;
 }
@@ -63,9 +63,9 @@ export type ZkClientEvent = 'attendance' | 'status' | 'error';
 export type DeviceStatus = 'connecting' | 'online' | 'offline';
 
 /**
- * Enriched device user entry stored in the local cache.
- * Mirrors the DecodedUser shape from zklib/utils but re-exported through
- * the ACL boundary so consumers never need to import from zklib directly.
+ * Entri pengguna perangkat yang diperkaya yang disimpan dalam cache lokal.
+ * Mencerminkan bentuk DecodedUser dari zklib/utils tetapi diekspor kembali melalui
+ * batas ACL sehingga konsumen tidak perlu mengimpor dari zklib secara langsung.
  */
 export interface CachedDeviceUser {
   uid: number;
@@ -85,14 +85,14 @@ export class ZkDeviceClient extends EventEmitter {
   private lastKnownLogCount = 0;
   private isRunning = false;
   private currentStatus: DeviceStatus = 'offline';
-  /** Full user objects keyed by userId string for O(1) lookup */
+  /** Objek pengguna lengkap yang diindeks oleh string userId untuk pencarian cepat O(1) */
   private deviceUserCache = new Map<string, CachedDeviceUser>();
 
   private constructor() {
     super();
-    // Prevent fatal process crashes if an error is emitted but no listeners are attached
+    // Mencegah crash proses fatal jika error dipancarkan tetapi tidak ada listener yang terpasang
     this.on('error', () => {
-      /* silently swallowed */
+      /* ditelan secara diam-diam */
     });
 
     this.zkInstance = new ZkTcpClient(
@@ -102,7 +102,7 @@ export class ZkDeviceClient extends EventEmitter {
     );
   }
 
-  /** Returns the shared singleton instance. Creates it on first call. */
+  /** Mengembalikan instansi singleton bersama. Membuatnya pada panggilan pertama. */
   public static getInstance(): ZkDeviceClient {
     if (!ZkDeviceClient.instance) {
       ZkDeviceClient.instance = new ZkDeviceClient();
@@ -110,57 +110,57 @@ export class ZkDeviceClient extends EventEmitter {
     return ZkDeviceClient.instance;
   }
 
-  /** Returns the current connection status of the device. */
+  /** Mengembalikan status koneksi perangkat saat ini. */
   public getStatus(): DeviceStatus {
     return this.currentStatus;
   }
 
   /**
-   * Returns the total number of attendance records seen since server start.
-   * Used by the /health endpoint to expose sync progress without leaking raw data.
+   * Mengembalikan jumlah total catatan kehadiran yang terlihat sejak server dimulai.
+   * Digunakan oleh endpoint /health untuk mengekspos kemajuan sinkronisasi tanpa membocorkan data mentah.
    */
   public getLastSyncCount(): number {
     return this.lastKnownLogCount;
   }
 
-  /** Exposes the cached name of a user fetched from the fingerprint device. */
+  /** Mengekspos nama cache dari pengguna yang diambil dari perangkat sidik jari. */
   public getDeviceUserName(deviceUserId: string): string | undefined {
     return this.deviceUserCache.get(deviceUserId)?.name;
   }
 
   /**
-   * Returns a snapshot of all device users currently in cache.
-   * Used by DeviceUsersService to enumerate users without a new ZK connection.
-   * Returns an empty array if the cache has not been populated yet (device offline).
+   * Mengembalikan snapshot dari semua pengguna perangkat yang saat ini ada di cache.
+   * Digunakan oleh DeviceUsersService untuk menghitung pengguna tanpa koneksi ZK baru.
+   * Mengembalikan array kosong jika cache belum diisi (perangkat offline).
    */
   public getCachedUsers(): CachedDeviceUser[] {
     return Array.from(this.deviceUserCache.values());
   }
 
   /**
-   * Starts the polling loop. Idempotent — safe to call multiple times.
+   * Memulai loop polling. Idempotent — aman untuk dipanggil beberapa kali.
    *
-   * Strategy: PERSISTENT CONNECTION
-   *   - Connect once (CMD_CONNECT) → device beeps once on startup — expected.
-   *   - Poll (getAttendances) every POLLING_INTERVAL_MS on the SAME open socket.
-   *   - Only reconnect when the socket drops (network error, device reboot, etc).
+   * Strategi: KONEKSI PERSISTEN
+   *   - Terhubung sekali (CMD_CONNECT) → perangkat berbunyi bip sekali pada awal mula — diharapkan.
+   *   - Lakukan polling (getAttendances) setiap POLLING_INTERVAL_MS pada soket terbuka yang SAMA.
+   *   - Hanya sambungkan kembali saat soket terputus (kesalahan jaringan, reboot perangkat, dll).
    *
-   * Emits:
-   *   - 'status'     → DeviceStatus on every state change
-   *   - 'attendance' → AttendanceRecord[] containing only NEW records per cycle
-   *   - 'error'      → Error (non-fatal, loop continues with back-off)
+   * Memancarkan Event:
+   *   - 'status'     → DeviceStatus pada setiap perubahan state
+   *   - 'attendance' → AttendanceRecord[] hanya berisi catatan BARU per siklus
+   *   - 'error'      → Error (non-fatal, loop berlanjut dengan back-off jeda waktu)
    */
   public async start(): Promise<void> {
     if (this.isRunning) return;
     this.isRunning = true;
     console.log(
-      `[ZkDeviceClient] Starting polling loop → ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`
+      `[ZkDeviceClient] Memulai loop polling → ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`
     );
-    // Start with immediate first poll (no delay)
+    // Mulai dengan polling pertama segera (tanpa penundaan)
     this.scheduleNextPoll(0);
   }
 
-  /** Stops the polling loop and cleanly disconnects from the device. */
+  /** Menghentikan loop polling dan memutuskan hubungan secara bersih dari perangkat. */
   public async stop(): Promise<void> {
     this.isRunning = false;
     if (this.pollingTimer) {
@@ -169,22 +169,22 @@ export class ZkDeviceClient extends EventEmitter {
     }
     await this.safeDisconnect();
     this.setStatus('offline');
-    console.log('[ZkDeviceClient] Polling stopped.');
+    console.log('[ZkDeviceClient] Polling dihentikan.');
   }
 
-  // ─── Private Helpers ───────────────────────────────────────────────────────
+  // ─── Pembantu Privat (Private Helpers) ───────────────────────────────────────
 
   private scheduleNextPoll(delayMs: number): void {
     if (!this.isRunning) return;
     this.pollingTimer = setTimeout(() => {
-      // Explicitly catch the returned Promise to prevent unhandled rejection
-      // crashes. runPollCycle has its own try/catch, but ZKLib can throw
-      // non-Error objects (plain objects/strings) that escape the async boundary.
+      // Tangkap Promise yang dikembalikan secara eksplisit untuk mencegah crash akibat unhandled rejection.
+      // runPollCycle memiliki try/catch sendiri, tetapi ZKLib dapat melempar
+      // objek non-Error (objek polos/string) yang lolos dari batas asinkron.
       this.runPollCycle().catch((err: unknown) => {
         const error = err instanceof Error ? err : new Error(JSON.stringify(err));
-        console.error('[ZkDeviceClient] Unhandled poll error (safety net):', error.message);
+        console.error('[ZkDeviceClient] Kesalahan polling tidak tertangani (jaring pengaman):', error.message);
         this.emit('error', error);
-        // Force reset so the next cycle reconnects from scratch
+        // Paksa reset sehingga siklus berikutnya terhubung kembali dari awal
         this.currentStatus = 'offline';
         this.safeDisconnect().finally(() => {
           this.scheduleNextPoll(env.RECONNECT_DELAY_MS);
@@ -195,24 +195,24 @@ export class ZkDeviceClient extends EventEmitter {
 
   private async runPollCycle(): Promise<void> {
     try {
-      // ── CONNECT PHASE (only if not already online) ────────────────────────
-      // Under persistent connection strategy, this block runs ONCE at startup
-      // and then only after an unexpected socket drop/device error.
-      // CMD_CONNECT triggers the device beep — sent at most ONCE per session.
+      // ── FASE KONEKSI (hanya jika belum online) ─────────────────────────────
+      // Di bawah strategi koneksi persisten, blok ini berjalan SATU KALI pada saat startup
+      // dan kemudian hanya setelah soket terputus secara tidak terduga/kesalahan perangkat.
+      // CMD_CONNECT memicu bunyi bip perangkat — dikirim maksimal SATU KALI per sesi.
       if (this.currentStatus !== 'online') {
         this.setStatus('connecting');
 
-        // Always reset the socket before reconnecting — zkInstance is stateful
-        // and a previously failed createSocket() leaves internal state dirty.
-        // Calling safeDisconnect() first guarantees a clean slate.
+        // Selalu setel ulang soket sebelum menghubungkan kembali — zkInstance mempertahankan state
+        // dan createSocket() yang gagal sebelumnya meninggalkan state internal kotor.
+        // Memanggil safeDisconnect() terlebih dahulu menjamin lembaran bersih.
         await this.safeDisconnect();
 
-        // Race the socket creation against the configured timeout.
-        // Without this, a hung TCP handshake blocks the entire polling loop
-        // forever — the device never transitions back to 'offline' and no
-        // retry is scheduled.
+        // Balapan pembuatan soket terhadap batas waktu yang dikonfigurasi.
+        // Tanpa ini, jabat tangan TCP yang menggantung memblokir seluruh loop polling
+        // selamanya — perangkat tidak pernah beralih kembali ke 'offline' dan tidak ada
+        // percobaan ulang yang dijadwalkan.
         const socketPromise = this.zkInstance.createSocket();
-        socketPromise.catch(() => {}); // swallow background rejection
+        socketPromise.catch(() => {}); // telan penolakan latar belakang
 
         await Promise.race([
           socketPromise,
@@ -221,7 +221,7 @@ export class ZkDeviceClient extends EventEmitter {
               () =>
                 reject(
                   new Error(
-                    `Connection to ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT} timed out after ${env.FINGERPRINT_TIMEOUT}ms`
+                    `Koneksi ke ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT} habis waktu setelah ${env.FINGERPRINT_TIMEOUT}ms`
                   )
                 ),
               env.FINGERPRINT_TIMEOUT
@@ -230,7 +230,7 @@ export class ZkDeviceClient extends EventEmitter {
         ]);
 
         const connectPromise = this.zkInstance.connect();
-        connectPromise.catch(() => {}); // swallow background rejection
+        connectPromise.catch(() => {}); // telan penolakan latar belakang
 
         await Promise.race([
           connectPromise,
@@ -239,7 +239,7 @@ export class ZkDeviceClient extends EventEmitter {
               () =>
                 reject(
                   new Error(
-                    `Handshake with ZKTeco device timed out after ${env.FINGERPRINT_TIMEOUT}ms`
+                    `Jabat tangan dengan perangkat ZKTeco habis waktu setelah ${env.FINGERPRINT_TIMEOUT}ms`
                   )
                 ),
               env.FINGERPRINT_TIMEOUT
@@ -249,11 +249,11 @@ export class ZkDeviceClient extends EventEmitter {
 
         this.setStatus('online');
         console.log(
-          `[ZkDeviceClient] ✓ Connected to ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`
+          `[ZkDeviceClient] ✓ Terhubung ke ${env.FINGERPRINT_IP}:${env.FINGERPRINT_PORT}`
         );
       }
 
-      // ── POLL PHASE (runs every cycle on the SAME open socket) ────────────
+      // ── FASE POLLING (berjalan setiap siklus pada soket terbuka yang SAMA) ───
       const attendancesPromise = this.zkInstance.getAttendances();
       attendancesPromise.catch(() => {});
 
@@ -261,16 +261,16 @@ export class ZkDeviceClient extends EventEmitter {
         attendancesPromise,
         new Promise<any>((_, reject) =>
           setTimeout(
-            () => reject(new Error(`getAttendances timed out after ${env.FINGERPRINT_TIMEOUT}ms`)),
+            () => reject(new Error(`getAttendances habis waktu setelah ${env.FINGERPRINT_TIMEOUT}ms`)),
             env.FINGERPRINT_TIMEOUT
           )
         ),
       ]);
       const rawRecords = result?.data ?? [];
 
-      // Check if there are any records with user IDs not present in the cache
+      // Periksa apakah ada catatan dengan ID pengguna yang tidak ada dalam cache
       const hasUnknownUser = rawRecords.some(
-        (r: any) => r.deviceUserId && !this.deviceUserCache.has(String(r.deviceUserId))
+          (r: any) => r.deviceUserId && !this.deviceUserCache.has(String(r.deviceUserId))
       );
 
       if (hasUnknownUser || this.deviceUserCache.size === 0) {
@@ -282,7 +282,7 @@ export class ZkDeviceClient extends EventEmitter {
             usersPromise,
             new Promise<any>((_, reject) =>
               setTimeout(
-                () => reject(new Error(`getUsers timed out after ${env.FINGERPRINT_TIMEOUT}ms`)),
+                () => reject(new Error(`getUsers habis waktu setelah ${env.FINGERPRINT_TIMEOUT}ms`)),
                 env.FINGERPRINT_TIMEOUT
               )
             ),
@@ -301,14 +301,14 @@ export class ZkDeviceClient extends EventEmitter {
             }
           }
           console.log(
-            `[ZkDeviceClient] Cache refreshed: ${this.deviceUserCache.size} users loaded.`
+            `[ZkDeviceClient] Cache diperbarui: ${this.deviceUserCache.size} pengguna dimuat.`
           );
         } catch (err) {
-          console.warn('[ZkDeviceClient] Failed to refresh device users list cache:', err);
+          console.warn('[ZkDeviceClient] Gagal memperbarui cache daftar pengguna perangkat:', err);
         }
       }
 
-      // Map raw ZkTcpClient output to our typed AttendanceRecord interface
+      // Petakan output mentah ZkTcpClient ke antarmuka AttendanceRecord yang bertipe kuat
       const allRecords: AttendanceRecord[] = rawRecords.map((r: any) => {
         return {
           userSn: r.userSn,
@@ -321,9 +321,9 @@ export class ZkDeviceClient extends EventEmitter {
 
       const newCount = allRecords.length;
 
-      // [CRITICAL FIX]: Handle device memory clear
+      // [CRITICAL FIX]: Tangani pembersihan memori perangkat jika log dihapus manual di alat
       if (newCount < this.lastKnownLogCount) {
-        console.warn(`[ZkDeviceClient] Device logs were cleared! Resetting pointer from ${this.lastKnownLogCount} to 0.`);
+        console.warn(`[ZkDeviceClient] Log perangkat dihapus/dibersihkan! Menyetel ulang pointer dari ${this.lastKnownLogCount} ke 0.`);
         this.lastKnownLogCount = 0;
       }
 
@@ -332,14 +332,14 @@ export class ZkDeviceClient extends EventEmitter {
         this.lastKnownLogCount = newCount;
         this.emit('attendance', newRecords);
         console.log(
-          `[ZkDeviceClient] ${newRecords.length} new attendance record(s) detected. Total: ${newCount}`
+          `[ZkDeviceClient] ${newRecords.length} catatan kehadiran baru terdeteksi. Total: ${newCount}`
         );
       }
 
-      // ── PERSISTENT CONNECTION: Do NOT disconnect after each poll ──────────
-      // Keep the socket open. Schedule the next poll cycle and return.
-      // The device will only beep again if the connection drops and needs
-      // to be re-established (handled by the catch block below).
+      // ── KONEKSI PERSISTEN: Jangan terputus setelah setiap polling ───────────
+      // Jaga agar soket tetap terbuka. Jadwalkan siklus polling berikutnya dan kembali.
+      // Perangkat hanya akan berbunyi bip lagi jika koneksi terputus dan perlu
+      // dibuat kembali (ditangani oleh blok catch di bawah).
       this.scheduleNextPoll(env.POLLING_INTERVAL_MS);
 
     } catch (err) {
@@ -349,11 +349,11 @@ export class ZkDeviceClient extends EventEmitter {
           : new Error(typeof err === 'object' ? JSON.stringify(err) : String(err));
 
       const retrySec = Math.round(env.RECONNECT_DELAY_MS / 1000);
-      console.warn(`[ZkDeviceClient] ✗ ${error.message} — reconnecting in ${retrySec}s`);
+      console.warn(`[ZkDeviceClient] ✗ ${error.message} — menghubungkan kembali dalam ${retrySec} detik`);
       this.emit('error', error);
 
-      // Mark offline and tear down the broken socket cleanly before retrying.
-      // The next poll cycle will reconnect (single beep on device) and resume.
+      // Tandai offline dan hancurkan soket yang rusak secara bersih sebelum mencoba lagi.
+      // Siklus polling berikutnya akan terhubung kembali (satu bip pada perangkat) dan dilanjutkan.
       this.setStatus('offline');
       await this.safeDisconnect();
       this.scheduleNextPoll(env.RECONNECT_DELAY_MS);
@@ -372,9 +372,9 @@ export class ZkDeviceClient extends EventEmitter {
     try {
       await this.zkInstance.disconnect();
     } catch {
-      // Intentionally ignored — disconnect errors are non-fatal.
-      // The zkInstance is stateless across poll cycles; a stale disconnect
-      // will not corrupt the next cycle's createSocket() call.
+      // Sengaja diabaikan — kesalahan pemutusan koneksi bersifat non-fatal.
+      // zkInstance tidak mempertahankan state di antara siklus polling; pemutusan koneksi yang basi
+      // tidak akan merusak panggilan createSocket() siklus berikutnya.
     }
   }
 }

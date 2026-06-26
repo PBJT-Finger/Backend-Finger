@@ -1,11 +1,17 @@
+// src/controllers/export.controller.ts
+// Kontroler ini bertanggung jawab untuk mengekspor data rekapitulasi absensi pegawai ke berbagai format file:
+// Excel (.xlsx), PDF (.pdf), dan CSV (.csv). 
+// Data yang diekspor disaring berdasarkan rentang tanggal/bulan, jabatan (Dosen/Karyawan), 
+// dan ID pegawai tertentu, lengkap dengan Kop Surat institusi (Politeknik Baja Tegal) pada laporan PDF.
+
 import { Request, Response } from 'express';
-import prisma from '../config/prisma';
-import { errorResponse } from '../utils/responseFormatter';
-import logger from '../utils/logger';
-import ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
-import path from 'path';
-import fs from 'fs';
+import prisma from '../config/prisma'; // Prisma client untuk akses database
+import { errorResponse } from '../utils/responseFormatter'; // Util format respon error API
+import logger from '../utils/logger'; // Logger aplikasi
+import ExcelJS from 'exceljs'; // Library untuk generate file Excel
+import PDFDocument from 'pdfkit'; // Library untuk generate file PDF
+import path from 'path'; // Module internal Node.js untuk resolusi path file
+import fs from 'fs'; // Module internal Node.js untuk operasi file system
 
 import {
   extractTimeString,
@@ -14,9 +20,9 @@ import {
   transformKaryawanAttendance,
   RawAttendanceRecord,
   calculateWorkingDays,
-} from '../utils/attendanceTransformer';
+} from '../utils/attendanceTransformer'; // Helper transformasi data kehadiran dan perhitungan hari kerja
 
-// Helper wrapper to handle time formatting safely
+// Helper pembantu untuk format waktu (jam:menit) secara aman
 const formatTimeFixed = (timeVal: string | Date | null): string => {
   if (!timeVal) return '-';
   return extractTimeString(timeVal) || '-';
@@ -24,7 +30,7 @@ const formatTimeFixed = (timeVal: string | Date | null): string => {
 
 export class ExportController {
   /**
-   * Export attendance summary to Excel
+   * Mengekspor ringkasan (summary) kehadiran pegawai ke berkas Excel.
    * GET /api/export/excel?start_date=X&end_date=Y&jabatan=Z&user_id=W
    */
   public static async exportToExcel(req: Request, res: Response): Promise<Response | void> {
@@ -34,7 +40,7 @@ export class ExportController {
       let startDate = typeof start_date === 'string' ? start_date : '';
       let endDate = typeof end_date === 'string' ? end_date : '';
 
-      // Handle month/year to date range conversion
+      // Konversi jika parameter yang dikirim adalah bulan & tahun
       if (bulan && tahun) {
         const month = parseInt(bulan as string);
         const year = parseInt(tahun as string);
@@ -46,11 +52,12 @@ export class ExportController {
         endDate = end.toISOString().split('T')[0] as string;
       }
 
+      // Pastikan rentang tanggal sudah ditentukan
       if (!startDate || !endDate) {
-        return errorResponse(res, 'Start date/end date OR month/year are required', 400);
+        return errorResponse(res, 'Tanggal mulai/selesai ATAU bulan/tahun harus diisi', 400);
       }
 
-      // Get attendance data — deduplicate: one row per employee per date
+      // Query raw SQL untuk grouping absensi per tanggal per pegawai agar tidak ada duplikasi data scan masuk/keluar
       let sql = `
         SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
                MIN(a.jam_masuk) AS jam_masuk,
@@ -62,11 +69,13 @@ export class ExportController {
 
       const params: any[] = [startDate, endDate];
 
+      // Tambahkan filter jabatan jika ada
       if (jabatan) {
         sql += ' AND a.jabatan = ?';
         params.push(jabatan);
       }
 
+      // Tambahkan filter user_id jika ada
       if (id || user_id) {
         sql += ' AND a.user_id = ?';
         params.push(id || user_id);
@@ -77,10 +86,12 @@ export class ExportController {
 
       const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
 
+      // Jika data tidak ditemukan, batalkan proses ekspor
       if (attendance.length === 0) {
-        return errorResponse(res, 'No data found for export', 404);
+        return errorResponse(res, 'Data absensi tidak ditemukan untuk diekspor', 404);
       }
 
+      // Mengambil data pegawai aktif untuk pemetaan nama yang ter-update
       const activeEmployees = await prisma.employees.findMany({
         select: { user_id: true, nama: true, jabatan: true },
       });
@@ -94,7 +105,7 @@ export class ExportController {
         };
       });
 
-      // Get holidays in the selected range
+      // Mengambil daftar libur nasional dalam periode ekspor
       const holidayWhere: any = {};
       const startLocalDate = startDate ? new Date(startDate) : null;
       const endLocalDate = endDate ? new Date(endDate) : null;
@@ -114,10 +125,10 @@ export class ExportController {
         })
       );
 
+      // Menghitung total hari kerja efektif dalam periode ekspor
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
-      // Transform to aggregated data
-
+      // Transformasi data absensi berdasarkan jabatan (Dosen atau Karyawan)
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(
@@ -137,11 +148,11 @@ export class ExportController {
         );
       }
 
-      // Create workbook with ExcelJS
+      // Membuat workbook Excel baru menggunakan ExcelJS
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Rekap Absensi');
 
-      // Set columns
+      // Mendefinisikan kolom lembar kerja Excel
       worksheet.columns = [
         { header: 'No', key: 'no', width: 6 },
         { header: 'Nama', key: 'nama', width: 28 },
@@ -152,6 +163,7 @@ export class ExportController {
         { header: 'Persentase', key: 'persentase', width: 12 },
       ];
 
+      // Memasukkan setiap data baris rekap ke Excel
       transformedData.forEach((record, index) => {
         worksheet.addRow({
           no: index + 1,
@@ -164,14 +176,14 @@ export class ExportController {
         });
       });
 
-      // Bold header row
+      // Membuat teks baris header menjadi tebal (Bold)
       const headerRow = worksheet.getRow(1);
       headerRow.font = { bold: true };
 
-      // Generate buffer in memory
+      // Menghasilkan buffer file Excel di memori
       const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
 
-      // Set headers for file download
+      // Mengatur header HTTP agar browser mengunduh berkas sebagai file attachment Excel
       const filename = `rekap-absensi-summary-${String(jabatan || 'all')}-${startDate}-to-${endDate}.xlsx`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader(
@@ -180,7 +192,7 @@ export class ExportController {
       );
 
       const actorId = req.user?.id ?? 0;
-      logger.info('Excel summary export generated', {
+      logger.info('Proses ekspor summary Excel berhasil dibuat', {
         filename,
         records: transformedData.length,
         user_id: actorId,
@@ -189,16 +201,16 @@ export class ExportController {
       res.send(buffer);
       return;
     } catch (error) {
-      logger.error('Export to Excel summary error', {
+      logger.error('Error ekspor Excel summary', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-      return errorResponse(res, 'Failed to export to Excel summary', 500);
+      return errorResponse(res, 'Gagal mengekspor data rekap ke Excel', 500);
     }
   }
 
   /**
-   * Export detailed daily attendance to Excel
+   * Mengekspor detail riwayat absensi harian pegawai ke berkas Excel.
    * GET /api/export/excel-detail?start_date=X&end_date=Y&jabatan=Z&user_id=W
    */
   public static async exportToExcelDetail(req: Request, res: Response): Promise<Response | void> {
@@ -208,25 +220,22 @@ export class ExportController {
       let startDate = typeof start_date === 'string' ? start_date : '';
       let endDate = typeof end_date === 'string' ? end_date : '';
 
-      // Handle month/year to date range conversion
       if (bulan && tahun) {
         const month = parseInt(bulan as string);
         const year = parseInt(tahun as string);
 
-        // Start date: 1st of the month
         const start = new Date(year, month - 1, 1);
         startDate = start.toISOString().split('T')[0] as string;
 
-        // End date: Last day of the month
         const end = new Date(year, month, 0);
         endDate = end.toISOString().split('T')[0] as string;
       }
 
       if (!startDate || !endDate) {
-        return errorResponse(res, 'Start date/end date OR month/year are required', 400);
+        return errorResponse(res, 'Tanggal mulai/selesai ATAU bulan/tahun harus diisi', 400);
       }
 
-      // Get attendance data — deduplicate: one row per employee per date
+      // Query data absensi detail harian dari DB
       let sql = `
         SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
                MIN(a.jam_masuk) AS jam_masuk,
@@ -254,7 +263,7 @@ export class ExportController {
       const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
 
       if (attendance.length === 0) {
-        return errorResponse(res, 'No data found for export', 404);
+        return errorResponse(res, 'Data tidak ditemukan untuk diekspor', 404);
       }
 
       const activeEmployees = await prisma.employees.findMany({
@@ -270,7 +279,7 @@ export class ExportController {
         };
       });
 
-      // Format data for Excel — per-date detail rows (Daily Log)
+      // Format data untuk baris detail harian Excel
       const excelData = mappedAttendance.map((record) => ({
         Tanggal: formatDateID(record.tanggal),
         ID: record.user_id || '',
@@ -280,11 +289,10 @@ export class ExportController {
         Status: record.status || '',
       }));
 
-      // Create workbook with ExcelJS
+      // Inisialisasi sheet baru
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Detail Absensi');
 
-      // Set columns with headers and widths
       worksheet.columns = [
         { header: 'Tanggal', key: 'Tanggal', width: 15 },
         { header: 'ID', key: 'ID', width: 15 },
@@ -294,17 +302,14 @@ export class ExportController {
         { header: 'Status', key: 'Status', width: 12 },
       ];
 
-      // Bold header row
       const headerRow = worksheet.getRow(1);
       headerRow.font = { bold: true };
 
-      // Add data rows
+      // Masukkan baris data
       excelData.forEach((row) => worksheet.addRow(row));
 
-      // Generate buffer in memory
       const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
 
-      // Set headers for file download
       const filename = `detail-absensi-${String(jabatan || 'all')}-${startDate}-to-${endDate}.xlsx`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader(
@@ -313,7 +318,7 @@ export class ExportController {
       );
 
       const actorId = req.user?.id ?? 0;
-      logger.info('Excel detailed export generated', {
+      logger.info('Ekspor detail Excel berhasil dibuat', {
         filename,
         records: attendance.length,
         user_id: actorId,
@@ -322,16 +327,16 @@ export class ExportController {
       res.send(buffer);
       return;
     } catch (error) {
-      logger.error('Export to Excel detailed error', {
+      logger.error('Error ekspor Excel detail', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-      return errorResponse(res, 'Failed to export to Excel detailed', 500);
+      return errorResponse(res, 'Gagal mengekspor detail absensi ke Excel', 500);
     }
   }
 
   /**
-   * Export attendance to PDF
+   * Mengekspor rekapitulasi kehadiran pegawai ke format dokumen PDF (Dilengkapi Kop Surat Resmi).
    * GET /api/export/pdf?start_date=X&end_date=Y&jabatan=Z&user_id=W
    */
   public static async exportToPDF(req: Request, res: Response): Promise<Response | void> {
@@ -341,25 +346,22 @@ export class ExportController {
       let startDate = typeof start_date === 'string' ? start_date : '';
       let endDate = typeof end_date === 'string' ? end_date : '';
 
-      // Handle month/year to date range conversion
       if (bulan && tahun) {
         const month = parseInt(bulan as string);
         const year = parseInt(tahun as string);
 
-        // Start date: 1st of the month
         const start = new Date(year, month - 1, 1);
         startDate = start.toISOString().split('T')[0] as string;
 
-        // End date: Last day of the month
         const end = new Date(year, month, 0);
         endDate = end.toISOString().split('T')[0] as string;
       }
 
       if (!startDate || !endDate) {
-        return errorResponse(res, 'Start date/end date OR month/year are required', 400);
+        return errorResponse(res, 'Tanggal mulai/selesai ATAU bulan/tahun harus diisi', 400);
       }
 
-      // Get attendance data — deduplicate: one row per employee per date
+      // Query data absensi
       let sql = `
         SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
                MIN(a.jam_masuk) AS jam_masuk,
@@ -387,7 +389,7 @@ export class ExportController {
       const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
 
       if (attendance.length === 0) {
-        return errorResponse(res, 'No data found for export', 404);
+        return errorResponse(res, 'Data tidak ditemukan untuk diekspor', 404);
       }
 
       const activeEmployees = await prisma.employees.findMany({
@@ -403,7 +405,7 @@ export class ExportController {
         };
       });
 
-      // Get holidays in the selected range
+      // Get holidays
       const holidayWhere: any = {};
       const startLocalDate = startDate ? new Date(startDate) : null;
       const endLocalDate = endDate ? new Date(endDate) : null;
@@ -425,8 +427,7 @@ export class ExportController {
 
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
-      // Transform to aggregated data
-
+      // Transformasi data absensi
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(
@@ -446,29 +447,28 @@ export class ExportController {
         );
       }
 
-      // Create PDF document (Portrait A4 with 35pt margins for neat compact fit)
+      // Membuat dokumen PDF baru ukuran A4 Portrait, margin 35pt
       const doc = new PDFDocument({ margin: 35, size: 'A4' });
 
-      // Set response headers
+      // Mengatur header download HTTP response
       const filename = `rekap-absensi-${String(jabatan || 'all')}-${startDate}-to-${endDate}.pdf`;
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-      // Pipe PDF to response
+      // Mengalirkan langsung output PDF ke HTTP Response stream
       doc.pipe(res);
 
-      // Check if logo exists
+      // Cek ketersediaan file logo Politeknik Baja Tegal
       const logoPath = path.resolve('public/logo-pbjt.png');
       const hasLogo = fs.existsSync(logoPath);
 
       const logoStartY = 40;
       const logoWidth = 68;
       if (hasLogo) {
-        // Render logo (positioned further right and larger, with safe top padding)
-        doc.image(logoPath, 65, logoStartY, { width: logoWidth });
+        doc.image(logoPath, 65, logoStartY, { width: logoWidth }); // Render logo
       }
 
-      // Kop Surat (Institutional Letterhead) Text - Centered with safe margin from logo
+      // Membuat teks KOP SURAT
       const textX = hasLogo ? 70 : 35;
       const textWidth = hasLogo ? 490 : 525;
       const textStartY = 51;
@@ -509,11 +509,11 @@ export class ExportController {
           align: 'center',
         });
 
-      // Position below the Kop Surat texts (taking whichever is lower: doc.y or logo bottom)
+      // Menentukan posisi garis pemisah kop surat
       const logoBottomY = logoStartY + logoWidth;
       const separatorY = Math.max(doc.y, logoBottomY) + 8;
 
-      // Draw Double Line Separator (Thick & Thin)
+      // Menggambar garis ganda khas Kop Surat (tebal & tipis)
       doc
         .strokeColor('#0F172A')
         .lineWidth(2.2)
@@ -529,7 +529,7 @@ export class ExportController {
 
       doc.y = separatorY + 8;
 
-      // Report Title (Below the line)
+      // Judul Laporan PDF
       let jabatanLabel = 'SEMUA PEGAWAI';
       if (jabatan === 'DOSEN') jabatanLabel = 'DOSEN';
       if (jabatan === 'KARYAWAN') jabatanLabel = 'KARYAWAN / STAFF';
@@ -553,6 +553,7 @@ export class ExportController {
       const tableTop = doc.y;
       const startX = 35; 
 
+      // Pengaturan lebar kolom tabel laporan rekap
       const colWidths = [30, 180, 65, 55, 65, 65, 65];
       const headers = [
         'No',
@@ -567,6 +568,7 @@ export class ExportController {
       const rowHeight = 25;
       const headerHeight = 35;
 
+      // Fungsi untuk menggambar Header Tabel
       const drawTableHeader = (startY: number) => {
         let xPos = startX;
         doc.fontSize(10).fillColor('#334155').font('Helvetica-Bold');
@@ -575,10 +577,10 @@ export class ExportController {
         headers.forEach((header, i) => {
           const w = colWidths[i] || 50;
 
-          // Draw header cell background (Light grey with grey border)
+          // Menggambar kotak sel abu-abu muda dengan garis tepi
           doc.rect(xPos, startY, w, headerHeight).fillAndStroke('#F1F5F9', '#CBD5E1');
 
-          // Vertically center text
+          // Menyelaraskan teks secara vertikal di tengah sel
           const lines = header.split('\n');
           const textBlockHeight = lines.length * lineH;
           const textY = startY + (headerHeight - textBlockHeight) / 2;
@@ -592,16 +594,15 @@ export class ExportController {
         });
       };
 
-      // Draw initial header
-      drawTableHeader(tableTop);
+      drawTableHeader(tableTop); // Gambar header awal
 
-      // Draw data rows
       doc.font('Helvetica').fontSize(10);
       const dataLineH = doc.currentLineHeight();
       let yPos = tableTop + headerHeight;
 
+      // Iterasi untuk menggambar baris data rekap pegawai
       transformedData.forEach((record, index) => {
-        // Check if we need a new page
+        // Cek pengaman batas bawah halaman A4, tambah halaman baru jika melebihi batas 760pt
         if (yPos + rowHeight > 760) {
           doc.addPage();
           doc.moveDown(1.5);
@@ -623,13 +624,13 @@ export class ExportController {
           { text: `${record.persentase || 0}%` },
         ];
 
-        // Alternate background colors (Zebra Striping)
+        // Zebra striping baris tabel (selang-seling warna putih dan abu-abu tipis)
         const rowBg = index % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
 
         rowData.forEach((cell, i) => {
           const w = colWidths[i] || 50;
 
-          // Draw cell background and light grey border
+          // Gambar latar belakang sel
           doc.rect(xPos, yPos, w, rowHeight).fillAndStroke(rowBg, '#E2E8F0');
 
           const align = i === 1 ? 'left' : 'center';
@@ -638,6 +639,7 @@ export class ExportController {
 
           let fillHex = '#334155';
           let fontName = 'Helvetica';
+          // Tampilkan teks dengan warna MERAH tebal jika terdeteksi terlambat
           if (cell.isLate) {
             fillHex = '#EF4444';
             fontName = 'Helvetica-Bold';
@@ -660,27 +662,26 @@ export class ExportController {
         yPos += rowHeight;
       });
 
-      // Finalize PDF
-      doc.end();
+      doc.end(); // Finalisasi dan tutup dokumen PDF
 
       const actorId = req.user?.id ?? 0;
-      logger.info('PDF export generated', {
+      logger.info('PDF rekap berhasil dibuat', {
         filename,
         records: transformedData.length,
         user_id: actorId,
       });
       return;
     } catch (error) {
-      logger.error('Export to PDF error', {
+      logger.error('Error saat ekspor PDF', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-      return errorResponse(res, 'Failed to export to PDF', 500);
+      return errorResponse(res, 'Gagal mengekspor data rekap ke PDF', 500);
     }
   }
 
   /**
-   * Export attendance to CSV
+   * Mengekspor ringkasan rekapitulasi kehadiran ke berkas text CSV.
    * GET /api/export/csv?start_date=X&end_date=Y&jabatan=Z&user_id=W
    */
   public static async exportToCSV(req: Request, res: Response): Promise<Response | void> {
@@ -690,25 +691,22 @@ export class ExportController {
       let startDate = typeof start_date === 'string' ? start_date : '';
       let endDate = typeof end_date === 'string' ? end_date : '';
 
-      // Handle month/year to date range conversion
       if (bulan && tahun) {
         const month = parseInt(bulan as string);
         const year = parseInt(tahun as string);
 
-        // Start date: 1st of the month
         const start = new Date(year, month - 1, 1);
         startDate = start.toISOString().split('T')[0] as string;
 
-        // End date: Last day of the month
         const end = new Date(year, month, 0);
         endDate = end.toISOString().split('T')[0] as string;
       }
 
       if (!startDate || !endDate) {
-        return errorResponse(res, 'Start date/end date OR month/year are required', 400);
+        return errorResponse(res, 'Tanggal mulai/selesai ATAU bulan/tahun harus diisi', 400);
       }
 
-      // Get attendance data — deduplicate: one row per employee per date
+      // Query data absensi
       let sql = `
         SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
                MIN(a.jam_masuk) AS jam_masuk,
@@ -736,7 +734,7 @@ export class ExportController {
       const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
 
       if (attendance.length === 0) {
-        return errorResponse(res, 'No data found for export', 404);
+        return errorResponse(res, 'Data tidak ditemukan untuk diekspor', 404);
       }
 
       const activeEmployees = await prisma.employees.findMany({
@@ -752,8 +750,7 @@ export class ExportController {
         };
       });
 
-      // Format data for CSV
-      // Get holidays in the selected range
+      // Mengambil daftar libur nasional
       const holidayWhere: any = {};
       const startLocalDate = startDate ? new Date(startDate) : null;
       const endLocalDate = endDate ? new Date(endDate) : null;
@@ -775,8 +772,7 @@ export class ExportController {
 
       const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
 
-      // Transform to aggregated data
-
+      // Transformasi data
       let transformedData: any[];
       if (jabatan === 'DOSEN') {
         transformedData = transformDosenAttendance(
@@ -796,7 +792,7 @@ export class ExportController {
         );
       }
 
-      // Format data for CSV
+      // Memetakan ke bentuk struktur baris CSV
       const csvData = transformedData.map((record, index) => ({
         No: index + 1,
         Nama: record.nama || '-',
@@ -809,18 +805,18 @@ export class ExportController {
 
       const firstRecord = csvData[0];
       if (!firstRecord) {
-        return errorResponse(res, 'No data found for export', 404);
+        return errorResponse(res, 'Data tidak ditemukan untuk diekspor', 404);
       }
 
-      // Create CSV string
+      // Menyusun konten CSV string
       const headers = Object.keys(firstRecord);
       const csvRows = [
-        headers.join(','),
+        headers.join(','), // Baris header kolom
         ...csvData.map((row) =>
           headers
             .map((header) => {
               const value = row[header as keyof typeof row] || '';
-              // Escape commas and quotes
+              // Escape karakter koma (,) dan petik ganda (") agar tidak merusak formatting kolom CSV
               return `"${String(value).replace(/"/g, '""')}"`;
             })
             .join(',')
@@ -828,16 +824,16 @@ export class ExportController {
       ];
       const csvContent = csvRows.join('\n');
 
-      // Set headers for file download
+      // Mengatur HTTP header download file
       const filename = `rekap-absensi-${String(jabatan || 'all')}-${startDate}-to-${endDate}.csv`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
 
-      // Add BOM for Excel UTF-8 support
+      // Menambahkan BOM (Byte Order Mark) UTF-8 agar Microsoft Excel langsung mengenali encoding file dengan benar
       const BOM = '\uFEFF';
 
       const actorId = req.user?.id ?? 0;
-      logger.info('CSV export generated', {
+      logger.info('CSV rekap berhasil dibuat', {
         filename,
         records: transformedData.length,
         user_id: actorId,
@@ -846,11 +842,11 @@ export class ExportController {
       res.send(BOM + csvContent);
       return;
     } catch (error) {
-      logger.error('Export to CSV error', {
+      logger.error('Error saat ekspor CSV', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-      return errorResponse(res, 'Failed to export to CSV', 500);
+      return errorResponse(res, 'Gagal mengekspor data ke CSV', 500);
     }
   }
 }

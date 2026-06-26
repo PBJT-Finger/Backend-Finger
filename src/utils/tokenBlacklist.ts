@@ -1,32 +1,31 @@
 /**
- * src/utils/tokenBlacklist.ts — JWT Token Revocation
+ * src/utils/tokenBlacklist.ts — Pencabutan Token JWT (Token Revocation)
  *
- * Current implementation: in-memory Map fallback.
+ * Implementasi saat ini: Menggunakan fallback penyimpanan memori lokal (in-memory Map).
  *
- * Risk register (from masterplan):
- *   Redis disabled → token revocation does not survive process restart.
- *   This is an ACCEPTED trade-off for Phase 1 — tokens still expire naturally
- *   via JWT `exp` claim. Full Redis integration is a Sprint 5+ task.
+ * Catatan Risiko Keamanan:
+ *   Karena modul Redis tidak digunakan secara wajib, daftar token yang dicabut (blacklist)
+ *   akan terhapus jika aplikasi restart.
+ *   Ini adalah trade-off yang disepakati untuk kemudahan deployment awal — token tetap akan kadaluarsa
+ *   secara alami berdasarkan klaim `exp` di dalam JWT itu sendiri.
  *
- * When Redis is connected, replace the in-memory Map with ioredis setex/exists.
- * The interface contract (addToBlacklist, isBlacklisted) must NOT change.
+ * Jika server Redis dipasang di masa mendatang, ganti Map memori ini dengan setex/exists dari ioredis.
+ * Tanda tangan fungsi API (addToBlacklist, isBlacklisted) harus tetap dipertahankan.
  */
 
-import logger from './logger';
+import logger from './logger'; // Logger aplikasi
 
-// ─── In-Memory Fallback Store ─────────────────────────────────────────────────
+// ─── Penyimpanan Memori Lokal (In-Memory Fallback Store) ─────────────────────
 
 /**
- * Token → expiry timestamp (ms).
- * We store expiry so that the map can be pruned without Redis TTL.
- *
- * Trade-off: This map grows unbounded until process restart. Acceptable for
- * short-lived tokens (15m access tokens). Long-lived refresh tokens require
- * Redis for correctness in production.
+ * Map pemetaan Token → timestamp kadaluarsa (milidetik).
+ * Menyimpan waktu kadaluarsa agar Map dapat dibersihkan secara berkala tanpa bergantung pada Redis TTL.
  */
 const inMemoryBlacklist = new Map<string, number>();
 
-/** Prune expired entries to prevent memory leak on long-running processes. */
+/** 
+ * Membersihkan token yang sudah kadaluarsa dari Map agar tidak memicu kebocoran memori (memory leak).
+ */
 function pruneExpired(): void {
   const now = Date.now();
   for (const [token, expiry] of inMemoryBlacklist.entries()) {
@@ -36,42 +35,42 @@ function pruneExpired(): void {
   }
 }
 
-// Prune every 5 minutes
+// Jalankan pembersihan token kadaluarsa setiap 5 menit
 setInterval(pruneExpired, 5 * 60 * 1000).unref();
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// ─── API Publik ──────────────────────────────────────────────────────────────
 
 /**
- * Adds a token to the revocation list until its natural expiry.
- * @param token         - The raw JWT string (never log this)
- * @param expirySeconds - Seconds until the token naturally expires (from JWT `exp`)
+ * Memasukkan token ke daftar pencabutan (blacklist) sampai waktu kadaluarsa alaminya terlampaui.
+ * @param token         - String token JWT mentah (Jangan pernah dicatat lengkap di log)
+ * @param expirySeconds - Durasi detik tersisa sebelum token kadaluarsa secara alami (dari klaim `exp`)
  */
 export async function addToBlacklist(token: string, expirySeconds: number): Promise<void> {
   const expiryMs = Date.now() + expirySeconds * 1000;
   inMemoryBlacklist.set(token, expiryMs);
-  logger.info('Token added to revocation list (in-memory)', {
+  logger.info('Token berhasil dimasukkan ke daftar blacklist (in-memory)', {
     tokenPrefix: token.substring(0, 10) + '...',
     expiresAt: new Date(expiryMs).toISOString(),
   });
 }
 
 /**
- * Returns true if the token has been explicitly revoked.
- * Fails open (returns false) on error — maintaining uptime over strict security.
- * Document this trade-off for any security audit.
+ * Memeriksa apakah token yang dikirimkan tergolong token yang dicabut/logout.
  */
 export async function isBlacklisted(token: string): Promise<boolean> {
   const expiry = inMemoryBlacklist.get(token);
   if (expiry === undefined) return false;
   if (expiry < Date.now()) {
-    // Already expired — clean up and treat as not blacklisted
+    // Jika token sudah kadaluarsa secara alami, hapus dari memori dan anggap tidak di-blacklist
     inMemoryBlacklist.delete(token);
     return false;
   }
   return true;
 }
 
-/** Returns diagnostic stats for the /health endpoint. */
+/** 
+ * Mengembalikan data statistik ukuran blacklist untuk rute pemeriksaan kesehatan (/health).
+ */
 export async function getStats(): Promise<{
   totalBlacklisted: number;
   backend: string;
@@ -79,14 +78,14 @@ export async function getStats(): Promise<{
   pruneExpired();
   return {
     totalBlacklisted: inMemoryBlacklist.size,
-    backend: 'in-memory (Redis not connected)',
+    backend: 'in-memory (Redis tidak terhubung)',
   };
 }
 
 export async function connect(): Promise<void> {
-  logger.info('Token blacklist service initialized (in-memory fallback)');
+  logger.info('Layanan blacklist token JWT diinisialisasi (menggunakan memori lokal)');
 }
 
 export async function disconnect(): Promise<void> {
-  logger.info('Token blacklist service disconnected');
+  logger.info('Layanan blacklist token JWT dinonaktifkan');
 }

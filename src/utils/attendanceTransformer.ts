@@ -1,5 +1,9 @@
-import prisma from '../config/prisma';
-import logger from './logger';
+// src/utils/attendanceTransformer.ts
+// Utilitas pembantu untuk mentransformasi dan mengagregasi baris data absensi mentah
+// menjadi format data terstruktur siap saji untuk visualisasi dashboard dosen dan karyawan.
+
+import prisma from '../config/prisma'; // Prisma client untuk querying DB
+import logger from './logger'; // Logger aplikasi
 
 export interface TransformedDosenRecord {
   id: string;
@@ -40,15 +44,14 @@ export interface RawAttendanceRecord {
 }
 
 /**
- * Extract time string "HH:MM" from various formats.
+ * Mengekstrak string waktu "HH:MM" secara aman dari berbagai format input (string, Date).
  */
 export function extractTimeString(timeValue: string | Date | null): string | null {
   if (!timeValue) return null;
   if (typeof timeValue === 'string') {
     const match = timeValue.match(/^(\d{2}):(\d{2})/);
     if (match) {
-      // Values are already the correct local time stored in UTC slots.
-      // Use getUTC* to avoid double timezone offset.
+      // Menggunakan UTC pad untuk mencegah offset zona waktu ganda
       const h = String(parseInt(match[1] || '0', 10)).padStart(2, '0');
       const m = String(parseInt(match[2] || '0', 10)).padStart(2, '0');
       return `${h}:${m}`;
@@ -64,13 +67,13 @@ export function extractTimeString(timeValue: string | Date | null): string | nul
 }
 
 /**
- * Extract date string "YYYY-MM-DD" from various formats
+ * Mengekstrak string tanggal "YYYY-MM-DD" secara aman dari berbagai format (string, Date).
  */
 export function extractDateString(dateValue: string | Date | null): string {
   if (!dateValue) return '';
   if (typeof dateValue === 'string') return dateValue.split('T')[0] || '';
   if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
-    // Use getUTC* — dates are stored as UTC-aligned (Date.UTC) in the DB
+    // Tanggal disimpan menggunakan UTC-aligned (Date.UTC) di database, ambil komponen UTC
     const y = dateValue.getUTCFullYear();
     const m = String(dateValue.getUTCMonth() + 1).padStart(2, '0');
     const d = String(dateValue.getUTCDate()).padStart(2, '0');
@@ -80,7 +83,7 @@ export function extractDateString(dateValue: string | Date | null): string {
 }
 
 /**
- * Convert a TIME value (string or Date) to a UTC Date for comparison.
+ * Mengonversi nilai waktu (string TIME atau objek Date) menjadi objek Date UTC untuk keperluan komparasi aritmatika.
  */
 export function toUTCDate(timeValue: string | Date | null): Date | null {
   if (!timeValue) return null;
@@ -104,7 +107,8 @@ export function toUTCDate(timeValue: string | Date | null): Date | null {
 }
 
 /**
- * Calculate number of working days between two dates (excluding Saturdays, Sundays, and national holidays)
+ * Menghitung jumlah hari kerja efektif di antara dua tanggal.
+ * Mengecualikan akhir pekan (Sabtu-Minggu) dan libur nasional yang terdaftar di database.
  */
 export async function calculateWorkingDays(
   startDate: string | Date,
@@ -129,7 +133,7 @@ export async function calculateWorkingDays(
   const end = parseLocal(endDate);
   if (!start || !end) return 0;
 
-  // Retrieve holidays within the range from the database
+  // Ambil daftar hari libur nasional dari database dalam rentang tersebut
   const holidays = await prisma.holidays.findMany({
     where: {
       tanggal: {
@@ -142,7 +146,7 @@ export async function calculateWorkingDays(
     },
   });
 
-  // Keep a set of YYYY-MM-DD formatted holiday date strings
+  // Buat set string tanggal libur (YYYY-MM-DD) untuk pencarian instan O(1)
   const holidaySet = new Set(
     holidays.map((h) => {
       const t = h.tanggal;
@@ -157,7 +161,7 @@ export async function calculateWorkingDays(
     const dayOfWeek = current.getDay();
     const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
 
-    // Exclude Sundays (0), Saturdays (6), and holidays
+    // Kecualikan hari Minggu (0), Sabtu (6), dan tanggal libur nasional
     if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidaySet.has(dateStr)) {
       count++;
     }
@@ -168,7 +172,7 @@ export async function calculateWorkingDays(
 }
 
 /**
- * Transform raw attendance records into aggregated dosen data.
+ * Mentransformasi dan mengagregasi catatan log absensi mentah menjadi rekap DOSEN.
  */
 export function transformDosenAttendance(
   attendanceRecords: RawAttendanceRecord[],
@@ -195,6 +199,7 @@ export function transformDosenAttendance(
       }
     > = {};
 
+    // Isi template inisialisasi awal untuk semua pegawai aktif agar pegawai tanpa log absensi tetap muncul (status mangkir)
     if (activeEmployees) {
       activeEmployees.forEach((emp) => {
         grouped[emp.user_id] = {
@@ -208,81 +213,82 @@ export function transformDosenAttendance(
       });
     }
 
+    // Kelompokkan log absen berdasarkan user_id
     if (attendanceRecords) {
       attendanceRecords.forEach((record) => {
         const user_id = record.user_id;
         if (!user_id) return;
 
-      if (!grouped[user_id]) {
-        grouped[user_id] = {
-          user_id: user_id,
-          nama: record.nama || 'Unknown',
-          attendanceDates: new Set<string>(),
-          lateDates: new Set<string>(),
-          lastCheckInUTC: null,
-          lastCheckOutUTC: null,
-        };
-      }
-
-      const group = grouped[user_id];
-      if (group) {
-        const dateStr = extractDateString(record.tanggal);
-        if (dateStr) {
-          group.attendanceDates.add(dateStr);
-          if (record.status === 'TERLAMBAT') {
-            group.lateDates.add(dateStr);
-          }
+        if (!grouped[user_id]) {
+          grouped[user_id] = {
+            user_id: user_id,
+            nama: record.nama || 'Unknown',
+            attendanceDates: new Set<string>(),
+            lateDates: new Set<string>(),
+            lastCheckInUTC: null,
+            lastCheckOutUTC: null,
+          };
         }
 
-        if (record.jam_masuk) {
-          const checkInUTC = toUTCDate(record.jam_masuk);
-          if (checkInUTC && (!group.lastCheckInUTC || checkInUTC > group.lastCheckInUTC)) {
-            group.lastCheckInUTC = checkInUTC;
+        const group = grouped[user_id];
+        if (group) {
+          const dateStr = extractDateString(record.tanggal);
+          if (dateStr) {
+            group.attendanceDates.add(dateStr);
+            if (record.status === 'TERLAMBAT') {
+              group.lateDates.add(dateStr);
+            }
+          }
+
+          if (record.jam_masuk) {
+            const checkInUTC = toUTCDate(record.jam_masuk);
+            if (checkInUTC && (!group.lastCheckInUTC || checkInUTC > group.lastCheckInUTC)) {
+              group.lastCheckInUTC = checkInUTC;
+            }
+          }
+
+          if (record.jam_keluar) {
+            const checkOutUTC = toUTCDate(record.jam_keluar);
+            if (checkOutUTC && (!group.lastCheckOutUTC || checkOutUTC > group.lastCheckOutUTC)) {
+              group.lastCheckOutUTC = checkOutUTC;
+            }
           }
         }
-
-        if (record.jam_keluar) {
-          const checkOutUTC = toUTCDate(record.jam_keluar);
-          if (checkOutUTC && (!group.lastCheckOutUTC || checkOutUTC > group.lastCheckOutUTC)) {
-            group.lastCheckOutUTC = checkOutUTC;
-          }
-        }
-      }
-    });
-  }
-
-    const result = Object.values(grouped)
-      .map((group) => {
-        const totalHadir = group.attendanceDates.size;
-        const totalHariKerja = totalWorkingDays !== undefined ? totalWorkingDays : totalHadir;
-
-        return {
-          id: group.user_id,
-          user_id: group.user_id,
-          nama: group.nama,
-          totalHadir,
-          tidakHadir: Math.max(0, totalHariKerja - totalHadir),
-          totalTerlambat: group.lateDates.size,
-          totalHariKerja,
-          persentase:
-            totalHariKerja > 0
-              ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
-              : totalHadir > 0
-                ? 100
-                : 0,
-          attendanceDates: formatAttendanceDates(group.attendanceDates),
-          lastCheckIn: group.lastCheckInUTC
-            ? extractTimeString(group.lastCheckInUTC) || 'Belum ada data'
-            : 'Belum ada data',
-          lastCheckOut: group.lastCheckOutUTC
-            ? extractTimeString(group.lastCheckOutUTC) || 'Belum ada data'
-            : 'Belum ada data',
-        };
       });
+    }
+
+    // Kalkulasi rekapitulasi data agregat
+    const result = Object.values(grouped).map((group) => {
+      const totalHadir = group.attendanceDates.size;
+      const totalHariKerja = totalWorkingDays !== undefined ? totalWorkingDays : totalHadir;
+
+      return {
+        id: group.user_id,
+        user_id: group.user_id,
+        nama: group.nama,
+        totalHadir,
+        tidakHadir: Math.max(0, totalHariKerja - totalHadir),
+        totalTerlambat: group.lateDates.size,
+        totalHariKerja,
+        persentase:
+          totalHariKerja > 0
+            ? Math.min(100, Math.round((totalHadir / totalHariKerja) * 100))
+            : totalHadir > 0
+              ? 100
+              : 0,
+        attendanceDates: formatAttendanceDates(group.attendanceDates),
+        lastCheckIn: group.lastCheckInUTC
+          ? extractTimeString(group.lastCheckInUTC) || 'Belum ada data'
+          : 'Belum ada data',
+        lastCheckOut: group.lastCheckOutUTC
+          ? extractTimeString(group.lastCheckOutUTC) || 'Belum ada data'
+          : 'Belum ada data',
+      };
+    });
 
     return result;
   } catch (error) {
-    logger.error('Error transforming dosen attendance', {
+    logger.error('Gagal mentransformasi absensi dosen', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -291,7 +297,7 @@ export function transformDosenAttendance(
 }
 
 /**
- * Transform raw attendance records into aggregated karyawan data.
+ * Mentransformasi dan mengagregasi catatan log absensi mentah menjadi rekap KARYAWAN.
  */
 export function transformKaryawanAttendance(
   attendanceRecords: RawAttendanceRecord[],
@@ -336,43 +342,43 @@ export function transformKaryawanAttendance(
         const user_id = record.user_id;
         if (!user_id) return;
 
-      if (!grouped[user_id]) {
-        grouped[user_id] = {
-          user_id: user_id,
-          nama: record.nama || 'Unknown',
-          attendanceDates: new Set<string>(),
-          lateDates: new Set<string>(),
-          lastCheckInUTC: null,
-          lastCheckOutUTC: null,
-        };
-      }
-
-      const group = grouped[user_id];
-      if (group) {
-        const dateStr = extractDateString(record.tanggal);
-        if (dateStr) {
-          group.attendanceDates.add(dateStr);
-          if (record.status === 'TERLAMBAT') {
-            group.lateDates.add(dateStr);
-          }
+        if (!grouped[user_id]) {
+          grouped[user_id] = {
+            user_id: user_id,
+            nama: record.nama || 'Unknown',
+            attendanceDates: new Set<string>(),
+            lateDates: new Set<string>(),
+            lastCheckInUTC: null,
+            lastCheckOutUTC: null,
+          };
         }
 
-        if (record.jam_masuk) {
-          const checkInUTC = toUTCDate(record.jam_masuk);
-          if (checkInUTC && (!group.lastCheckInUTC || checkInUTC > group.lastCheckInUTC)) {
-            group.lastCheckInUTC = checkInUTC;
+        const group = grouped[user_id];
+        if (group) {
+          const dateStr = extractDateString(record.tanggal);
+          if (dateStr) {
+            group.attendanceDates.add(dateStr);
+            if (record.status === 'TERLAMBAT') {
+              group.lateDates.add(dateStr);
+            }
           }
-        }
 
-        if (record.jam_keluar) {
-          const checkOutUTC = toUTCDate(record.jam_keluar);
-          if (checkOutUTC && (!group.lastCheckOutUTC || checkOutUTC > group.lastCheckOutUTC)) {
-            group.lastCheckOutUTC = checkOutUTC;
+          if (record.jam_masuk) {
+            const checkInUTC = toUTCDate(record.jam_masuk);
+            if (checkInUTC && (!group.lastCheckInUTC || checkInUTC > group.lastCheckInUTC)) {
+              group.lastCheckInUTC = checkInUTC;
+            }
+          }
+
+          if (record.jam_keluar) {
+            const checkOutUTC = toUTCDate(record.jam_keluar);
+            if (checkOutUTC && (!group.lastCheckOutUTC || checkOutUTC > group.lastCheckOutUTC)) {
+              group.lastCheckOutUTC = checkOutUTC;
+            }
           }
         }
-      }
-    });
-  }
+      });
+    }
 
     const result = Object.values(grouped).map((group) => {
       const totalHadir = group.attendanceDates.size;
@@ -404,7 +410,7 @@ export function transformKaryawanAttendance(
 
     return result;
   } catch (error) {
-    logger.error('Error transforming karyawan attendance', {
+    logger.error('Gagal mentransformasi absensi karyawan', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -412,7 +418,9 @@ export function transformKaryawanAttendance(
   }
 }
 
-// Helper function to format attendance dates (timezone-safe using UTC)
+/**
+ * Format rentang tanggal kehadiran menjadi string yang ramah dibaca (contoh: "1 - 15 Jun 2026").
+ */
 export function formatAttendanceDates(datesSet: Set<string>): string {
   if (!datesSet || datesSet.size === 0) return 'Belum ada data';
 
@@ -467,7 +475,9 @@ export function formatAttendanceDates(datesSet: Set<string>): string {
   return 'Belum ada data';
 }
 
-// Helper function to format date in Indonesian format (DD/MM/YYYY) — timezone-safe
+/**
+ * Memformat string tanggal ke format standar Indonesia (DD/MM/YYYY) secara timezone-safe.
+ */
 export function formatDateID(dateString: string | Date | null): string {
   if (!dateString) return '-';
 

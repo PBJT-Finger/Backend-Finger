@@ -1,9 +1,14 @@
+// src/routes/attendance.routes.ts
+// Mengatur perutean (routing) untuk seluruh operasi data kehadiran (attendance),
+// mulai dari log absensi umum, detail dosen, detail karyawan, ringkasan/rekap bulanan,
+// impor berkas Excel/CSV, hapus log absensi (soft delete), serta pembaruan catatan admin.
+
 import { Router } from 'express';
-import multer from 'multer';
-import AttendanceController from '../controllers/attendance.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
-import { handleValidationErrors, sanitizeInputs } from '../middlewares/validate.middleware';
-import { userRateLimits } from '../middlewares/userRateLimit';
+import multer from 'multer'; // Middleware untuk penanganan upload berkas multipart/form-data
+import AttendanceController from '../controllers/attendance.controller'; // Kontroler logika absensi
+import { authenticateToken } from '../middlewares/auth.middleware'; // Middleware verifikasi token JWT
+import { handleValidationErrors, sanitizeInputs } from '../middlewares/validate.middleware'; // Middleware validasi sanitasi input
+import { userRateLimits } from '../middlewares/userRateLimit'; // Middleware pembatas laju request
 import {
   validateSummary,
   validateAttendanceFilters,
@@ -11,18 +16,19 @@ import {
   validateRekapRange,
   validateMonthlyParams,
   validateImportFile,
-} from '../validators/attendance.validators';
+} from '../validators/attendance.validators'; // Validator spesifik untuk absensi
 
-// Configure multer for file uploads
+// Konfigurasi penyimpanan multer untuk mengupload berkas ke dalam memori RAM (buffer)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize: 5 * 1024 * 1024, // Batasi ukuran berkas maksimal 5 Megabytes (MB)
   },
   fileFilter: (req, file, cb) => {
     const allowedExtensions = ['.xlsx', '.xls', '.csv'];
     const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
 
+    // Validasi ekstensi berkas yang diperbolehkan
     if (allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
@@ -33,7 +39,7 @@ const upload = multer({
 
 const router = Router();
 
-// All routes require authentication and input sanitization
+// Seluruh rute absensi di bawah ini membutuhkan verifikasi token login dan sanitasi input dari tag HTML berbahaya
 router.use(authenticateToken);
 router.use(sanitizeInputs);
 
@@ -62,10 +68,11 @@ router.use(sanitizeInputs);
  *       200:
  *         description: Import berhasil
  */
+// Rute impor data dari file Excel/CSV (POST /api/attendance/import)
 router.post(
   '/import',
-  upload.single('file'),
-  validateImportFile,
+  upload.single('file'), // Parsing single file dengan field 'file'
+  validateImportFile, // Validasi awal keberadaan file
   AttendanceController.importAttendance
 );
 
@@ -111,6 +118,7 @@ router.post(
  *       200:
  *         description: Rekaman absensi berhasil diambil
  */
+// Rute mengambil log seluruh absensi (GET /api/attendance)
 router.get(
   '/',
   validateAttendanceFilters,
@@ -162,6 +170,7 @@ router.get(
  *       200:
  *         description: Ringkasan absensi berhasil diambil
  */
+// Rute mengambil data statistik summary (GET /api/attendance/summary)
 router.get(
   '/summary',
   userRateLimits.moderate,
@@ -202,6 +211,7 @@ router.get(
  *       200:
  *         description: Ringkasan absensi berhasil diambil
  */
+// Rute mengambil laporan rekapitulasi kehadiran (GET /api/attendance/rekap)
 router.get(
   '/rekap',
   validateRekapRange,
@@ -234,6 +244,7 @@ router.get(
  *       200:
  *         description: Laporan bulanan berhasil diambil
  */
+// Rute mengambil laporan bulanan (GET /api/attendance/rekap/bulanan)
 router.get(
   '/rekap/bulanan',
   validateMonthlyParams,
@@ -260,6 +271,7 @@ router.get(
  *       200:
  *         description: Rekaman absensi berhasil dihapus
  */
+// Rute untuk melakukan soft-delete log absensi (DELETE /api/attendance/:id)
 router.delete(
   '/:id',
   validateAttendanceId,
@@ -294,6 +306,7 @@ router.delete(
  *       200:
  *         description: Berhasil
  */
+// Rute memperbarui catatan admin pada log absensi (PATCH /api/attendance/:id/notes)
 router.patch(
   '/:id/notes',
   validateAttendanceId,
@@ -313,6 +326,7 @@ router.patch(
  *       200:
  *         description: Berhasil mengambil data dosen
  */
+// Rute mengambil rekap absensi khusus dosen (GET /api/attendance/dosen)
 router.get('/dosen', AttendanceController.getLecturerAttendance);
 
 /**
@@ -327,6 +341,7 @@ router.get('/dosen', AttendanceController.getLecturerAttendance);
  *       200:
  *         description: Berhasil mengambil data karyawan
  */
+// Rute mengambil rekap absensi khusus karyawan (GET /api/attendance/karyawan)
 router.get('/karyawan', AttendanceController.getEmployeeAttendance);
 
 export default router;

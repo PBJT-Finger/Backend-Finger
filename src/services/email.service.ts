@@ -1,18 +1,18 @@
 /**
  * Email Service
- * Handles sending emails for authentication flows (password reset, welcome emails, etc.)
- * Uses nodemailer with SMTP configuration
+ * Mengatur pengiriman email untuk alur autentikasi (seperti reset password, email sambutan admin baru, dll).
+ * Menggunakan pustaka nodemailer dengan konfigurasi SMTP.
  */
 
-import nodemailer from 'nodemailer';
-import logger from '../utils/logger';
-import { env } from '../config/env';
+import nodemailer from 'nodemailer'; // Modul Node.js untuk mengirim email
+import logger from '../utils/logger'; // Logger internal aplikasi
+import { env } from '../config/env'; // Pembaca variabel lingkungan (.env)
 
-// Email configuration from environment variables
+// Konfigurasi server SMTP yang dibaca dari file .env
 const emailConfig = {
   host: env.SMTP_HOST || 'smtp.gmail.com',
   port: env.SMTP_PORT || 587,
-  secure: env.SMTP_SECURE, // true for 465, false for other ports
+  secure: env.SMTP_SECURE, // Bernilai true untuk port 465, false untuk port lainnya
   auth: {
     user: env.SMTP_USER,
     pass: env.SMTP_PASSWORD,
@@ -22,24 +22,24 @@ const emailConfig = {
 const fromEmail = env.EMAIL_FROM || 'noreply@fingerattendance.com';
 const fromName = env.EMAIL_FROM_NAME || 'Finger Attendance System';
 
-// Create reusable transporter
+// Membuat objek transporter nodemailer reusable
 let transporter: nodemailer.Transporter | null = null;
 
 /**
- * Initialize email transporter
+ * Menginisialisasi transporter SMTP email.
  */
 const initializeTransporter = (): nodemailer.Transporter | null => {
   if (!env.SMTP_USER || !env.SMTP_PASSWORD) {
-    logger.warn('SMTP credentials not configured. Email service will use console logging only.');
+    logger.warn('Kredensial SMTP tidak terkonfigurasi. Layanan email akan dialihkan ke mode log konsol saja.');
     return null;
   }
 
   try {
     transporter = nodemailer.createTransport(emailConfig);
-    logger.info('Email transporter initialized successfully');
+    logger.info('Transporter email berhasil diinisialisasi');
     return transporter;
   } catch (error) {
-    logger.error('Failed to initialize email transporter', {
+    logger.error('Gagal menginisialisasi transporter email', {
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -47,11 +47,11 @@ const initializeTransporter = (): nodemailer.Transporter | null => {
 };
 
 /**
- * Send email
- * @param to - Recipient email address
- * @param subject - Email subject
- * @param html - HTML email body
- * @param text - Plain text email body (optional)
+ * Mengirim email ke tujuan.
+ * @param to - Alamat email penerima
+ * @param subject - Subjek/judul email
+ * @param html - Isi email dalam format HTML
+ * @param text - Isi email dalam format teks polos (opsional)
  */
 export const sendEmail = async (
   to: string,
@@ -59,7 +59,7 @@ export const sendEmail = async (
   html: string,
   text = ''
 ): Promise<{ success: boolean; messageId: string }> => {
-  // Initialize transporter if not already done
+  // Inisialisasi transporter jika belum dibuat
   if (!transporter) {
     transporter = initializeTransporter();
   }
@@ -69,13 +69,13 @@ export const sendEmail = async (
     to,
     subject,
     html,
-    text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML tags for text version
+    text: text || html.replace(/<[^>]*>/g, ''), // Konversi HTML ke teks polos jika parameter text kosong
   };
 
   try {
-    // If SMTP not configured, fall back to console logging
+    // Jika SMTP belum dikonfigurasi, jalankan mode simulasi (log konsol)
     if (!transporter) {
-      logger.info('📧 EMAIL (Console Mode - SMTP not configured)', {
+      logger.info('📧 EMAIL (Mode Konsol - SMTP belum terkonfigurasi)', {
         to,
         subject,
         preview: html.substring(0, 200),
@@ -88,9 +88,9 @@ export const sendEmail = async (
       return { success: true, messageId: 'console-mode' };
     }
 
-    // Send actual email in production
+    // Mengirim email sungguhan via transporter
     const info = await transporter.sendMail(mailOptions);
-    logger.info('Email sent successfully', {
+    logger.info('Email berhasil terkirim', {
       to,
       subject,
       messageId: info.messageId,
@@ -98,7 +98,7 @@ export const sendEmail = async (
 
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    logger.error('Failed to send email', {
+    logger.error('Gagal mengirim email', {
       to,
       subject,
       error: error instanceof Error ? error.message : String(error),
@@ -108,10 +108,10 @@ export const sendEmail = async (
 };
 
 /**
- * Send password reset code email
- * @param email - Recipient email
- * @param code - 6-digit verification code
- * @param username - Admin username
+ * Mengirim kode verifikasi reset password via email.
+ * @param email - Email tujuan penerima
+ * @param code - 6 digit kode OTP verifikasi
+ * @param username - Nama user admin
  */
 export const sendPasswordResetEmail = async (
   email: string,
@@ -171,7 +171,7 @@ Kami menerima permintaan untuk mereset password akun Anda.
 Kode Verifikasi: ${code}
 (Berlaku selama 15 menit)
 
-If Anda tidak meminta reset password, abaikan email ini.
+Jika Anda tidak meminta reset password, abaikan email ini.
 
 Terima kasih,
 Tim Finger Attendance System
@@ -181,9 +181,9 @@ Tim Finger Attendance System
 };
 
 /**
- * Send welcome email for new admin registration
- * @param email - Recipient email
- * @param username - Admin username
+ * Mengirim email sambutan (welcome email) setelah pendaftaran admin sukses.
+ * @param email - Email penerima
+ * @param username - Nama user admin baru
  */
 export const sendWelcomeEmail = async (
   email: string,
@@ -248,9 +248,9 @@ Tim Finger Attendance System
 };
 
 /**
- * Send password reset confirmation email
- * @param email - Recipient email
- * @param username - Admin username
+ * Mengirim email konfirmasi setelah password admin berhasil diubah/direset.
+ * @param email - Email penerima
+ * @param username - Nama user admin
  */
 export const sendPasswordResetConfirmation = async (
   email: string,

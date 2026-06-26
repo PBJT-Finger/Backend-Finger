@@ -1,37 +1,32 @@
 /**
  * src/services/zk-sync.service.ts
  *
- * Bridges the ZkDeviceClient (hardware layer) with the Prisma database (persistence layer).
+ * Menghubungkan ZkDeviceClient (lapisan perangkat keras mesin) dengan database Prisma (lapisan penyimpanan data).
  *
- * Responsibilities:
- *   1. Listen for 'attendance' events emitted by ZkDeviceClient
- *   2. Map ZKTeco AttendanceRecord fields to the Prisma `attendance` schema
- *   3. Persist records using upsert for idempotency (safe to replay on reconnect)
- *   4. Never crash the process — all errors are caught, logged, and the loop continues
+ * Tanggung Jawab:
+ *   1. Mendengarkan event 'attendance' yang dipancarkan oleh ZkDeviceClient
+ *   2. Memetakan field objek log scan mesin ZKTeco (AttendanceRecord) ke struktur tabel `attendance` di database Prisma
+ *   3. Menyimpan log scan absensi secara independen (idempotent) sehingga aman dari duplikasi saat reconect
+ *   4. Melindungi proses server agar tidak mati (crash) — menangkap semua error secara terisolasi pada setiap baris proses
  *
- * Design decision — upsert vs. insert:
- *   ZKTeco devices re-emit all historical records on every poll cycle.
- *   A raw INSERT would produce massive duplication on reconnect.
- *   We use prisma.attendance.upsert with a composite unique key
- *   (user_id + tanggal + jam_masuk) to ensure idempotency.
+ * Desain Keputusan — Idempotensi (Upsert/Isolate logic):
+ *   Mesin ZKTeco memancarkan kembali semua log historis yang ada dalam memori setiap siklus polling.
+ *   Operasi INSERT mentah secara acak akan menimbulkan banyak sekali log duplikat di DB.
+ *   Oleh karena itu, dilakukan pengecekan record yang presisi berdasarkan user_id, tanggal, dan waktu scan
+ *   untuk memfilter log duplikat yang dikirim ulang oleh memori mesin.
  *
- *   NOTE: Schema currently lacks @@unique([user_id, tanggal]) — see schema migration note below.
- *   Until that migration is applied, we use findFirst + createOrUpdate pattern to avoid
- *   a runtime crash. Sprint 5 migration task adds the proper DB constraint.
- *
- * Mapping note:
- *   ZKTeco → Prisma attendance fields:
- *   - deviceUserId → user_id (String)
- *   - recordTime   → tanggal (Date only) + jam_masuk (Time, first scan) / jam_keluar (Time, subsequent)
- *   - ip           → device_id (used as reference key)
+ * Catatan Pemetaan Kolom:
+ *   ZKTeco → Prisma database:
+ *   - deviceUserId → user_id (String/NIP)
+ *   - recordTime   → tanggal (Date saja) + jam_masuk / jam_keluar (waktu scan)
+ *   - ip           → device_id (alamat IP mesin sidik jari pengirim)
  */
 
-import { v4 as uuidv4 } from 'uuid';
-import prisma from '../config/prisma';
-import { ZkDeviceClient, AttendanceRecord } from '../infrastructure/zk-client';
-// import type { Prisma } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid'; // Pembuat string UUID acak untuk pelacakan batch
+import prisma from '../config/prisma'; // Prisma client untuk query DB
+import { ZkDeviceClient, AttendanceRecord } from '../infrastructure/zk-client'; // Client konektivitas ZKTeco
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Tipe Data ────────────────────────────────────────────────────────────────
 
 interface BatchResult {
   batchId: string;
@@ -51,32 +46,25 @@ export class ZkSyncService {
   }
 
   /**
-   * Attaches the attendance listener to ZkDeviceClient.
-   * Call this once after server startup. Idempotent for repeated calls
-   * because EventEmitter deduplicates identical listener references.
+   * Menempelkan (attach) event listener kehadiran pada ZkDeviceClient.
+   * Dipanggil sekali saat server startup pertama kali.
    */
   public start(): void {
     this.zkClient.on('attendance', (records: AttendanceRecord[]) => {
-      // Fire-and-forget: persistAttendanceBatch handles its own error catching.
-      // We intentionally do NOT await here — the event handler must return
-      // synchronously to avoid blocking the EventEmitter call stack.
+      // Jalankan fungsi penyimpanan secara asinkron tanpa harus di-await (fire-and-forget),
+      // agar tidak menghalangi atau memblokir antrean event loop Node.js.
       void this.persistAttendanceBatch(records);
     });
 
-    console.log('[ZkSyncService] Attendance sync listener attached.');
+    console.log('[ZkSyncService] Listener sinkronisasi absensi mesin berhasil ditempelkan.');
   }
 
   /**
-   * Persists a batch of attendance records from the ZKTeco device into the database.
+   * Menyimpan sekumpulan (batch) log absensi yang dikirim dari mesin ZKTeco ke database.
    *
-   * Idempotency strategy:
-   *   For each record, we check if an attendance row already exists for
-   *   (user_id + tanggal). If yes → update jam_keluar (last scan of day).
-   *   If no → create new row with jam_masuk (first scan of day).
-   *
-   * Error isolation:
-   *   Each record is processed in a try/catch independently. One bad record
-   *   does not abort the entire batch.
+   * Isolasi Kesalahan:
+   *   Masing-masing log diproses dalam blok try/catch secara mandiri. Kegagalan menyimpan satu baris log
+   *   tidak akan membatalkan pemrosesan log lainnya dalam batch tersebut.
    */
   private async persistAttendanceBatch(records: AttendanceRecord[]): Promise<BatchResult> {
     const batchId = uuidv4();
@@ -84,32 +72,29 @@ export class ZkSyncService {
     const updated = 0;
     let errors = 0;
 
-    console.log(`[ZkSyncService] Processing batch ${batchId} — ${records.length} record(s)`);
+    console.log(`[ZkSyncService] Memproses batch sinkronisasi ${batchId} — berisi ${records.length} rekaman`);
 
     for (const record of records) {
       try {
-        // [FIX] Ignore incorrect/mock scans (Melinda '1' is active and should not be ignored)
+        // Abaikan scan dari ID simulasi/dummy/testing (Melinda '1' adalah user asli, jadi ID 5,6,7 yang diabaikan)
         if (['5', '6', '7'].includes(record.deviceUserId)) {
           continue;
         }
 
-        // Ignore Aziz (8) incorrect scan on 2026-06-03
+        // Abaikan log scan salah milik Aziz (ID 8) pada tanggal 2026-06-03
         const recordDateStr = record.recordTime.toISOString().substring(0, 10);
         if (record.deviceUserId === '8' && recordDateStr === '2026-06-03') {
           continue;
         }
 
         await this.upsertAttendanceRecord(record);
-        // We determine created/updated from the result but for simplicity
-        // we increment both counters in the catch-free path
         created++;
       } catch (err) {
         errors++;
         const msg = err instanceof Error ? err.message : String(err);
         console.error(
-          `[ZkSyncService] Failed to persist record for user=${record.deviceUserId} time=${record.recordTime.toISOString()} — ${msg}`
+          `[ZkSyncService] Gagal menyimpan log absensi user=${record.deviceUserId} waktu=${record.recordTime.toISOString()} — ${msg}`
         );
-        // Do NOT rethrow — isolate this record's failure from the rest of the batch
       }
     }
 
@@ -122,26 +107,23 @@ export class ZkSyncService {
     };
 
     console.log(
-      `[ZkSyncService] Batch ${batchId} complete — processed=${result.processed} created=${result.created} errors=${result.errors}`
+      `[ZkSyncService] Batch ${batchId} selesai — diproses=${result.processed} sukses=${result.created} gagal=${result.errors}`
     );
 
     return result;
   }
 
   /**
-   * Upsert logic for a single attendance record.
+   * Logika penyimpanan (upsert/insert) untuk satu data rekaman absensi.
    *
-   * Business rule mapping:
-   *   - First scan of the day → creates row with jam_masuk
-   *   - Subsequent scan of same day → updates jam_keluar
-   *
-   * This reflects the typical fingerprint machine usage: employee taps in the
-   * morning (jam_masuk) and taps again when leaving (jam_keluar).
+   * Aturan Bisnis Pemetaan:
+   *   - Waktu scan yang datang dari mesin adalah waktu lokal mesin.
+   *   - zklib memparsingnya ke dalam objek Date UTC. Kita konversi kembali ke jam lokal
+   *     dan simpan ke database dengan format tanggal jam UTC Epoch 1970 untuk representasi waktu murni.
    */
   private async upsertAttendanceRecord(record: AttendanceRecord): Promise<void> {
     const t = new Date(record.recordTime);
-    // zklib parses local device time into UTC fields (e.g., 08:00 WIB becomes 08:00 UTC).
-    // We extract the exact local time fields:
+    // Ekstrak waktu komponen lokal mesin dari data zklib
     const localYear = t.getUTCFullYear();
     const localMonth = t.getUTCMonth();
     const localDate = t.getUTCDate();
@@ -149,13 +131,13 @@ export class ZkSyncService {
     const localMinute = t.getUTCMinutes();
     const localSecond = t.getUTCSeconds();
 
-    // The 'tanggal' field is midnight UTC representing the local date.
+    // Field 'tanggal' diisi dengan waktu tengah malam UTC (Midnight) merepresentasikan tanggal tersebut
     const tanggal = new Date(Date.UTC(localYear, localMonth, localDate));
 
-    // 1. deviceUserId maps directly to user_id
+    // ID user di mesin dipetakan ke user_id
     const user_id = record.deviceUserId;
 
-    // 2. Fetch employee details
+    // Ambil info master data pegawai aktif dari DB
     const employee = await prisma.employees.findFirst({
       where: { user_id: user_id, is_active: true },
       include: { shifts: true },
@@ -166,9 +148,7 @@ export class ZkSyncService {
     const resolvedName = employee?.nama ?? deviceName ?? `Karyawan ${record.deviceUserId}`;
     const resolvedJabatan = employee?.jabatan === 'DOSEN' ? 'DOSEN' : 'KARYAWAN';
 
-    // Store time components exactly as they come from the device.
-    // The device sends local time. We store it directly into the UTC epoch (1970)
-    // so that when Prisma returns it and we call getUTCHours(), it returns the exact local time.
+    // Simpan bagian jam saja ke dalam UTC Epoch 1970-01-01T[jam]:[menit]:[detik]
     const timePart = new Date(Date.UTC(1970, 0, 1, localHour, localMinute, localSecond));
 
     // ─── Logika Pencegahan Duplikasi (Pak Dani) ───────────────────
@@ -193,6 +173,9 @@ export class ZkSyncService {
       const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
       const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
       const isNightSession = localHour >= 15;
+      
+      // Keterlambatan dihitung jika scan lebih dari 15 menit melewati jam masuk shift kerja.
+      // Jam malam (Night Session, misal absen susulan/lembur malam) dianggap HADIR biasa.
       const morningStatus = isNightSession ? 'HADIR' : (scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR');
 
       await prisma.attendance.create({
@@ -231,6 +214,8 @@ export class ZkSyncService {
       const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
       const scanMinutes = localHour * 60 + localMinute;
       const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
+      
+      // Status pulang cepat dihitung jika scan pulang sebelum jam pulang shift kerja yang ditentukan
       const afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
 
       await prisma.attendance.update({

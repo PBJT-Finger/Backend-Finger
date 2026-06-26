@@ -1,14 +1,14 @@
 /**
  * src/utils/calendarScheduler.ts
  *
- * This module defines shifts (Morning & Afternoon) and implements robust, timezone-safe
- * calendar calculations to handle leap years (2026-2088) and monthly schedule verifications
- * without off-by-one errors, especially on the first day of the month.
+ * Mendefinisikan shift jam kerja (Pagi & Siang) dan mengimplementasikan perhitungan
+ * kalender yang aman dari zona waktu (timezone-safe) untuk menangani tahun kabisat (2026-2088)
+ * serta verifikasi jadwal bulanan tanpa kesalahan offset indeks (off-by-one errors).
  */
 
-import logger from './logger';
+import logger from './logger'; // Logger internal aplikasi
 
-// ─── CONSTANTS & SHIFT DEFINITIONS ───────────────────────────────────────────
+// ─── KONSTANTA & DEFINISI SHIFT JAM KERJA ────────────────────────────────────
 
 export const SHIFT_NAMES = {
   MORNING: 'MORNING',
@@ -18,12 +18,13 @@ export const SHIFT_NAMES = {
 export type ShiftName = (typeof SHIFT_NAMES)[keyof typeof SHIFT_NAMES];
 
 export interface ShiftTimeWindow {
-  arrivalStart: string; // HH:MM:SS format
-  arrivalEnd: string; // HH:MM:SS format
-  departureStart: string; // HH:MM:SS format
-  departureEnd: string; // HH:MM:SS format
+  arrivalStart: string; // Waktu mulai scan masuk (format HH:MM:SS)
+  arrivalEnd: string; // Batas akhir scan masuk (format HH:MM:SS)
+  departureStart: string; // Batas minimal scan pulang (format HH:MM:SS)
+  departureEnd: string; // Batas maksimal scan pulang (format HH:MM:SS)
 }
 
+// Konfigurasi jam scan untuk masing-masing shift jam kerja
 export const SHIFT_SCHEDULES: Record<ShiftName, ShiftTimeWindow> = {
   MORNING: {
     arrivalStart: '07:00:00',
@@ -40,76 +41,72 @@ export const SHIFT_SCHEDULES: Record<ShiftName, ShiftTimeWindow> = {
 };
 
 export interface ShiftScheduleDay {
-  dateString: string; // YYYY-MM-DD
-  dayOfWeek: number; // 0 = Sunday, 1 = Monday, ... 6 = Saturday
-  dayName: string;
-  isWorkingDay: boolean;
+  dateString: string; // Tanggal berformat YYYY-MM-DD
+  dayOfWeek: number; // Indeks hari: 0 = Minggu, 1 = Senin, ... 6 = Sabtu
+  dayName: string; // Nama hari dalam Bahasa Indonesia
+  isWorkingDay: boolean; // Menandakan hari kerja efektif
   shift: ShiftTimeWindow;
 }
 
-// ─── CALENDAR MATH (LEAP YEARS 2026 - 2088) ───────────────────────────────────
+// ─── LOGIKA KALENDER (TAHUN KABISAT 2026 - 2088) ──────────────────────────────
 
 /**
- * Determines if a year is a leap year.
- * Divisible by 4, but if divisible by 100, must also be divisible by 400.
+ * Memvalidasi apakah tahun merupakan tahun kabisat (Leap Year).
+ * Habis dibagi 4, tetapi jika habis dibagi 100, harus juga habis dibagi 400.
  */
 export function isLeapYear(year: number): boolean {
   if (year < 2026 || year > 2088) {
-    logger.warn(`isLeapYear: Year ${year} is outside the analyzed window of 2026-2088.`);
+    logger.warn(`isLeapYear: Tahun ${year} di luar rentang analisis 2026-2088.`);
   }
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
 /**
- * Returns the exact number of days in a year.
- * Aligning with Gregorian calendar rules: 366 days for leap years, 365 for non-leap.
+ * Mengembalikan jumlah hari dalam satu tahun (366 hari jika kabisat, 365 jika tidak).
  */
 export function getDaysInYear(year: number): number {
   return isLeapYear(year) ? 366 : 365;
 }
 
 /**
- * Returns the number of days in a month.
- * Month parameter is 1-indexed (1 = January, 12 = December).
+ * Mengembalikan jumlah hari dalam suatu bulan (1-indexed: 1 = Januari, 12 = Desember).
  */
 export function getDaysInMonth(year: number, month: number): number {
   if (month < 1 || month > 12) {
-    throw new Error(`Invalid month: ${month}. Must be between 1 and 12.`);
+    throw new Error(`Bulan tidak valid: ${month}. Harus berada di antara 1 sampai 12.`);
   }
 
   const daysMap: Record<number, number> = {
-    1: 31, // January
-    2: isLeapYear(year) ? 29 : 28, // February (leap year sensitive)
-    3: 31, // March
+    1: 31, // Januari
+    2: isLeapYear(year) ? 29 : 28, // Februari (memperhitungkan tahun kabisat)
+    3: 31, // Maret
     4: 30, // April
-    5: 31, // May
-    6: 30, // June
-    7: 31, // July
-    8: 31, // August
+    5: 31, // Mei
+    6: 30, // Juni
+    7: 31, // Juli
+    8: 31, // Agustus
     9: 30, // September
-    10: 31, // October
+    10: 31, // Oktober
     11: 30, // November
-    12: 31, // December
+    12: 31, // Desember
   };
 
   const days = daysMap[month];
   if (days === undefined) {
-    throw new Error(`Unexpected error resolving days in month ${month} for year ${year}`);
+    throw new Error(`Gagal menghitung jumlah hari pada bulan ${month} untuk tahun ${year}`);
   }
   return days;
 }
 
-// ─── TIMEZONE-SAFE BOUNDARY CALCULATIONS ──────────────────────────────────────
+// ─── PERHITUNGAN BATAS ZONA WAKTU AMAN ────────────────────────────────────────
 
 export interface YearMonth {
   year: number;
-  month: number; // 1-indexed (1-12)
+  month: number;
 }
 
 /**
- * Safe subtraction of one month.
- * Solves the first day of the month transition where subtracting one month
- * from January (1) must roll back to December (12) of the previous year.
+ * Mundur satu bulan secara aman (menggulung balik Januari ke Desember tahun sebelumnya).
  */
 export function getPreviousMonth(year: number, month: number): YearMonth {
   if (month === 1) {
@@ -119,7 +116,7 @@ export function getPreviousMonth(year: number, month: number): YearMonth {
 }
 
 /**
- * Safe addition of one month.
+ * Maju satu bulan secara aman (menggulung maju Desember ke Januari tahun berikutnya).
  */
 export function getNextMonth(year: number, month: number): YearMonth {
   if (month === 12) {
@@ -129,9 +126,8 @@ export function getNextMonth(year: number, month: number): YearMonth {
 }
 
 /**
- * Formats a Date object to YYYY-MM-DD in the local timezone context.
- * Avoids UTC timezone shifts where 00:00:00 local time on the 1st of a month
- * is formatted as the last day of the previous month due to negative timezone offset.
+ * Memformat objek Date ke format string YYYY-MM-DD sesuai zona waktu lokal.
+ * Mencegah offset zona waktu negatif yang menggeser tanggal ke hari sebelumnya.
  */
 export function formatLocalDateString(date: Date): string {
   const y = date.getFullYear();
@@ -141,21 +137,21 @@ export function formatLocalDateString(date: Date): string {
 }
 
 /**
- * Generates local date boundaries (start of first day, end of last day)
- * of a given month in a timezone-safe manner.
+ * Mengambil batas awal tanggal (00:00:00) dan batas akhir tanggal (23:59:59)
+ * untuk suatu bulan secara aman berdasarkan zona waktu lokal.
  */
 export function getLocalMonthBoundaries(year: number, month: number): { start: Date; end: Date } {
-  // Start on 1st of the month at 00:00:00.000 local time
+  // Tanggal 1 pada jam 00:00:00.000 lokal
   const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
 
-  // Last day of the month is obtained by passing 0 as the day in the next month context
+  // Tanggal terakhir bulan tersebut pada jam 23:59:59.999 lokal
   const totalDays = getDaysInMonth(year, month);
   const end = new Date(year, month - 1, totalDays, 23, 59, 59, 999);
 
   return { start, end };
 }
 
-// ─── SCHEDULE GENERATION & VERIFICATION ───────────────────────────────────────
+// ─── GENERASI JADWAL & VERIFIKASI LOG ABSENSI ─────────────────────────────────
 
 const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
@@ -174,14 +170,14 @@ export interface VerificationResult {
 }
 
 /**
- * Generates a full month schedule grid.
- * Configured by default to exclude Sundays (0) and Saturdays (6) as non-working days.
+ * Menghasilkan susunan tabel kalender jadwal kerja bulanan.
+ * Secara default mengecualikan hari Sabtu (6) dan Minggu (0) sebagai hari kerja.
  */
 export function generateMonthlySchedule(
   year: number,
   month: number,
   shiftName: ShiftName,
-  excludeDays: number[] = [0, 6] // Default exclude Sunday (0) and Saturday (6)
+  excludeDays: number[] = [0, 6] // Default libur Sabtu dan Minggu
 ): ShiftScheduleDay[] {
   const totalDays = getDaysInMonth(year, month);
   const schedule: ShiftScheduleDay[] = [];
@@ -199,7 +195,7 @@ export function generateMonthlySchedule(
     schedule.push({
       dateString: `${yearStr}-${monthStr}-${dayStr}`,
       dayOfWeek,
-      dayName: DAY_NAMES[dayOfWeek] || 'Unknown',
+      dayName: DAY_NAMES[dayOfWeek] || 'Tidak Diketahui',
       isWorkingDay,
       shift,
     });
@@ -209,8 +205,7 @@ export function generateMonthlySchedule(
 }
 
 /**
- * Verify if a given scan time aligns with a specified shift on that date.
- * Performs checks with timezone-safe parsing.
+ * Memverifikasi waktu scan absensi terhadap target rentang jam shift kerja pegawai.
  */
 export function verifyScanAgainstShift(
   scanTime: Date,
@@ -245,19 +240,19 @@ export function verifyScanAgainstShift(
   let minutesEarlyDeparture = 0;
 
   if (isArrivalScan) {
-    // Arrival window validation
+    // Validasi jendela kedatangan (Check-In)
     isWithinArrivalWindow =
       scanTotalSeconds >= arrivalStartSec && scanTotalSeconds <= arrivalEndSec;
     if (scanTotalSeconds > arrivalEndSec) {
-      isLate = true;
+      isLate = true; // Terlambat jika melewati batas jam masuk
       minutesLate = Math.ceil((scanTotalSeconds - arrivalEndSec) / 60);
     }
   } else {
-    // Departure window validation
+    // Validasi jendela kepulangan (Check-Out)
     isWithinDepartureWindow =
       scanTotalSeconds >= departureStartSec && scanTotalSeconds <= departureEndSec;
     if (scanTotalSeconds < departureStartSec) {
-      isEarlyDeparture = true;
+      isEarlyDeparture = true; // Pulang cepat jika scan keluar sebelum jam pulang shift
       minutesEarlyDeparture = Math.ceil((departureStartSec - scanTotalSeconds) / 60);
     }
   }

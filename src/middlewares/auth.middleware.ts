@@ -1,28 +1,28 @@
 /**
- * src/middlewares/auth.middleware.ts — JWT Authentication & Authorization
+ * src/middlewares/auth.middleware.ts — JWT Autentikasi & Otorisasi
  *
- * This middleware sits at the Express boundary — all inputs are untrusted.
- * Failure modes handled:
- *   - No token in header → 401
- *   - Token on blacklist (revoked) → 401
- *   - Invalid/expired JWT signature → 403
- *   - JWT payload missing required fields → 403
+ * Middleware ini berada di batas luar Express — semua input/header tidak dapat dipercaya secara langsung.
+ * Kasus kegagalan (Failure modes) yang ditangani:
+ *   - Tidak ada token di header → 401 Unauthorized
+ *   - Token berada dalam daftar blacklist (sudah logout/dicabut) → 401 Unauthorized
+ *   - Tanda tangan JWT tidak valid/kadaluarsa → 403 Forbidden
+ *   - Payload JWT kekurangan field wajib → 403 Forbidden
  *
- * Security: JWT_ACCESS_SECRET is read from the validated env — never from
- * process.env directly — to guarantee it has been validated at startup.
+ * Keamanan: JWT_ACCESS_SECRET dibaca dari konfigurasi objek env yang telah divalidasi
+ * saat startup, bukan langsung membaca dari process.env secara mentah.
  */
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import logger from '../utils/logger';
-import { isBlacklisted } from '../utils/tokenBlacklist';
-import { AuthenticationError } from '../utils/errors';
-import { env } from '../config/env';
-import type { AuthenticatedUser } from '../types/express.d';
+import logger from '../utils/logger'; // Logger aplikasi
+import { isBlacklisted } from '../utils/tokenBlacklist'; // Fungsi cek token di blacklist database redis/cache
+import { AuthenticationError } from '../utils/errors'; // Error khusus autentikasi
+import { env } from '../config/env'; // Variabel lingkungan (.env) ter-validasi
+import type { AuthenticatedUser } from '../types/express.d'; // Interface tipe req.user
 
-// ─── Internal Types ───────────────────────────────────────────────────────────
+// ─── Tipe Data Internal ───────────────────────────────────────────────────────
 
-/** Shape of the JWT payload we encode during token signing. */
+/** Struktur isi payload JWT saat token ditandatangani. */
 interface JwtPayload {
   id: number;
   username: string;
@@ -31,13 +31,13 @@ interface JwtPayload {
   exp?: number;
 }
 
-// ─── Middlewares ──────────────────────────────────────────────────────────────
+// ─── Middleware ──────────────────────────────────────────────────────────────
 
 /**
- * Validates the Bearer JWT from the Authorization header.
- * On success, populates `req.user` with the decoded payload.
- * On failure, returns a 401/403 response — never calls next(err) for auth failures
- * to prevent error handler from leaking internal details.
+ * Validasi Bearer JWT dari header Authorization.
+ * Jika sukses, mengisi properti `req.user` dengan payload yang telah didecode.
+ * Jika gagal, langsung mengembalikan respons error 401/403 tanpa meneruskan error ke handler global
+ * untuk mencegah kebocoran informasi detail sistem.
  */
 export const authenticateToken = async (
   req: Request,
@@ -46,10 +46,10 @@ export const authenticateToken = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader?.split(' ')[1]; // Expect: "Bearer <token>"
+    const token = authHeader?.split(' ')[1]; // Format yang diharapkan: "Bearer <token>"
 
     if (!token) {
-      logger.warn('Auth failed: No token provided', {
+      logger.warn('Gagal Autentikasi: Token tidak disertakan', {
         ip: req.ip,
         path: req.path,
         correlationId: req.correlationId,
@@ -58,16 +58,16 @@ export const authenticateToken = async (
         success: false,
         error: {
           code: 'TOKEN_MISSING',
-          message: 'Access token is required',
+          message: 'Access token wajib disertakan',
         },
       });
       return;
     }
 
-    // Check token revocation BEFORE signature verification to avoid wasting CPU
+    // Periksa status pencabutan token (blacklist) SEBELUM verifikasi tanda tangan JWT demi menghemat beban CPU
     const revoked = await isBlacklisted(token);
     if (revoked) {
-      logger.warn('Auth failed: Token has been revoked', {
+      logger.warn('Gagal Autentikasi: Token telah dicabut (blacklisted)', {
         ip: req.ip,
         path: req.path,
         tokenPrefix: token.substring(0, 10) + '...',
@@ -77,19 +77,19 @@ export const authenticateToken = async (
         success: false,
         error: {
           code: 'TOKEN_REVOKED',
-          message: 'Token has been revoked. Please login again.',
+          message: 'Token telah dicabut. Silakan login kembali.',
         },
       });
       return;
     }
 
-    // Synchronous verify — throws if invalid or expired
+    // Verifikasi JWT secara sinkron — memicu error jika tanda tangan salah atau kadaluarsa
     let decoded: JwtPayload;
     try {
       decoded = jwt.verify(token, env.JWT_ACCESS_SECRET as string) as unknown as JwtPayload;
     } catch (jwtErr) {
-      const msg = jwtErr instanceof Error ? jwtErr.message : 'Invalid token';
-      logger.warn('Auth failed: JWT verification error', {
+      const msg = jwtErr instanceof Error ? jwtErr.message : 'Token tidak valid';
+      logger.warn('Gagal Autentikasi: Eror verifikasi JWT', {
         ip: req.ip,
         path: req.path,
         reason: msg,
@@ -99,15 +99,15 @@ export const authenticateToken = async (
         success: false,
         error: {
           code: 'TOKEN_INVALID',
-          message: 'Invalid or expired token',
+          message: 'Token tidak valid atau telah kadaluarsa',
         },
       });
       return;
     }
 
-    // Validate payload shape before trusting it
+    // Validasi bentuk payload JWT sebelum mempercayainya
     if (typeof decoded.id !== 'number' || !decoded.username || !decoded.role) {
-      throw new AuthenticationError('Malformed token payload');
+      throw new AuthenticationError('Struktur isi token tidak valid');
     }
 
     const user: AuthenticatedUser = {
@@ -118,7 +118,8 @@ export const authenticateToken = async (
 
     req.user = user;
 
-    // Reject write actions for PIMPINAN role, except logout
+    // Larang operasi modifikasi (Write Actions: POST, PUT, DELETE, PATCH) untuk pengguna dengan role 'PIMPINAN'
+    // Kecuali untuk endpoint logout
     const writeMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
     const isLogout = req.path.endsWith('/logout');
     if (
@@ -126,7 +127,7 @@ export const authenticateToken = async (
       user.role.toUpperCase() === 'PIMPINAN' &&
       !isLogout
     ) {
-      logger.warn('Auth failed: Write access denied for PIMPINAN role', {
+      logger.warn('Gagal Autentikasi: Hak akses modifikasi ditolak untuk PIMPINAN', {
         userId: user.id,
         role: user.role,
         path: req.path,
@@ -143,7 +144,7 @@ export const authenticateToken = async (
       return;
     }
 
-    logger.info('Authentication successful', {
+    logger.info('Autentikasi berhasil', {
       userId: user.id,
       username: user.username,
       path: req.path,
@@ -153,7 +154,7 @@ export const authenticateToken = async (
 
     next();
   } catch (error) {
-    logger.error('Authentication middleware error', {
+    logger.error('Error pada middleware autentikasi', {
       error: error instanceof Error ? error.message : String(error),
       ip: req.ip,
       path: req.path,
@@ -163,16 +164,16 @@ export const authenticateToken = async (
       success: false,
       error: {
         code: 'AUTHENTICATION_ERROR',
-        message: 'Authentication service error',
+        message: 'Terjadi kegagalan pada layanan autentikasi',
       },
     });
   }
 };
 
 /**
- * Role-based access control middleware.
- * Must be placed AFTER authenticateToken in the middleware chain.
- * Accepts a list of permitted roles — defaults to admin-only if none provided.
+ * Middleware Otorisasi berbasis hak akses (Role-Based Access Control).
+ * Harus diletakkan SETELAH middleware authenticateToken.
+ * Jika parameter allowedRoles kosong, default pengamanan hanya membolehkan ADMIN dan SUPER_ADMIN.
  */
 export const requireRole =
   (...allowedRoles: string[]) =>
@@ -180,7 +181,7 @@ export const requireRole =
     if (!req.user) {
       res.status(401).json({
         success: false,
-        error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
+        error: { code: 'UNAUTHENTICATED', message: 'Autentikasi diperlukan' },
       });
       return;
     }
@@ -189,7 +190,7 @@ export const requireRole =
       allowedRoles.length > 0 ? allowedRoles.map((r) => r.toUpperCase()) : ['ADMIN', 'SUPER_ADMIN'];
 
     if (!permitted.includes(req.user.role.toUpperCase())) {
-      logger.warn('Authorization failed: insufficient role', {
+      logger.warn('Gagal Otorisasi: Hak akses (role) tidak mencukupi', {
         userId: req.user.id,
         role: req.user.role,
         required: permitted,
@@ -198,7 +199,7 @@ export const requireRole =
       });
       res.status(403).json({
         success: false,
-        error: { code: 'AUTHORIZATION_FAILED', message: 'Insufficient permissions' },
+        error: { code: 'AUTHORIZATION_FAILED', message: 'Akses ditolak: hak akses Anda tidak mencukupi' },
       });
       return;
     }
@@ -206,18 +207,18 @@ export const requireRole =
     next();
   };
 
-/** Shorthand: admin-only route guard */
+/** Shortcut: Guard pengaman rute khusus Admin/Super Admin */
 export const requireAdmin = requireRole('ADMIN', 'SUPER_ADMIN');
 
 /**
- * HTTP request logging middleware.
- * Logs method, path, status code, and duration on response finish.
- * Placed early in the middleware stack so it captures all requests.
+ * Middleware untuk mencatat log HTTP request.
+ * Mencatat metode HTTP, path rute, kode status respons, dan durasi eksekusi.
+ * Diletakkan di awal tumpukan middleware Express.
  */
 export const requestLogger = (req: Request, res: Response, next: NextFunction): void => {
   const start = Date.now();
 
-  logger.http('Request received', {
+  logger.http('Menerima request HTTP', {
     method: req.method,
     path: req.path,
     ip: req.ip,
@@ -226,7 +227,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction): 
 
   res.on('finish', () => {
     const duration = Date.now() - start;
-    logger.http('Request completed', {
+    logger.http('Request HTTP selesai diproses', {
       method: req.method,
       path: req.path,
       statusCode: res.statusCode,
