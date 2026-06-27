@@ -33,6 +33,7 @@ export const env = cleanEnv(process.env, {
   }),
   DB_USERNAME: str({
     desc: 'Username akses database',
+    default: 'root',
     example: 'finger_user',
   }),
   DB_PASSWORD: str({

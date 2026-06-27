@@ -288,9 +288,13 @@ jobs:
                --args \"redis-server --appendonly yes --requirepass \${REDIS_PASSWORD}\" \
                || echo '⚠️ Warning: Failed to update redis service'
 
+             echo '🧹 Running Deep Garbage Collection to free space before deployment...'
+             docker system prune -af --volumes --filter \"until=168h\" || true
+
              echo '🚀 Updating swarm service finger-be_backend...'
              DATABASE_URL=\"mysql://root:\${ENCODED_DB_PASS}@mysql:3306/\${DB_NAME}\"
              
+             echo '⏳ Executing service update...'
              docker service update --image \"\$BACKEND_IMAGE\" \
                --env-add PORT=3333 \
                --env-add TZ=\"\$TZ\" \
@@ -305,16 +309,14 @@ jobs:
                --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
                --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
                --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
-               --with-registry-auth finger-be_backend
+               --with-registry-auth finger-be_backend \
+               || { echo '❌ Service update failed! Fetching logs...'; docker service logs finger-be_backend --tail 100; exit 1; }
 
              echo '✅ Service update stabilized and converged successfully!'
 
              docker images \"\$IMG_REPO\" --format '{{.Tag}}' | grep '^main-' | sort -r | tail -n +6 | \
                xargs -r -I {} docker rmi \"\${IMG_REPO}:{}\" || true
              
-             echo '🧹 Running Deep Garbage Collection...'
-             docker system prune -af --volumes --filter \"until=168h\" || true
-
              echo \"🎉 Deployed: \$BACKEND_IMAGE\""
 
       - name: Deployment summary
