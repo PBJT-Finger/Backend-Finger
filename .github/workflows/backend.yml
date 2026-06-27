@@ -307,11 +307,17 @@ jobs:
                --env-add DB_NAME=\"\$DB_NAME\" \
                --env-add DATABASE_URL=\"\$DATABASE_URL\" \
                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
-               --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
-               --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
-               --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
+               --env-add POLLING_INTERVAL_MS="\$POLLING_INTERVAL_MS" \
+               --env-add RECONNECT_DELAY_MS="\$RECONNECT_DELAY_MS" \
+               --health-cmd "wget -qO- http://127.0.0.1:3333/health || exit 1" \
                --with-registry-auth finger-be_backend \
-               || { echo '❌ Service update failed! Fetching logs...'; docker service logs finger-be_backend --tail 100; exit 1; }
+               || { 
+                 echo '❌ Service update failed! Fetching task status...'; 
+                 docker service ps finger-be_backend --no-trunc;
+                 echo 'Fetching container logs...';
+                 docker service logs finger-be_backend --tail 100 || true;
+                 exit 1; 
+               }
 
              echo '✅ Service update stabilized and converged successfully!'
 
