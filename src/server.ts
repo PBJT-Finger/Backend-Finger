@@ -64,8 +64,8 @@ const startServer = async (): Promise<void> => {
       logger.info(
         `🔒 Keamanan: ${process.env['NODE_ENV'] === 'production' ? 'Mode Production (Rate Limiting Aktif)' : 'Mode Development'}`
       );
-      logger.info(`🧪 Try It (Swagger UI): http://localhost:${PORT}/finger-api/docs`);
-      logger.info(`📖 Dokumentasi Lengkap tersedia di: http://localhost:${PORT}/finger-api/docs/`);
+      logger.info(`🧪 Dokumentasi Scalar (Modern): http://localhost:${PORT}/finger-api/docs`);
+      logger.info(`🧪 Dokumentasi Swagger (Standard): http://localhost:${PORT}/finger-api/swagger`);
     });
 
     // Menangani error spesifik pada server HTTP

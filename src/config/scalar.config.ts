@@ -29,7 +29,6 @@ export function generateScalarHTML(_spec: any): string {
   <script 
     id="api-reference" 
     data-url="/finger-api/docs-json"
-    data-proxy-url="https://proxy.scalar.com"
   ></script>
   
   <!-- Logika Klien untuk Mengatur Opsi Tampilan Dokumentasi -->
