@@ -33,7 +33,8 @@ RUN npm ci --omit=dev && npx prisma generate
 # ---------- Stage 3: Production image ----------
 FROM node:22-alpine AS runner
 
-# Security: Use non-root user
+# Security: Gunakan tini sebagai init system (PID 1) agar sinyal SIGTERM ditangani dengan baik
+RUN apk add --no-cache tini
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 express
 
@@ -51,7 +52,7 @@ COPY --chown=express:nodejs public ./dist/public
 COPY --chown=express:nodejs prisma ./prisma/
 COPY --chown=express:nodejs package.json ./
 COPY --chown=express:nodejs fingerprint_db.sql ./
-RUN mkdir -p exports logs && chown -R express:nodejs exports logs
+RUN mkdir -p exports logs .npm && chown -R express:nodejs exports logs .npm
 
 # Switch to non-root user
 USER express
@@ -59,9 +60,10 @@ USER express
 # Expose port (runtime value from ENV)
 EXPOSE 3333
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# Health check (waktu start_period dikembalikan menjadi normal karena tidak ada seeding lagi)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1:3333/health || exit 1
 
-# Start the compiled server
-CMD ["npm", "start"]
+# Start the compiled server using tini
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "dist/src/server.js"]

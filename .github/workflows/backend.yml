@@ -283,6 +283,13 @@ jobs:
                && echo '✅ Migrations complete' \
                || { echo '❌ Migration failed!'; exit 1; }
 
+             echo '🌱 Running database seeding...'
+             docker run --rm --network finger-net \
+               -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
+               \"\$BACKEND_IMAGE\" npx prisma db seed \
+               && echo '✅ Seeding complete' \
+               || { echo '❌ Seeding failed!'; exit 1; }
+
              echo '🚀 Updating swarm service finger-be_redis...'
              docker service update finger-be_redis \
                --args \"redis-server --appendonly yes --requirepass \${REDIS_PASSWORD}\" \
