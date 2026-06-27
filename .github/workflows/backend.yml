@@ -120,10 +120,12 @@ jobs:
       - name: Add SSH known host
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
         run: |
           : "${SSH_HOST:?❌ Secret SSH_HOST is not set!}"
+          PORT="${SSH_PORT:-22}"
           mkdir -p ~/.ssh
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || {
+          ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || {
             echo "❌ ssh-keyscan failed — host unreachable or port closed"
             exit 1
           }
