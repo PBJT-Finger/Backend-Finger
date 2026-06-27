@@ -26,7 +26,7 @@ import { requestCorrelation } from './middlewares/correlation';
 import { metricsMiddleware } from './middlewares/metrics.middleware';
 
 // Mengimpor spesifikasi dokumentasi OpenAPI (Swagger) dan Scalar UI
-import { specs } from './config/swagger';
+import { specs, swaggerUi, swaggerOptions } from './config/swagger';
 import { generateScalarHTML } from './config/scalar.config';
 import { translateTags, translateDescription, getTranslation } from './config/i18n.translations';
 
@@ -231,6 +231,10 @@ app.get('/api-docs', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/html');
   res.send(html);
 });
+
+// ==================== DOKUMENTASI API SWAGGER UI (STANDARD) ====================
+app.use('/finger-api/swagger', swaggerUi.serve, swaggerUi.setup(specs, swaggerOptions));
+app.use('/swagger', swaggerUi.serve, swaggerUi.setup(specs, swaggerOptions));
 
 // Endpoint OpenAPI JSON spec - Mendukung lokalisasi/terjemahan bahasa (Indonesian / English)
 app.get('/finger-api/docs-json', (req: Request, res: Response) => {
