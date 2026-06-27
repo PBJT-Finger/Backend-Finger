@@ -12,11 +12,13 @@ on:
       - '.github/workflows/backend.yml'
       - 'public/**'
       - 'fingerprint_db.sql'
+      - 'scripts/**'
   pull_request:
     branches: [main]
     paths:
       - 'src/**'
       - 'prisma/**'
+      - 'scripts/**'
   workflow_dispatch:
 
 env:

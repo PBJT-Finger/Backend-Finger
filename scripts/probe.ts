@@ -1,12 +1,19 @@
+/**
+ * scripts/probe.ts
+ *
+ * Skrip utilitas CLI untuk menguji komunikasi langsung dengan mesin sidik jari ZKTeco.
+ * Melakukan pemeriksaan port, koneksi soket, penarikan informasi dasar, daftar pengguna,
+ * dan log kehadiran untuk memastikan perangkat keras online dan dapat diakses.
+ */
 import dotenv from 'dotenv';
 dotenv.config();
 
 import { ZkTcpClient } from '../src/infrastructure/zklib';
 
-// All device configuration MUST come from .env — no fallback IPs allowed.
-// Missing env vars will throw immediately to prevent silent misconfiguration.
+// Seluruh konfigurasi perangkat WAJIB diambil dari .env - tidak diperbolehkan fallback IP.
+// Jika variabel env tidak lengkap, skrip akan langsung berhenti untuk mencegah miskonfigurasi.
 if (!process.env.FINGERPRINT_IP) {
-  console.error('[FATAL] FINGERPRINT_IP is not set in .env');
+  console.error('[FATAL] FINGERPRINT_IP belum diatur di dalam berkas .env');
   process.exit(1);
 }
 const DEVICE_IP = process.env.FINGERPRINT_IP;
@@ -14,60 +21,60 @@ const DEVICE_PORT = parseInt(process.env.FINGERPRINT_PORT ?? '4370', 10);
 const CONNECTION_TIMEOUT_MS = parseInt(process.env.FINGERPRINT_TIMEOUT ?? '10000', 10);
 
 async function runConnectionProbe(): Promise<void> {
-  console.log(`[INFO] Initializing connection to ${DEVICE_IP}:${DEVICE_PORT}...`);
+  console.log(`[INFO] Menginisialisasi koneksi ke ${DEVICE_IP}:${DEVICE_PORT}...`);
 
   const zkInstance = new ZkTcpClient(DEVICE_IP, DEVICE_PORT, CONNECTION_TIMEOUT_MS);
 
   try {
-    console.log('[INFO] Attempting to create socket...');
+    console.log('[INFO] Mencoba membuat soket TCP...');
     await zkInstance.createSocket();
     await zkInstance.connect();
-    console.log('[SUCCESS] Socket successfully established and session connected.');
+    console.log('[SUCCESS] Soket berhasil dibuat dan sesi koneksi terhubung.');
 
-    // Test 1: Device Info
+    // Pengujian 1: Mendapatkan Informasi Perangkat
     try {
-      console.log('\n[1/3] Fetching device info...');
+      console.log('\n[1/3] Menarik informasi dasar perangkat...');
       const deviceInfo = await zkInstance.getInfo();
-      console.log('[DATA] Device Info:', deviceInfo);
+      console.log('[DATA] Informasi Perangkat:', deviceInfo);
     } catch (e) {
-      console.error('[ERROR] Failed to fetch device info:', e);
+      console.error('[ERROR] Gagal menarik informasi dasar perangkat:', e);
     }
 
-    // Test 2: Users
+    // Pengujian 2: Mendapatkan Master Data Pengguna
     try {
-      console.log('\n[2/3] Fetching users (Master Data)...');
+      console.log('\n[2/3] Menarik data pengguna (Master Data)...');
       const users = await zkInstance.getUsers();
-      console.log(`[DATA] Found ${users?.data?.length || 0} users.`);
+      console.log(`[DATA] Ditemukan ${users?.data?.length || 0} pengguna.`);
       if (users?.data && users.data.length > 0) {
-        console.log('[DATA] Sample Users:', users.data.slice(0, 5));
+        console.log('[DATA] Contoh Data Pengguna:', users.data.slice(0, 5));
       }
     } catch (e) {
-      console.error('[ERROR] Failed to fetch users:', e);
+      console.error('[ERROR] Gagal menarik data pengguna dari mesin:', e);
     }
 
-    // Test 3: Attendances
+    // Pengujian 3: Mendapatkan Log Kehadiran
     try {
-      console.log('\n[3/3] Fetching recent attendance logs (Clock-ins)...');
+      console.log('\n[3/3] Menarik log kehadiran (Clock-ins)...');
       const attendances = await zkInstance.getAttendances();
-      console.log(`[DATA] Found ${attendances?.data?.length || 0} attendance records.`);
+      console.log(`[DATA] Ditemukan ${attendances?.data?.length || 0} catatan log kehadiran.`);
       if (attendances?.data && attendances.data.length > 0) {
-        console.log('[DATA] Sample Attendances:', attendances.data.slice(0, 5));
+        console.log('[DATA] Contoh Catatan Kehadiran:', attendances.data.slice(0, 5));
       }
     } catch (e) {
       console.error(
-        '[ERROR] Failed to fetch attendances. Machine buffer might still be empty or reading issue.',
+         '[ERROR] Gagal menarik log absensi. Buffer mesin mungkin masih kosong atau terjadi gangguan pembacaan.',
         e
       );
     }
   } catch (error) {
-    console.error('[ERROR] Probe failed to communicate with the edge device:', error);
+    console.error('[ERROR] Uji coba koneksi (probe) gagal berkomunikasi dengan perangkat biometrik:', error);
   } finally {
-    console.log('\n[INFO] Closing socket connection...');
+    console.log('\n[INFO] Menutup koneksi soket...');
     try {
       await zkInstance.disconnect();
-      console.log('[SUCCESS] Connection cleanly disconnected.');
+      console.log('[SUCCESS] Koneksi berhasil diputuskan dengan bersih.');
     } catch (disconnectError) {
-      // Abaikan error disconnect agar exit code tetap 0
+      // Abaikan error disconnect agar skrip tetap keluar dengan exit code 0
     }
   }
 }
