@@ -307,9 +307,9 @@ jobs:
                --env-add DB_NAME=\"\$DB_NAME\" \
                --env-add DATABASE_URL=\"\$DATABASE_URL\" \
                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
-               --env-add POLLING_INTERVAL_MS="\$POLLING_INTERVAL_MS" \
-               --env-add RECONNECT_DELAY_MS="\$RECONNECT_DELAY_MS" \
-               --health-cmd "wget -qO- http://127.0.0.1:3333/health || exit 1" \
+               --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
+               --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
+               --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
                --with-registry-auth finger-be_backend \
                || { 
                  echo '❌ Service update failed! Fetching task status...'; 
