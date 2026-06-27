@@ -288,12 +288,6 @@ jobs:
                --args \"redis-server --appendonly yes --requirepass \${REDIS_PASSWORD}\" \
                || echo '⚠️ Warning: Failed to update redis service'
 
-             echo '🧹 Running Deep Garbage Collection on Manager Node...'
-             docker system prune -af --filter "until=24h" || true
-             docker volume prune -f || true
-             
-             echo '🧹 Attempting to remotely prune swarm-worker-1 via internal SSH...'
-             ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 swarm-worker-1 \"docker system prune -af --filter 'until=24h' && docker volume prune -f\" || echo '⚠️ Remote prune skipped (SSH access not configured between nodes)'
 
              echo '🚀 Updating swarm service finger-be_backend...'
              DATABASE_URL=\"mysql://root:\${ENCODED_DB_PASS}@mysql:3306/\${DB_NAME}\"
