@@ -1,16 +1,23 @@
+/**
+ * scripts/seed-holidays.ts
+ *
+ * Skrip utilitas CLI untuk memasukkan data hari libur nasional Indonesia tahun 2026
+ * ke dalam database secara otomatis. Berguna untuk perhitungan absensi (misal: membedakan hari kerja dan libur).
+ */
 import dotenv from 'dotenv';
 dotenv.config();
 
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
+// Interface tipe data untuk struktur hari libur
 interface HolidayInput {
-  tanggal: string; // YYYY-MM-DD
+  tanggal: string; // Format tanggal YYYY-MM-DD
   nama_libur: string;
 }
 
+// Daftar Libur Nasional & Cuti Bersama Indonesia Tahun 2026
 const holidays2026: HolidayInput[] = [
-  // Libur Nasional & Cuti Bersama 2026
   { tanggal: '2026-01-01', nama_libur: 'Tahun Baru Masehi' },
   { tanggal: '2026-01-16', nama_libur: "Isra Mi'raj Nabi Muhammad S.A.W." },
   { tanggal: '2026-02-16', nama_libur: 'Cuti Bersama Tahun Baru Imlek 2577 Kongzili' },
@@ -39,11 +46,11 @@ const holidays2026: HolidayInput[] = [
 ];
 
 async function main() {
-  console.log('[INFO] Seeding Indonesian Holidays for 2026...');
+  console.log('[INFO] Memulai proses seeding data Hari Libur Nasional 2026...');
 
   for (const h of holidays2026) {
     const tanggalDate = new Date(h.tanggal);
-    // Use upsert to avoid duplicate key errors
+    // Menggunakan operasi upsert untuk menghindari duplikasi kunci primer jika data sudah ada
     await prisma.holidays.upsert({
       where: { tanggal: tanggalDate },
       update: { nama_libur: h.nama_libur },
@@ -54,13 +61,15 @@ async function main() {
     });
   }
 
+  // Menghitung jumlah total data hari libur yang terdaftar
   const count = await prisma.holidays.count();
-  console.log(`[SUCCESS] Seeding completed. Total holiday records: ${count}`);
+  console.log(`[SUCCESS] Seeding selesai. Total data hari libur di database: ${count}`);
 }
 
+// Eksekusi fungsi utama dan penanganan pemutusan koneksi client database
 main()
   .catch((e) => {
-    console.error('[ERROR] Error seeding holidays:', e);
+    console.error('[ERROR] Terjadi kesalahan saat seeding hari libur:', e);
     process.exit(1);
   })
   .finally(async () => {

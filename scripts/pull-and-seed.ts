@@ -1,14 +1,16 @@
 /**
  * scripts/pull-and-seed.ts
  *
- * Script standalone untuk:
- *  1. Menarik SEMUA data user dari alat fingerprint ZKTeco via TCP
- *  2. Mengekspor hasilnya sebagai file SQL seed (INSERT INTO employees)
+ * Skrip utilitas CLI mandiri (standalone) untuk:
+ *   1. Menarik seluruh data pengguna dari mesin fingerprint ZKTeco via koneksi soket TCP.
+ *   2. Memformat dan mengekspor hasilnya menjadi file SQL seed (INSERT INTO employees) dan file JSON.
  *
- * Jalankan di server Proxmox (yang bisa menjangkau 175.17.5.50):
- *   FINGERPRINT_IP=175.17.5.50 npx tsx scripts/pull-and-seed.ts
+ * Cara Menjalankan (pastikan server dapat menjangkau IP mesin):
+ *   FINGERPRINT_IP=192.168.137.50 npx tsx scripts/pull-and-seed.ts
  *
- * Output: seeds/employees_from_device.sql
+ * Berkas Keluaran:
+ *   - seeds/employees_from_device.sql (Skrip SQL)
+ *   - seeds/employees_from_device.json (Data JSON)
  */
 
 import dotenv from 'dotenv';
@@ -18,37 +20,44 @@ import fs from 'fs';
 import path from 'path';
 import { ZkTcpClient } from '../src/infrastructure/zklib';
 
-// ─── Konfigurasi ────────────────────────────────────────────────────────────
-const DEVICE_IP = process.env.FINGERPRINT_IP ?? '175.17.5.50';
+// ─── Konfigurasi Parameter Koneksi & Default ────────────────────────────────
+const DEVICE_IP = process.env.FINGERPRINT_IP ?? '192.168.137.50';
 const DEVICE_PORT = parseInt(process.env.FINGERPRINT_PORT ?? '4370', 10);
 const TIMEOUT_MS = parseInt(process.env.FINGERPRINT_TIMEOUT ?? '15000', 10);
 
-// Shift default untuk semua karyawan yang belum ada assignment-nya
+// ID shift kerja bawaan untuk seluruh pegawai baru yang diimpor dari mesin
 const DEFAULT_SHIFT_ID = 1;
 
-// Output file
+// Menentukan direktori dan berkas keluaran untuk data seeding
 const OUTPUT_DIR = path.resolve(__dirname, '../seeds');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'employees_from_device.sql');
 const OUTPUT_JSON = path.join(OUTPUT_DIR, 'employees_from_device.json');
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Fungsi Pembantu (Helpers) ──────────────────────────────────────────────
+
+/**
+ * Mengamankan string teks agar aman dimasukkan ke dalam query SQL (mencegah SQL Injection).
+ */
 function escapeSQL(val: string): string {
   return val.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
+/**
+ * Menyusun perintah INSERT SQL massal berdasarkan data pengguna yang berhasil ditarik.
+ */
 function buildSeedSQL(users: Array<{ userId: string; name: string }>): string {
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
   const lines: string[] = [
     '-- ============================================================',
     '-- employees_from_device.sql',
-    `-- Generated: ${new Date().toISOString()}`,
-    `-- Source   : ZKTeco @ ${DEVICE_IP}:${DEVICE_PORT}`,
-    `-- Total    : ${users.length} records`,
+    `-- Dibuat otomatis pada: ${new Date().toISOString()}`,
+    `-- Sumber Perangkat    : ZKTeco @ ${DEVICE_IP}:${DEVICE_PORT}`,
+    `-- Jumlah Pengguna     : ${users.length} catatan`,
     '-- ============================================================',
     '',
-    '-- Pastikan tabel shifts memiliki setidaknya 1 baris (id=1) sebelum import ini.',
-    '-- Gunakan: INSERT IGNORE INTO employees (...) untuk skip duplikat.',
+    '-- Pastikan tabel shifts memiliki setidaknya 1 baris (id=1) sebelum mengimpor file ini.',
+    '-- Menggunakan INSERT IGNORE agar tidak menimpa jika data sudah ada sebelumnya.',
     '',
     'START TRANSACTION;',
     '',
@@ -60,7 +69,7 @@ function buildSeedSQL(users: Array<{ userId: string; name: string }>): string {
   const valueRows = users.map((u, idx) => {
     const userId = escapeSQL(u.userId);
     const nama = escapeSQL(u.name || `User-${u.userId}`);
-    // Default ke KARYAWAN — admin bisa update via UI setelah import
+    // Default jabatan diset ke KARYAWAN (bisa diperbarui admin lewat UI web nanti)
     const jabatan = 'KARYAWAN';
     const isLast = idx === users.length - 1;
     return `  ('${userId}', '${nama}', '${jabatan}', ${DEFAULT_SHIFT_ID}, 'AKTIF', 1, '${now}', '${now}')${isLast ? '' : ','}`;
@@ -73,60 +82,60 @@ function buildSeedSQL(users: Array<{ userId: string; name: string }>): string {
   lines.push('');
   lines.push('COMMIT;');
   lines.push('');
-  lines.push(`-- Total ${users.length} employees di-seed dari alat fingerprint.`);
+  lines.push(`-- Selesai: Total ${users.length} pegawai berhasil di-seed.`);
 
   return lines.join('\n');
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// ─── Fungsi Utama (Main Execution) ──────────────────────────────────────────
 async function main(): Promise<void> {
   console.log('='.repeat(60));
-  console.log('[ ZKTeco Pull & Seed ]');
-  console.log(`  Device : ${DEVICE_IP}:${DEVICE_PORT}`);
-  console.log(`  Timeout: ${TIMEOUT_MS}ms`);
+  console.log('[ Penarikan Data & Seeding ZKTeco ]');
+  console.log(`  IP Mesin : ${DEVICE_IP}:${DEVICE_PORT}`);
+  console.log(`  Timeout  : ${TIMEOUT_MS}ms`);
   console.log('='.repeat(60));
 
   const zk = new ZkTcpClient(DEVICE_IP, DEVICE_PORT, TIMEOUT_MS);
 
   try {
-    // 1. Buat koneksi TCP ke alat
-    console.log('\n[1/4] Membuka socket TCP ke alat...');
+    // 1. Membuka koneksi soket TCP
+    console.log('\n[1/4] Membuka soket TCP ke mesin...');
     await zk.createSocket();
-    console.log('      ✓ Socket terbuka');
+    console.log('      ✓ Soket berhasil dibuka');
 
-    // 2. Handshake / inisiasi sesi ZKTeco
-    console.log('[2/4] Menginisiasi sesi ZKTeco...');
+    // 2. Melakukan handshake sesi dengan ZKTeco
+    console.log('[2/4] Melakukan inisiasi sesi komunikasi...');
     await zk.connect();
-    console.log('      ✓ Sesi berhasil');
+    console.log('      ✓ Sesi berhasil terhubung');
 
-    // 3. Ambil info alat dulu
-    console.log('[3/4] Mengambil info alat...');
+    // 3. Mengambil informasi status mesin
+    console.log('[3/4] Mengambil status informasi mesin...');
     try {
       const info = await zk.getInfo();
-      console.log(`      ✓ User di alat : ${info.userCounts}`);
-      console.log(`      ✓ Log absensi  : ${info.logCounts}`);
-      console.log(`      ✓ Kapasitas log: ${info.logCapacity}`);
+      console.log(`      ✓ Pengguna di mesin: ${info.userCounts}`);
+      console.log(`      ✓ Jumlah log absensi: ${info.logCounts}`);
+      console.log(`      ✓ Kapasitas memori  : ${info.logCapacity}`);
     } catch (e) {
-      console.warn('      ⚠ Gagal ambil info alat, lanjut tarik user...');
+      console.warn('      ⚠ Gagal mendapatkan informasi mesin, mencoba langsung menarik data pengguna...');
     }
 
-    // 4. Tarik semua user
-    console.log('[4/4] Menarik data user dari alat...');
+    // 4. Menarik data seluruh pengguna
+    console.log('[4/4] Menarik daftar pengguna dari mesin...');
     const result = await zk.getUsers();
     const rawUsers = result.data ?? [];
 
     if (result.err) {
-      console.warn(`      ⚠ Ada error saat tarik: ${result.err.message}`);
+      console.warn(`      ⚠ Terjadi kendala saat penarikan data: ${result.err.message}`);
     }
 
-    console.log(`      ✓ Berhasil: ${rawUsers.length} user ditemukan`);
+    console.log(`      ✓ Sukses: Ditemukan ${rawUsers.length} pengguna`);
 
     if (rawUsers.length === 0) {
-      console.warn('\n[WARN] Tidak ada user di alat. Seed tidak dibuat.');
+      console.warn('\n[WARN] Tidak ada pengguna terdaftar pada mesin. Berkas SQL seed tidak akan dibuat.');
       return;
     }
 
-    // Normalize data
+    // Normalisasi struktur data pengguna
     const users = rawUsers
       .map((u) => ({
         userId: String((u as any).userId ?? (u as any).uid ?? ''),
@@ -134,51 +143,51 @@ async function main(): Promise<void> {
       }))
       .filter((u) => u.userId !== '');
 
-    // Tampilkan daftar
-    console.log('\n--- Daftar User dari Alat ---');
+    // Menampilkan daftar pengguna yang ditarik ke layar konsol
+    console.log('\n--- Daftar Pengguna Hasil Tarik Mesin ---');
     users.forEach((u, i) => {
       console.log(
         `  [${String(i + 1).padStart(3, '0')}] ID: ${u.userId.padEnd(6)} | Nama: ${u.name}`
       );
     });
-    console.log(`--- Total: ${users.length} user ---\n`);
+    console.log(`--- Total: ${users.length} Pengguna ---\n`);
 
-    // Buat output dir jika belum ada
+    // Membuat direktori keluaran jika belum tersedia
     if (!fs.existsSync(OUTPUT_DIR)) {
       fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     }
 
-    // Simpan JSON mentah
+    // Menyimpan berkas JSON mentah
     fs.writeFileSync(OUTPUT_JSON, JSON.stringify(users, null, 2), 'utf-8');
-    console.log(`[✓] JSON mentah tersimpan: ${OUTPUT_JSON}`);
+    console.log(`[✓] Berkas JSON mentah disimpan ke: ${OUTPUT_JSON}`);
 
-    // Buat SQL seed
+    // Menyusun skrip SQL dan menyimpannya
     const sql = buildSeedSQL(users);
     fs.writeFileSync(OUTPUT_FILE, sql, 'utf-8');
-    console.log(`[✓] SQL seed tersimpan   : ${OUTPUT_FILE}`);
+    console.log(`[✓] Berkas SQL seed disimpan ke   : ${OUTPUT_FILE}`);
 
-    console.log('\n[SELESAI] Untuk import ke MySQL jalankan:');
-    console.log(`  mysql -u root -p fingerprint_db < ${OUTPUT_FILE}`);
-    console.log('\nAtau dari dalam container Docker:');
+    console.log('\n[SELESAI] Untuk mengimpor hasil seed ke MySQL, jalankan:');
+    console.log(`  mysql -u root -p nama_database < ${OUTPUT_FILE}`);
+    console.log('\nAtau jika menggunakan kontainer Docker:');
     console.log(
-      '  docker exec -i finger-be_mysql mysql -uroot -p<password> fingerprint_db < seeds/employees_from_device.sql'
+      '  docker exec -i nama_kontainer_mysql mysql -uroot -p<password> nama_database < seeds/employees_from_device.sql'
     );
   } catch (err) {
-    console.error('\n[ERROR] Gagal terhubung ke alat fingerprint:');
+    console.error('\n[ERROR] Gagal terhubung ke perangkat fingerprint:');
     console.error(err);
     console.error('\nPastikan:');
     console.error(
-      `  1. Alat fingerprint menyala dan bisa di-ping dari server ini: ping ${DEVICE_IP}`
+      `  1. Alat fingerprint menyala dan dapat di-ping dari server ini: ping ${DEVICE_IP}`
     );
-    console.error('  2. Port 4370 tidak diblokir firewall');
-    console.error('  3. Script ini dijalankan dari server Proxmox (bukan PC lokal)');
+    console.error('  2. Port komunikasi 4370 tidak diblokir oleh firewall');
+    console.error('  3. Konfigurasi IP pada berkas .env sudah tepat');
     process.exit(1);
   } finally {
     try {
       await zk.disconnect();
-      console.log('\n[INFO] Koneksi ke alat ditutup.');
+      console.log('\n[INFO] Sesi koneksi ke alat telah ditutup.');
     } catch (_) {
-      // abaikan error saat disconnect
+      // Abaikan error saat proses pemutusan koneksi
     }
   }
 }
