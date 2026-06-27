@@ -289,7 +289,8 @@ jobs:
                || echo '⚠️ Warning: Failed to update redis service'
 
              echo '🧹 Running Deep Garbage Collection to free space before deployment...'
-             docker system prune -af --volumes --filter \"until=168h\" || true
+             docker system prune -af --filter "until=24h" || true
+             docker volume prune -f || true
 
              echo '🚀 Updating swarm service finger-be_backend...'
              DATABASE_URL=\"mysql://root:\${ENCODED_DB_PASS}@mysql:3306/\${DB_NAME}\"
