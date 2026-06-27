@@ -48,7 +48,7 @@ CREATE TABLE `admins` (
 
 LOCK TABLES `admins` WRITE;
 /*!40000 ALTER TABLE `admins` DISABLE KEYS */;
-INSERT INTO `admins` VALUES (1,'admin','$2b$12$XN/p3ldwnOhAQiAFGJgpfOoKl5Sobp2n2EoDhCtH0kTmhdqJgC6j.','admin.pbjt@gmail.com','Administrator','admin',1,NULL,'2026-06-26 09:14:32','2026-06-26 09:14:32'),(2,'pimpinan','$2b$12$7fG83BoQiZv6Uemv7Op2TOzqBmDnrf3W/O132meCYN2B/vY8avey6','pimpinan.pbjt@gmail.com','Pimpinan','pimpinan',1,NULL,'2026-06-26 09:14:32','2026-06-26 09:14:32');
+INSERT INTO `admins` VALUES (1,'admin','$2b$12$qIaNgsuqia2LtKmMZMKU1.0JF/7tGscZtaEBm8NRnSew4DyqSrWOG','admin.pbjt@gmail.com','Administrator','admin',1,NULL,'2026-06-26 09:14:32','2026-06-26 09:14:32'),(2,'pimpinan','$2b$12$1W7oG7D3DjtznsQdQnA5suLZTOnOy2o51xgOZ6fF1ePZuFUs.Xayy','pimpinan.pbjt@gmail.com','Pimpinan','pimpinan',1,NULL,'2026-06-26 09:14:32','2026-06-26 09:14:32');
 /*!40000 ALTER TABLE `admins` ENABLE KEYS */;
 UNLOCK TABLES;
 
