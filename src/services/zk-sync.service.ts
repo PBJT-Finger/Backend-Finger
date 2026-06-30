@@ -40,6 +40,9 @@ interface BatchResult {
 
 export class ZkSyncService {
   private readonly zkClient: ZkDeviceClient;
+  
+  // Mutex lock in-memory untuk mencegah race condition (double scan) pada milidetik yang sama
+  private processingLocks = new Set<string>();
 
   constructor(zkClient: ZkDeviceClient) {
     this.zkClient = zkClient;
@@ -127,15 +130,40 @@ export class ZkSyncService {
     const localYear = t.getUTCFullYear();
     const localMonth = t.getUTCMonth();
     const localDate = t.getUTCDate();
-    const localHour = t.getUTCHours();
-    const localMinute = t.getUTCMinutes();
-    const localSecond = t.getUTCSeconds();
 
     // Field 'tanggal' diisi dengan waktu tengah malam UTC (Midnight) merepresentasikan tanggal tersebut
     const tanggal = new Date(Date.UTC(localYear, localMonth, localDate));
 
     // ID user di mesin dipetakan ke user_id
     const user_id = record.deviceUserId;
+
+    // Mutex Lock Check: Jika thread/proses lain sedang memproses absensi user ini di hari yang sama saat ini juga
+    const lockKey = `${user_id}_${tanggal.toISOString()}`;
+    if (this.processingLocks.has(lockKey)) {
+      // Abaikan. Jika ini scan baru, ZKTeco akan memancarkan ulang di siklus polling berikutnya.
+      return;
+    }
+    this.processingLocks.add(lockKey);
+
+    try {
+      await this._doUpsertAttendanceRecord(record, t, localYear, localMonth, localDate, tanggal, user_id);
+    } finally {
+      this.processingLocks.delete(lockKey);
+    }
+  }
+
+  private async _doUpsertAttendanceRecord(
+    record: AttendanceRecord,
+    t: Date,
+    localYear: number,
+    localMonth: number,
+    localDate: number,
+    tanggal: Date,
+    user_id: string
+  ): Promise<void> {
+    const localHour = t.getUTCHours();
+    const localMinute = t.getUTCMinutes();
+    const localSecond = t.getUTCSeconds();
 
     // Ambil info master data pegawai aktif dari DB
     const employee = await prisma.employees.findFirst({
