@@ -295,6 +295,14 @@ jobs:
                && echo '✅ Seeding complete' \
                || { echo '❌ Seeding failed!'; exit 1; }
 
+             echo '🧹 Running cleanup for double scans...'
+             docker run --rm --network finger-net \
+               -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
+               \"\$BACKEND_IMAGE\" node dist/scripts/cleanup-duplicates.js \
+               && echo '✅ Cleanup complete' \
+               || { echo '⚠️ Cleanup failed or skipped'; }
+
+
              echo '🚀 Updating swarm service finger-be_redis...'
              docker service update finger-be_redis \
                --args \"redis-server --appendonly yes --requirepass \${REDIS_PASSWORD}\" \
