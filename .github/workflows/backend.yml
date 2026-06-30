@@ -9,6 +9,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'Dockerfile'
+      - '.dockerignore'
       - '.github/workflows/backend.yml'
       - 'public/**'
       - 'fingerprint_db.sql'
