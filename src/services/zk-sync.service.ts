@@ -76,8 +76,8 @@ export class ZkSyncService {
 
     for (const record of records) {
       try {
-        // Abaikan scan dari ID simulasi/dummy/testing (Melinda '1' adalah user asli, jadi ID 5,6,7 yang diabaikan)
-        if (['5', '6', '7'].includes(record.deviceUserId)) {
+        // Abaikan scan dari ID simulasi/dummy/testing
+        if (['1', '5', '6', '7'].includes(record.deviceUserId)) {
           continue;
         }
 

@@ -179,7 +179,6 @@ async function main() {
     // Jika berkas tidak ada, tampilkan peringatan dan gunakan data simulasi cadangan
     console.warn('employees_from_device.json not found. Using default mock users.');
     rawUsers = [
-      { userId: '1', name: 'Melinda' },
       { userId: '3', name: 'Ilham_Akhsani' },
       { userId: '4', name: 'Slamet_Riyadi' },
       { userId: '5', name: 'Lily_Budinurani' },
