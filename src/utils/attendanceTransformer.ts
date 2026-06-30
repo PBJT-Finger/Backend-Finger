@@ -25,7 +25,6 @@ export interface TransformedKaryawanRecord {
   nama: string;
   totalHadir: number;
   tidakHadir: number;
-  totalTerlambat: number;
   totalHariKerja: number;
   persentase: number;
   attendanceDates: string;
@@ -318,7 +317,6 @@ export function transformKaryawanAttendance(
         user_id: string;
         nama: string;
         attendanceDates: Set<string>;
-        lateDates: Set<string>;
         lastCheckInUTC: Date | null;
         lastCheckOutUTC: Date | null;
       }
@@ -330,7 +328,6 @@ export function transformKaryawanAttendance(
           user_id: emp.user_id,
           nama: emp.nama || 'Unknown',
           attendanceDates: new Set<string>(),
-          lateDates: new Set<string>(),
           lastCheckInUTC: null,
           lastCheckOutUTC: null,
         };
@@ -347,7 +344,6 @@ export function transformKaryawanAttendance(
             user_id: user_id,
             nama: record.nama || 'Unknown',
             attendanceDates: new Set<string>(),
-            lateDates: new Set<string>(),
             lastCheckInUTC: null,
             lastCheckOutUTC: null,
           };
@@ -358,9 +354,6 @@ export function transformKaryawanAttendance(
           const dateStr = extractDateString(record.tanggal);
           if (dateStr) {
             group.attendanceDates.add(dateStr);
-            if (record.status === 'TERLAMBAT') {
-              group.lateDates.add(dateStr);
-            }
           }
 
           if (record.jam_masuk) {
@@ -390,7 +383,6 @@ export function transformKaryawanAttendance(
         nama: group.nama,
         totalHadir,
         tidakHadir: Math.max(0, totalHariKerja - totalHadir),
-        totalTerlambat: group.lateDates.size,
         totalHariKerja,
         persentase:
           totalHariKerja > 0
