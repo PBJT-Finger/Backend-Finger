@@ -152,28 +152,31 @@ export class ExportController {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Rekap Absensi');
 
-      // Mendefinisikan kolom lembar kerja Excel
+      // Mendefinisikan kolom lembar kerja Excel — kolom Terlambat hanya untuk Dosen
+      const isDosen = jabatan === 'DOSEN';
       worksheet.columns = [
         { header: 'No', key: 'no', width: 6 },
         { header: 'Nama', key: 'nama', width: 28 },
         { header: 'Hari Kerja Target', key: 'total_hari_kerja', width: 18 },
         { header: 'Hadir', key: 'hadir', width: 10 },
-        { header: 'Terlambat', key: 'terlambat', width: 12 },
+        ...(isDosen ? [{ header: 'Terlambat', key: 'terlambat', width: 12 }] : []),
         { header: 'Tidak Hadir', key: 'tidak_hadir', width: 12 },
         { header: 'Persentase', key: 'persentase', width: 12 },
       ];
 
       // Memasukkan setiap data baris rekap ke Excel
       transformedData.forEach((record, index) => {
-        worksheet.addRow({
+        const row: Record<string, any> = {
           no: index + 1,
           nama: record.nama || '-',
           total_hari_kerja: record.totalHariKerja || 0,
           hadir: record.totalHadir || 0,
-          terlambat: record.totalTerlambat || 0,
           tidak_hadir: record.tidakHadir || 0,
           persentase: `${record.persentase || 0}%`,
-        });
+        };
+        // Hanya sertakan kolom terlambat untuk Dosen
+        if (isDosen) row['terlambat'] = record.totalTerlambat || 0;
+        worksheet.addRow(row);
       });
 
       // Membuat teks baris header menjadi tebal (Bold)
@@ -553,17 +556,14 @@ export class ExportController {
       const tableTop = doc.y;
       const startX = 35; 
 
-      // Pengaturan lebar kolom tabel laporan rekap
-      const colWidths = [30, 180, 65, 55, 65, 65, 65];
-      const headers = [
-        'No',
-        'Nama',
-        'Hari Kerja\nTarget',
-        'Hadir',
-        'Terlambat',
-        'Tidak\nHadir',
-        'Persentase',
-      ];
+      // Pengaturan lebar kolom tabel laporan rekap — kolom Terlambat hanya untuk Dosen
+      const isDosenPdf = jabatan === 'DOSEN';
+      const colWidths = isDosenPdf
+        ? [30, 180, 65, 55, 65, 65, 65]
+        : [30, 210, 75, 65, 75, 70];  // Tanpa kolom Terlambat untuk Karyawan
+      const headers = isDosenPdf
+        ? ['No', 'Nama', 'Hari Kerja\nTarget', 'Hadir', 'Terlambat', 'Tidak\nHadir', 'Persentase']
+        : ['No', 'Nama', 'Hari Kerja\nTarget', 'Hadir', 'Tidak\nHadir', 'Persentase'];
 
       const rowHeight = 25;
       const headerHeight = 35;
@@ -614,15 +614,24 @@ export class ExportController {
 
         let xPos = startX;
 
-        const rowData = [
-          { text: String(index + 1) },
-          { text: (record.nama || '-').replace(/_/g, ' ') },
-          { text: String(record.totalHariKerja || 0) },
-          { text: String(record.totalHadir || 0) },
-          { text: String(record.totalTerlambat || 0), isLate: (record.totalTerlambat || 0) > 0 },
-          { text: String(record.tidakHadir || 0) },
-          { text: `${record.persentase || 0}%` },
-        ];
+        const rowData = isDosenPdf
+          ? [
+              { text: String(index + 1) },
+              { text: (record.nama || '-').replace(/_/g, ' ') },
+              { text: String(record.totalHariKerja || 0) },
+              { text: String(record.totalHadir || 0) },
+              { text: String(record.totalTerlambat || 0), isLate: (record.totalTerlambat || 0) > 0 },
+              { text: String(record.tidakHadir || 0) },
+              { text: `${record.persentase || 0}%` },
+            ]
+          : [
+              { text: String(index + 1) },
+              { text: (record.nama || '-').replace(/_/g, ' ') },
+              { text: String(record.totalHariKerja || 0) },
+              { text: String(record.totalHadir || 0) },
+              { text: String(record.tidakHadir || 0) },
+              { text: `${record.persentase || 0}%` },
+            ];
 
         // Zebra striping baris tabel (selang-seling warna putih dan abu-abu tipis)
         const rowBg = index % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
@@ -792,16 +801,20 @@ export class ExportController {
         );
       }
 
-      // Memetakan ke bentuk struktur baris CSV
-      const csvData = transformedData.map((record, index) => ({
-        No: index + 1,
-        Nama: record.nama || '-',
-        'Hari Kerja Target': record.totalHariKerja || 0,
-        Hadir: record.totalHadir || 0,
-        Terlambat: record.totalTerlambat || 0,
-        'Tidak Hadir': record.tidakHadir || 0,
-        Persentase: `${record.persentase || 0}%`,
-      }));
+      // Memetakan ke bentuk struktur baris CSV — kolom Terlambat hanya untuk Dosen
+      const isDosenCsv = jabatan === 'DOSEN';
+      const csvData = transformedData.map((record, index) => {
+        const row: Record<string, any> = {
+          No: index + 1,
+          Nama: record.nama || '-',
+          'Hari Kerja Target': record.totalHariKerja || 0,
+          Hadir: record.totalHadir || 0,
+        };
+        if (isDosenCsv) row['Terlambat'] = record.totalTerlambat || 0;
+        row['Tidak Hadir'] = record.tidakHadir || 0;
+        row['Persentase'] = `${record.persentase || 0}%`;
+        return row;
+      });
 
       const firstRecord = csvData[0];
       if (!firstRecord) {
