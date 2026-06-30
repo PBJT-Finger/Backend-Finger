@@ -302,6 +302,12 @@ jobs:
                && echo '✅ Cleanup complete' \
                || { echo '⚠️ Cleanup failed or skipped'; }
 
+             echo '🧹 Removing Melinda data anomaly...'
+             docker run --rm --network finger-net \
+               -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
+               \"\$BACKEND_IMAGE\" node dist/scripts/remove-melinda.js \
+               && echo '✅ Anomaly removed' \
+               || { echo '⚠️ Anomaly removal failed'; }
 
              echo '🚀 Updating swarm service finger-be_redis...'
              docker service update finger-be_redis \
