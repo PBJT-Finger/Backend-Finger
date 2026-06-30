@@ -8,7 +8,6 @@ exports/
 .gitignore
 .github
 README.md
-scripts/
 seeds/
 .prettierrc
 .prettierignore
