@@ -277,6 +277,11 @@ jobs:
              echo \"📦 Deploying: \$BACKEND_IMAGE\"
 
              echo '🗄️ Running database migrations...'
+             echo 'Mencoba baselining database...'
+             docker run --rm --network finger-net \
+               -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
+               \"\$BACKEND_IMAGE\" npx prisma migrate resolve --applied 20260227000000_init || true
+
              docker run --rm --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
                \"\$BACKEND_IMAGE\" npx prisma migrate deploy \
