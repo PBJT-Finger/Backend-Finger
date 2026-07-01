@@ -191,6 +191,13 @@ async function main() {
   
   // Melakukan iterasi untuk setiap user dari perangkat fingerprint
   for (const u of rawUsers) {
+    // --- SUPER BLACKLIST MELINDA ---
+    // Cegah Melinda (ID 1) masuk dari proses seeding, terlepas dari apa yang ada di file statis JSON
+    if (u.userId === '1') {
+      console.log(`[SEED BLACKLIST] Mengabaikan data bibit atas nama Melinda (ID 1).`);
+      continue;
+    }
+
     // Membuat atau memperbarui data pegawai berdasarkan user_id mesin fingerprint
     const emp = await prisma.employees.upsert({
       // Menentukan pencarian pegawai berdasarkan kolom unik user_id
