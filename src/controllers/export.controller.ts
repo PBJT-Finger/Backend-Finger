@@ -671,6 +671,90 @@ export class ExportController {
         yPos += rowHeight;
       });
 
+      // Tanda tangan di bagian kanan bawah
+      const signatureHeight = 110;
+      if (yPos + signatureHeight > 760) {
+        doc.addPage();
+        yPos = 50;
+      } else {
+        yPos += 20;
+      }
+
+      const monthsID = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      const exportDate = new Date();
+      const exportDay = String(exportDate.getDate()).padStart(2, '0');
+      const exportMonth = monthsID[exportDate.getMonth()];
+      const exportYear = exportDate.getFullYear();
+      const dateText = `Dukuhwaru, ${exportDay} ${exportMonth} ${exportYear}`;
+
+      const rightAlignX = 360;
+      const signatureWidth = 200;
+
+      // 1. Tanggal Ekspor
+      doc
+        .fontSize(10)
+        .fillColor('#334155')
+        .font('Helvetica')
+        .text(dateText, rightAlignX, yPos, {
+          width: signatureWidth,
+          align: 'center',
+        });
+
+      // 2. Jabatan
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#334155')
+        .text('Pimpinan,', rightAlignX, doc.y + 2, {
+          width: signatureWidth,
+          align: 'center',
+        });
+
+      // 3. Ruang TTD
+      doc.moveDown(4.0);
+
+      // 4. Nama (Bold, Tanda Kurung)
+      const nameText = '( Aziz Azindani, M. Kom )';
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .fillColor('#334155')
+        .text(nameText, rightAlignX, doc.y, {
+          width: signatureWidth,
+          align: 'center',
+          underline: false,
+        });
+
+      // Menggambar garis bawah kustom dengan spasi proporsional
+      const nameWidth = doc.widthOfString(nameText);
+      const lineStartX = rightAlignX + (signatureWidth - nameWidth) / 2;
+      const lineEndX = lineStartX + nameWidth;
+      const lineY = doc.y - 1.5;
+
+      doc
+        .strokeColor('#334155')
+        .lineWidth(0.8)
+        .moveTo(lineStartX, lineY)
+        .lineTo(lineEndX, lineY)
+        .stroke();
+
+      // Menyesuaikan posisi y sebelum mencetak NIY agar tidak bertabrakan dengan garis
+      doc.y = lineY + 3.5;
+
+      // 5. NIY
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#334155')
+        .text('NIY. 850 018 701', rightAlignX, doc.y, {
+          width: signatureWidth,
+          align: 'center',
+          underline: false,
+        });
+
       doc.end(); // Finalisasi dan tutup dokumen PDF
 
       const actorId = req.user?.id ?? 0;
