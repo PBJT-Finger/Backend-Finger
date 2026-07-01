@@ -462,7 +462,8 @@ export class ExportController {
       doc.pipe(res);
 
       // Cek ketersediaan file logo Politeknik Baja Tegal
-      const logoPath = path.resolve('public/logo-pbjt.png');
+      // Menggunakan __dirname agar konsisten antara lingkungan dev (root) dan production Docker (/app/dist)
+      const logoPath = path.join(__dirname, '../../public/logo-pbjt.png');
       const hasLogo = fs.existsSync(logoPath);
 
       const logoStartY = 40;
