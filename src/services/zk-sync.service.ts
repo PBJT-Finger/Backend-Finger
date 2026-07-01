@@ -137,6 +137,13 @@ export class ZkSyncService {
     // ID user di mesin dipetakan ke user_id
     const user_id = record.deviceUserId;
 
+    // --- BLACKLIST MELINDA ---
+    // Mencegah Melinda (ID 1) masuk dari polling sinkronisasi real-time alat
+    if (user_id === '1') {
+      console.log(`[BLACKLIST] Mengabaikan absen hantu Melinda (ID 1) dari alat ZKTeco`);
+      return;
+    }
+
     // Mutex Lock Check: Jika thread/proses lain sedang memproses absensi user ini di hari yang sama saat ini juga
     const lockKey = `${user_id}_${tanggal.toISOString()}`;
     if (this.processingLocks.has(lockKey)) {

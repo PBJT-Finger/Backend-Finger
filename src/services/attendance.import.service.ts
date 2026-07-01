@@ -182,6 +182,13 @@ export class AttendanceImportService {
   ): ParsedRow | null {
     try {
       const user_id = String(row['NIK'] || row['ID'] || '').trim();
+      
+      // --- BLACKLIST MELINDA ---
+      if (user_id === '1') {
+        logger.warn(`[BLACKLIST] Mengabaikan data baris Fingerspot milik Melinda (ID 1)`);
+        return null; // Abaikan baris ini sepenuhnya
+      }
+
       const nama = String(row['Nama'] || '').trim();
       const tanggalStr = String(row['Tanggal Absensi'] || row['Tanggal Ab'] || '').trim();
       const waktuStr = String(row['Waktu Absensi'] || row['Waktu Abs'] || '').trim();
@@ -345,6 +352,12 @@ export class AttendanceImportService {
     }
 
     const user_id = String(row['user_id']).trim();
+
+    // --- BLACKLIST MELINDA ---
+    if (user_id === '1') {
+      errors.push(`Baris ${rowNum}: User ID '1' (Melinda) masuk dalam daftar blacklist sistem`);
+      return { valid: false, errors, data: null };
+    }
 
     // Pastikan pegawai terdaftar di database
     let employee: any;
