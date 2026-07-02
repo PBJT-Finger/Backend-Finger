@@ -17,8 +17,6 @@ RUN npm ci
 # Copy source code and build
 COPY tsconfig.json ./
 COPY src ./src/
-RUN echo "Cache buster 1"
-COPY scripts ./scripts/
 RUN npx prisma generate
 RUN npm run build
 
