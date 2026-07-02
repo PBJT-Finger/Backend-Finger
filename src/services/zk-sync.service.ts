@@ -213,11 +213,6 @@ export class ZkSyncService {
       }
     }
 
-    // Identifikasi pilihan tombol absen dari mesin fisik ZKTeco, jika didukung.
-    // Biasanya 0 (Check-In), 1 (Check-Out), 2 (Break-Out), 3 (Break-In), 4 (OT-In), 5 (OT-Out).
-    const type = record.attendanceType;
-    const isMachineMasuk = (type === 0 || type === 4);
-
     if (!existingRecord) {
       // Apapun tombol yang ditekan, catatan PERTAMA pada sesi ini SELALU dianggap Check-In (jam_masuk).
       const shiftStartHour = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCHours() : 8;
@@ -244,15 +239,25 @@ export class ZkSyncService {
       return;
     }
 
-    // Jika data sudah ada, kita periksa status dari tombol mesin (Masuk/Pulang)
-    if (isMachineMasuk) {
-      // User memilih tombol ABSEN MASUK di alat, padahal untuk sesi ini JAM MASUK sudah ada.
-      // Maka scan "Masuk" yang kedua dan seterusnya dalam sesi yang sama HARUS kita ABAIKAN!
-      return;
-    }
+    // Jika data sudah ada, cek rentang waktu dengan jam_masuk
+    if (existingRecord.jam_masuk) {
+      const existingMasuk = new Date(existingRecord.jam_masuk);
+      const existingScanMinutes = existingMasuk.getUTCHours() * 60 + existingMasuk.getUTCMinutes();
+      const currentScanMinutes = localHour * 60 + localMinute;
 
-    // Jika tombolnya "Pulang", atau tombolnya tidak jelas (bukan masuk) tetapi sudah ada jam_masuk sebelumnya,
-    // maka kita jadikan scan ini sebagai jam_keluar (check-out).
+      // Perhatikan perbedaan menit melewati hari untuk shift malam
+      let diffMinutes = 0;
+      if (isNightSession && currentScanMinutes < 360 && existingScanMinutes >= 900) {
+        diffMinutes = (24 * 60 - existingScanMinutes) + currentScanMinutes;
+      } else {
+        diffMinutes = Math.abs(currentScanMinutes - existingScanMinutes);
+      }
+
+      // Jika scan berjarak kurang dari 2 jam (120 menit), anggap sebagai duplikasi dari sesi yang sama (Abaikan)
+      if (diffMinutes < 120) {
+        return;
+      }
+    }
 
     // Kita cek jika jam_keluar sudah ada, maka kita abaikan karena yang dicatat adalah absen pulang PERTAMA.
     if (existingRecord.jam_keluar) {

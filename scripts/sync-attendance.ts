@@ -105,7 +105,7 @@ async function syncAttendance(): Promise<void> {
       let existing = null;
       for (const rec of existingRecords) {
         if (rec.jam_masuk) {
-          const recHour = new Date(rec.jam_masuk).getHours();
+          const recHour = new Date(rec.jam_masuk).getUTCHours();
           const recordIsNight = recHour >= 15 || recHour < 6;
           if (recordIsNight === isNightSession) {
             existing = rec;
@@ -115,22 +115,20 @@ async function syncAttendance(): Promise<void> {
       }
 
       if (existing) {
-        // Identifikasi jenis tombol dari mesin
-        const type = (log as any).attendanceType;
-        const isMachineMasuk = (type === 0 || type === 4);
-        // Fallback: anggap sebagai pulang jika bukan tombol masuk eksplicit
-        const isMachinePulang = !isMachineMasuk;
-
-        // Jika data sesi ini sudah ada, pastikan hanya memproses state "Pulang"
         if (existing.jam_masuk) {
-          if (isMachineMasuk) {
-            // User menekan "Masuk" lagi padahal sudah ada jam_masuk. Abaikan.
-            // Karena yang ditunjukkan hanya "yang paling awal".
-            continue;
+          const existingMasuk = new Date(existing.jam_masuk);
+          const currentMins = localHour * 60 + scanTime.getMinutes();
+          const existMins = existingMasuk.getUTCHours() * 60 + existingMasuk.getUTCMinutes();
+
+          let diffMinutes = 0;
+          if (isNightSession && currentMins < 360 && existMins >= 900) {
+            diffMinutes = (24 * 60 - existMins) + currentMins;
+          } else {
+            diffMinutes = Math.abs(currentMins - existMins);
           }
 
-          if (isMachinePulang) {
-            // Hanya update jika belum ada jam_keluar, menahan nilai absen pulang PALING AWAL
+          // Cukup update bila berjarak lebih dari 2 jam (120 menit)
+          if (diffMinutes >= 120) {
             if (!existing.jam_keluar) {
               await prisma.attendance.update({
                 where: { id: existing.id },

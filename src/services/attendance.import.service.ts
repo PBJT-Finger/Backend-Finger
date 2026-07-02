@@ -318,25 +318,14 @@ export class AttendanceImportService {
       let jam_keluar: Date | null = null;
 
       if (group.entries.length > 0) {
-        // Yang muncul hanya "yang paling awal" untuk tipe MASUK
-        const masukEntries = group.entries.filter((e) => e.isCheckIn);
-        if (masukEntries.length > 0) {
-          jam_masuk = masukEntries[0]!.waktu; // Paling awal
-        } else {
-          // Fallback wajar jika di data anehnya tidak ada satupun yang bermarking masuk
-          jam_masuk = group.entries[0]!.waktu;
-        }
+        // Apapun jenis laporannya di Excel, karena rentan error dan user lupa tekan tombol/cek-in cek-out:
+        // 1. Yang paling awal di grup sesi ini selalu dianggap Masuk
+        jam_masuk = group.entries[0]!.waktu;
 
-        // Yang muncul selanjute ini yang scan "Keluar" (PALING AWAL sesuai revisi baru)
-        const keluarEntries = group.entries.filter((e) => !e.isCheckIn);
-        if (keluarEntries.length > 0) {
-          jam_keluar = keluarEntries[0]!.waktu; // Paling awal
-        } else {
-          // Fallback: Jika user lupa tekan tombol Pulang sama sekali, tapi ada sisa scan yang > 2 jam
-          const last = group.entries[group.entries.length - 1];
-          if (last && jam_masuk && (last.waktu.getTime() - jam_masuk.getTime() >= 120 * 60 * 1000)) {
-            jam_keluar = last.waktu;
-          }
+        // 2. Yang muncul selanjute untuk Pulang adalah scan pertama yang >= 2 jam dari jam masuk
+        const validKeluar = group.entries.find((e) => e.waktu.getTime() - jam_masuk!.getTime() >= 120 * 60 * 1000);
+        if (validKeluar) {
+          jam_keluar = validKeluar.waktu;
         }
       }
 
