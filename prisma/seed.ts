@@ -60,16 +60,16 @@ async function main() {
 
   // 3. Mengimpor data awal secara aman dari dump SQL (fingerprint_db.sql)
   const sqlPath = path.join(process.cwd(), 'fingerprint_db.sql'); // Menentukan path absolut berkas SQL dump
-  
+
   // Memeriksa apakah berkas dump SQL ada di direktori project
   if (fs.existsSync(sqlPath)) {
     // Menampilkan log bahwa berkas dump SQL ditemukan dan akan diproses
     console.log('Found fingerprint_db.sql. Extracting and running INSERT statements safely...');
-    
+
     // Membaca isi berkas SQL dump ke dalam buffer biner
     const buffer = fs.readFileSync(sqlPath);
     let sqlContent = ''; // Variabel penampung string SQL
-    
+
     // Memeriksa keberadaan UTF-16 LE BOM (Byte Order Mark) untuk encoding file
     if (buffer[0] === 0xff && buffer[1] === 0xfe) {
       // Jika memiliki BOM UTF-16 LE, ubah buffer menjadi string ber-encoding utf16le
@@ -78,39 +78,39 @@ async function main() {
       // Jika tidak, gunakan encoding UTF-8 standar
       sqlContent = buffer.toString('utf-8');
     }
-    
+
     // Memecah seluruh isi teks SQL menjadi array baris berdasarkan karakter newline
     const lines = sqlContent.split(/\r?\n/);
-    
+
     // Objek penampung untuk mengelompokkan baris INSERT berdasarkan nama tabel
     const inserts: Record<string, string[]> = {};
-    
+
     // Melakukan iterasi di setiap baris dari file SQL
     for (const line of lines) {
       // Jika baris diawali dengan statemen "INSERT INTO"
       if (line.startsWith('INSERT INTO')) {
         // Ekstrak nama tabel yang dibungkus oleh tanda backtick (`)
         const match = line.match(/INSERT INTO `([^`]+)`/);
-        
+
         // Jika nama tabel berhasil didapatkan
         if (match && match[1]) {
           const tableName = match[1]; // Dapatkan nama tabel
           let tableInserts = inserts[tableName]; // Ambil daftar baris insert yang sudah ada untuk tabel tersebut
-          
+
           // Jika belum ada entri untuk tabel tersebut, buat array baru kosong
           if (!tableInserts) {
             tableInserts = [];
             inserts[tableName] = tableInserts;
           }
-          
+
           // Ubah perintah "INSERT INTO" menjadi "INSERT IGNORE INTO" agar tidak terjadi error bentrok key unik
           let finalLine = line.replace('INSERT INTO', 'INSERT IGNORE INTO');
-          
+
           // Penanganan khusus untuk tabel employees agar memperbarui jabatan dan is_active jika baris sudah ada
           if (tableName === 'employees') {
             finalLine = line.replace(';', ' ON DUPLICATE KEY UPDATE jabatan=VALUES(jabatan), is_active=VALUES(is_active);');
           }
-          
+
           // Masukkan baris SQL final ke dalam daftar baris insert untuk tabel bersangkutan
           tableInserts.push(finalLine);
         }
@@ -129,11 +129,11 @@ async function main() {
     ];
 
     let insertCount = 0; // Penghitung jumlah blok tabel yang berhasil diproses
-    
+
     // Lakukan perulangan eksekusi SQL berdasarkan urutan tabel yang aman
     for (const table of tableOrder) {
       const tableInserts = inserts[table]; // Ambil data INSERT untuk tabel saat ini
-      
+
       // Jika ada baris SQL yang perlu dimasukkan untuk tabel saat ini
       if (tableInserts) {
         try {
@@ -143,10 +143,10 @@ async function main() {
             // Menjalankan query SQL mentah secara aman untuk mengosongkan tabel admins
             await prisma.$executeRawUnsafe('DELETE FROM `admins`');
           }
-          
+
           // Menampilkan log jumlah batch yang akan dimasukkan ke tabel
           console.log(`Inserting data for table: ${table} (${tableInserts.length} batches)...`);
-          
+
           // Eksekusi setiap baris query INSERT secara sekuensial menggunakan Prisma raw execution
           for (const sqlLine of tableInserts) {
             await prisma.$executeRawUnsafe(sqlLine);
@@ -168,7 +168,7 @@ async function main() {
   // 4. Mengimpor daftar Pegawai dari data ekspor biner mesin (seeds/employees_from_device.json)
   const jsonPath = path.join(process.cwd(), 'seeds/employees_from_device.json'); // Tentukan path berkas JSON
   let rawUsers: { userId: string; name: string }[] = []; // Inisialisasi penampung pegawai mentah
-  
+
   // Memeriksa keberadaan file JSON pegawai mesin
   if (fs.existsSync(jsonPath)) {
     // Membaca konten string dari berkas JSON
@@ -188,16 +188,9 @@ async function main() {
   }
 
   const employees = []; // Array untuk menampung data pegawai yang berhasil diproses
-  
+
   // Melakukan iterasi untuk setiap user dari perangkat fingerprint
   for (const u of rawUsers) {
-    // --- SUPER BLACKLIST MELINDA ---
-    // Cegah Melinda (ID 1) masuk dari proses seeding, terlepas dari apa yang ada di file statis JSON
-    if (u.userId === '1') {
-      console.log(`[SEED BLACKLIST] Mengabaikan data bibit atas nama Melinda (ID 1).`);
-      continue;
-    }
-
     // Membuat atau memperbarui data pegawai berdasarkan user_id mesin fingerprint
     const emp = await prisma.employees.upsert({
       // Menentukan pencarian pegawai berdasarkan kolom unik user_id

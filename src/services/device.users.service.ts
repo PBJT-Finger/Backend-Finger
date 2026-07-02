@@ -124,9 +124,9 @@ export class DeviceUsersService {
     const employees =
       deviceUserIds.length > 0
         ? await prisma.employees.findMany({
-            where: { user_id: { in: deviceUserIds } },
-            select: { user_id: true, nama: true, jabatan: true, shift_id: true, is_active: true },
-          })
+          where: { user_id: { in: deviceUserIds } },
+          select: { user_id: true, nama: true, jabatan: true, shift_id: true, is_active: true },
+        })
         : [];
 
     // Buat map pencarian cepat (lookup map): user_id → employee
@@ -134,31 +134,30 @@ export class DeviceUsersService {
 
     // Gabungkan data cache mesin dengan status database
     const users: DeviceUserWithStatus[] = cachedUsers
-      .filter((u) => u.userId !== '1') // --- BLACKLIST MELINDA --- Sembunyikan dari daftar registrasi
       .map((u) => {
-      const employee = employeeByUserId.get(u.userId) ?? null;
+        const employee = employeeByUserId.get(u.userId) ?? null;
 
-      let registrationStatus: RegistrationStatus;
-      if (!employee) {
-        registrationStatus = 'unregistered';
-      } else if (!employee.is_active) {
-        registrationStatus = 'partial';
-      } else {
-        registrationStatus = 'registered';
-      }
+        let registrationStatus: RegistrationStatus;
+        if (!employee) {
+          registrationStatus = 'unregistered';
+        } else if (!employee.is_active) {
+          registrationStatus = 'partial';
+        } else {
+          registrationStatus = 'registered';
+        }
 
-      return {
-        uid: u.uid,
-        userId: u.userId,
-        name: u.name,
-        role: u.role,
-        cardno: u.cardno,
-        registrationStatus,
-        employeeNama: employee?.nama ?? null,
-        employeeJabatan: employee?.jabatan ?? null,
-        employeeShiftId: employee?.shift_id ?? null,
-      };
-    });
+        return {
+          uid: u.uid,
+          userId: u.userId,
+          name: u.name,
+          role: u.role,
+          cardno: u.cardno,
+          registrationStatus,
+          employeeNama: employee?.nama ?? null,
+          employeeJabatan: employee?.jabatan ?? null,
+          employeeShiftId: employee?.shift_id ?? null,
+        };
+      });
 
     // Hitung total ringkasan per status registrasi
     const summary = users.reduce(
@@ -191,11 +190,6 @@ export class DeviceUsersService {
   public async registerDeviceUser(dto: RegisterDeviceUserDto): Promise<RegisterResult> {
     const { deviceUserId, nama, jabatan, shiftId } = dto;
 
-    // --- BLACKLIST MELINDA ---
-    if (deviceUserId === '1') {
-      throw new Error(`User ID '1' (Melinda) masuk dalam daftar blacklist sistem dan tidak dapat didaftarkan.`);
-    }
-
     // 1. Periksa apakah pegawai dengan user_id ini sudah ada di database
     const existingEmployee = await prisma.employees.findUnique({
       where: { user_id: deviceUserId },
@@ -208,7 +202,7 @@ export class DeviceUsersService {
       if (!deviceUser) {
         throw new Error(
           `User ID mesin "${deviceUserId}" tidak ditemukan di cache. ` +
-            'Pastikan mesin terhubung dan coba tarik data user terlebih dahulu.'
+          'Pastikan mesin terhubung dan coba tarik data user terlebih dahulu.'
         );
       }
     }
