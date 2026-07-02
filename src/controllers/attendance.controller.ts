@@ -55,7 +55,7 @@ export class AttendanceController {
       // [FIX] Mengambil daftar pegawai yang AKTIF dan jabatannya adalah DOSEN.
       // Ini memastikan pengguna yang belum terdaftar di tabel pegawai tidak muncul di rekap dosen.
       const activeDosenEmployees = await prisma.employees.findMany({
-        where: { jabatan: 'DOSEN', is_active: true },
+        where: { jabatan: 'DOSEN', is_active: true, user_id: { notIn: ['1', '5', '6', '7'] } },
         select: { user_id: true, nama: true, jabatan: true },
       });
       // Mengambil seluruh user_id dari dosen yang aktif
@@ -185,7 +185,7 @@ export class AttendanceController {
 
       // [FIX] Mengambil daftar pegawai aktif dengan jabatan KARYAWAN
       const activeKaryawanEmployees = await prisma.employees.findMany({
-        where: { jabatan: 'KARYAWAN', is_active: true },
+        where: { jabatan: 'KARYAWAN', is_active: true, user_id: { notIn: ['1', '5', '6', '7'] } },
         select: { user_id: true, nama: true, jabatan: true },
       });
       const activeKaryawanUserIds = activeKaryawanEmployees.map((e) => e.user_id);
@@ -359,6 +359,7 @@ export class AttendanceController {
 
       // Mengambil daftar pegawai untuk memetakan nama yang paling update secara langsung
       const employees = await prisma.employees.findMany({
+        where: { user_id: { notIn: ['1', '5', '6', '7'] } },
         select: { user_id: true, nama: true, jabatan: true, is_active: true },
       });
       const employeeMap = new Map(employees.map((e) => [e.user_id, e]));
@@ -430,7 +431,7 @@ export class AttendanceController {
       }
 
       // Menentukan pegawai yang akan dihitung ringkasannya (hanya yang aktif)
-      const employeeWhere: Record<string, any> = { is_active: true };
+      const employeeWhere: Record<string, any> = { is_active: true, user_id: { notIn: ['1', '5', '6', '7'] } };
       if (id || user_id) employeeWhere['user_id'] = id || user_id;
       if (jabatan) {
         employeeWhere['jabatan'] = jabatan;

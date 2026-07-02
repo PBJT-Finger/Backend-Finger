@@ -26,10 +26,12 @@ export default class EmployeeController {
       const jabatan = req.query.jabatan as 'DOSEN' | 'KARYAWAN' | undefined;
       const status = req.query.status as 'AKTIF' | 'CUTI' | 'RESIGN' | 'NON_AKTIF' | undefined;
       const is_active_param = req.query.is_active as string | undefined;
-      
+
       const skip = (page - 1) * limit; // Menghitung offset baris data yang dilewati
 
-      const whereClause: Prisma.employeesWhereInput = {}; // Objek kondisi query database
+      const whereClause: Prisma.employeesWhereInput = {
+        user_id: { notIn: ['1', '5', '6', '7'] }
+      }; // Objek kondisi query database
 
       // Jika ada kata kunci pencarian, cari kecocokan di nama pegawai ATAU user_id (NIDN/NIP)
       if (search) {
@@ -118,10 +120,10 @@ export default class EmployeeController {
 
       // Perbarui nama jika dikirimkan oleh client
       if (nama !== undefined) updateData.nama = nama;
-      
+
       // Perbarui jabatan jika dikirimkan oleh client
       if (jabatan !== undefined) updateData.jabatan = jabatan as 'DOSEN' | 'KARYAWAN';
-      
+
       // Menghubungkan atau memutus relasi shift kerja pegawai
       if (shift_id !== undefined) {
         if (shift_id === null) {
