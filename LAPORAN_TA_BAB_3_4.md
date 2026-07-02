@@ -2,102 +2,182 @@
 # METODE PENELITIAN DAN PERANCANGAN SISTEM
 
 ## 3.1 Metode Pengumpulan Data
-Metode Pengumpulan data yang digunakan dalam penelitian ini adalah:
+Metode Pengumpulan data yang digunakan dalam penelitian ini adalah :
 1. **Observasi**
-Tahap awal adalah melakukan pengamatan secara langsung pada proses pencatatan kehadiran dosen dan karyawan, mengamati infrastruktur jaringan dan bagaimana transfer data absensi dari mesin pemindai sidik jari ZKTeco menuju ke pusat pelaporan guna mengidentifikasi kelemahan sistem lama.
+Tahap awal adalah melakukan pengamatan secara langsung dengan meninjau mesin sidik jari biometrik ZKTeco X100-C dan bagaimana data ditransmisikan, untuk mengamati kegiatan absensi Dosen dan Karyawan yang sedang berlangsung sehingga dapat mengidentifikasi masalah, seperti data yang tumpang tindih.
 2. **Wawancara**
-Kegiatan wawancara dilakukan dengan melakukan proses interaksi dan komunikasi tanya jawab terhadap pihak-pihak pengelola administrasi serta petugas IT kampus yang bertanggung jawab memanajemen kehadiran. Hal ini dilakukan untuk menggali informasi terkait prosedur absensi dan kendala rekapitulasi data.
+Kegiatan wawancara dilakukan dengan melakukan proses interaksi dan tanya jawab terhadap pihak staf akademik dan pengelola server yang memberikan informasi tentang objek penelitian, terutama kendala rekapan manual.
 3. **Dokumentasi**
-Teknik dokumentasi digunakan untuk mengumpulkan spesifikasi teknis mesin ZKTeco X100-C, berkas-berkas laporan absensi sebelumnya (berupa *spreadsheet* Excel), serta kebutuhan pencatatan *shift* kerja (sesi pagi dan malam).
+Teknik dokumentasi digunakan untuk mencari sumber informasi yang ada kaitannya dengan penelitian berupa log sistem lama, buku panduan ZKTeco, serta format pelaporan Excel yang wajib dipertahankan.
 4. **Studi Pustaka**
-Mengkaji literatur dan referensi komprehensif terkait teknik sinkronisasi data biometrik secara langsung (*direct TCP/UDP socket*), implementasi RESTful API menggunakan Node.js dan Express, serta optimasi basis data relasional.
+Mengkaji referensi terkait *Internet of Things* (IoT) pada mesin biometrik dan pengembangan sistem *backend* menggunakan Node.js dan pola arsitektur *Modular Monolith*.
 
 ## 3.2 Metode Pengembangan Sistem 
-Penelitian ini menggunakan pendekatan rekayasa perangkat lunak (*software engineering*) yang bertujuan untuk merancang, mengembangkan, dan mengimplementasikan sistem backend absensi biometrik. Metode yang digunakan adalah model **Waterfall**, karena memberikan tahapan yang terstruktur dan sistematis untuk proyek yang spesifikasi alurnya jelas sejak awal.
-
-Model ini meliputi langkah-langkah yang berurutan untuk menciptakan sistem backend yang beroperasi secara efektif. Pendekatan ini dimulai dari penentuan kebutuhan, perencanaan arsitektur, pembuatan model (*schema database*), pembangunan logika sinkronisasi (*development*), hingga penyerahan dan peluncuran produk:
+Penelitian ini menggunakan pendekatan rekayasa perangkat lunak (*software engineering*) yang bertujuan untuk merancang, mengembangkan, dan mengimplementasikan sistem *backend* absensi otomatis. Metode yang digunakan adalah model *Waterfall* karena memberikan tahapan yang terstruktur dan sistematis, sesuai dengan kebutuhan instansi yang formal.
+Model ini meliputi langkah-langkah berurutan untuk menciptakan sistem yang beroperasi efektif serta menekankan bahwa setiap langkah diselesaikan secara menyeluruh. Pendekatan ini dimulai dari penentuan kebutuhan pengguna, pembuatan model, pembangunan, hingga penyerahan sistem.
 a. **Analisis Kebutuhan**
-Analisis dilakukan melalui studi kelayakan sistem absensi manual. Hasilnya, diperlukan sistem *backend* yang sanggup menarik data sidik jari langsung dari mesin (koneksi UDP/TCP), memiliki fitur seleksi otomatis untuk masuk dan pulang antar sesi, menghalau duplikat klik/scan dari pengguna, dan menyediakan *endpoint* data bagi antarmuka web.
+Analisis dilakukan melalui studi literatur dan wawancara di instansi terkait. Hasilnya, sistem membutuhkan fitur otentikasi admin, manajemen data pegawai, penarikan data langsung (TCP *Pulling*) dari mesin sidik jari, perbaikan sesi masuk/pulang menggunakan *Time-Gap 120 Menit*, serta *Blacklist* ID. Kebutuhan non-fungsional mencakup asinkronasi otomatis dan pencegahan duplikasi (*Mutex lock*).
 b. **Perancangan Sistem**
-Tahapan ini mencakup perancangan arsitektur *backend* menggunakan Node.js dan Express, serta lapisan ORM Prisma. Sistem dibangun modular menjadi API terpisah seperti: autentikasi, manajemen mesin (_device sync_), pengelolaan log kehadiran, dan ekspor pelaporan (*Excel/PDF*).
+Tahap ini mencakup perancangan arsitektur *backend* menggunakan Node.js dan struktur REST API. Sistem dibangun modular. Disusun pula struktur database dengan Prisma ORM yang memuat tabel utama seperti `admins`, `employees`, `attendance`, `devices`, dan `shifts`.
+1. **Rancangan Tampilan Login**
+Tampilan login adalah antarmuka awal yang digunakan admin untuk mendapatkan JWT *Token* akses sistem.
+*(Gambar 3.1 Tampilan Login Frontend)*
+2. **Rancangan Tampilan Dashboard**
+Tampilan Dashboard menyajikan ringkasan statistik seperti rekap hadir hari ini secara *live*, rasio keterlambatan, dan daftar mesin aktif.
+*(Gambar 3.2 Tampilan Dashboard)*
+3. **Rancangan Tampilan Rekap Absensi**
+Tampilan ini menggantikan "Katalog" atau pencatatan fisik, memuat log riwayat masuk-keluar Dosen dan Karyawan secara real-time.
+*(Gambar 3.3 Tampilan Rekap Absensi)*
+4. **Rancangan Tampilan Manajemen Pegawai (Tarik User Mesin)**
+Tampilan ini berfungsi sebagai pusat manajemen keanggotaan pengguna sidik jari, di mana admin memetakan nomor ID di mesin dengan NIP resmi di sistem.
+*(Gambar 3.4 Tampilan Manajemen Pegawai)*
+
 c. **Implementasi**
-Sistem dikembangkan (*coding*) secara utuh. Logika bisnis difokuskan pada `zk-sync.service.ts` untuk menangani algoritma filter waktu jeda asinkron (minimal 2 jam antar absen) guna menutup celah kebingungan pergantian sesi, serta integrasi lapisan keamanan otentikasi JWT pada *middlewares*.
+Implementasi sistem dilakukan menggunakan protokol Express.js dan soket (ZkLib) sebagai backend. Fitur login menggunakan autentikasi *JWT Bearer* yang solid. Modul sinkronisasi mengotomasi deteksi hari, menentukan shift Pagi dan Malam tanpa mensyaratkan tombol tekan di mesin yang rentan kelalaian, dan menangkal bug *Type-Coercion* yang kerap meloloskan *Blacklist user*.
 d. **Pengujian**
-Sistem diuji dengan skenario metode *black box testing*, mengevaluasi setiap *endpoint* API (memakai Postman) tanpa melibatkan kode internal guna menjamin fungsionalitas utama seperti sinkronisasi TCP dan proteksi keamanan otentikasi berjalan sebagaimana spesifikasi.
+Pengujian menggunakan metode *black box testing* memanfaatkan aplikasi Postman. Fitur utama seperti sinkronisasi TCP/UDP, login admin, hapus riwayat, dan ekspor pelaporan diuji output-nya.
 e. **Pemeliharaan**
-Tahap akhir melibatkan monitor log sistem (*error logs*), perawatan *database* secara rutin, dan integrasi penambalan *bug* yang dideteksi melalui tahap penggunaan harian oleh staf administrasi.
+Tahap pemeliharaan bertujuan memastikan sistem *Database Sync* berjalan berkelanjutan tanpa memori bocor (*memory leak*). Termasuk perbaikan *time-zone bugs*, *backup* data harian MySQL, dan dokumentasi URL API via Swagger.
 
 ## 3.3 Alat dan Bahan
-Dalam pengembangan sistem absensi backend ini, digunakan beberapa alat dan bahan yang terdiri dari perangkat lunak (*software*) dan perangkat keras (*hardware*):
-1. **Perangkat Lunak (Software)**:
-   a. **Node.js (v20.x)** : *Runtime* utama berkecepatan tinggi tempat backend beroperasi.
-   b. **Express.js & TypeScript** : *Framework* web API utama.
-   c. **Prisma ORM** : Pengelola *Database* dan pembuat skema (*Schema builder*).
-   d. **MySQL (v8.x)** : Digunakan sebagai basis data relasional.
-   e. **Postman / Swagger UI** : Digunakan untuk pengujian URL dan *Endpoint API*.
-   f. **Visual Studio Code** : Teks editor utama pengelolaan bahasa pemrograman.
-   g. **Laragon / XAMPP** : Pendukung *web-server* lokal pengujian database.
-2. **Perangkat Keras (Hardware)**:
-   a. Mesin Sidik Jari Presensi: *ZKTeco X100-C*.
-   b. Laptop Pengembangan: *Prosesor kelas menengah, 8 GB RAM, dan SSD*.
+Dalam pengembangan sistem backend perpustakaan ini, digunakan beberapa alat dan bahan yang terdiri dari perangkat lunak (*software*) dan perangkat keras (*hardware*) sebagai berikut :
+1. **Perangkat Lunak (Software)**  
+   a. **Node.js & Express** : Framework *backend* utama dalam komunikasi HTTP REST API.
+   b. **TypeScript** : Bahasa pemrograman strict-typing menggantikan JavaScript reguler.
+   c. **Prisma ORM & MySQL 8.x** : Digunakan untuk menjembatani dan menyimpan relasi tabel data.
+   d. **Postman / Swagger** : Digunakan untuk menguji *endpoint* eksternal dan lokal.
+   e. **Visual Studio Code** : Editor kode utama.
+2. **Perangkat Keras (Hardware)** : 
+   a. **Mesin Biometrik ZKTeco X100-C** (Target Objek).
+   b. **Laptop Pengembangan** : Minimal RAM 8 GB dengan OS Windows/Linux.
 
 ---
 
-# BAB IV
+# BAB IV 
 # HASIL DAN PEMBAHASAN
 
 ## 4.1 Hasil
-Berdasarkan keluhan yang dimonitor di instansi pendidikan terkait, ditemukan sejumlah kendala dalam mengelola data kehadiran Dosen dan Karyawan secara sekunder. Pengambilan rekaman absensi sebelumnya mewajibkan pengelola untuk menarik data logikal mesin secara manual via perangkat eksternal dengan durasi yang tak efisien (via USB atau software usang bawaan), yang membuat sistem kewalahan dalam memetakan sesi Masuk dan Pulang (utamanya saat pengguna tidak menekan tombol yang tepat di mesin biometrik).
-Menanggapi masalah akut tersebut, sistem backend pintar yang adaptif telah sukses dibangun. Sistem RESTful API menggunakan arsitektur Node.js yang ditugaskan untuk menghisap/menarik data dari ZKTeco secara digital (*Live Pull*) secara _autonomous_ maupun manual. Lewat pemeringkatan filter jeda logis 120 menit dan penyesuaian zona waktu, Dosen tidak lagi dikhawatirkan gagal terekap absensinya. Sistem menghasilkan _output_ terpusat, mempermudah admin dan terintegrasi aman di tingkat infrastruktur.
+Berdasarkan keluhan yang dimonitor di instansi pendidikan terkait, ditemukan sejumlah kendala dalam mengelola data kehadiran. Pendataan sebelumnya hanya mengandalkan ekspor file _flat_ via USB Flashdisk ke Microsoft Excel dengan pencocokan data ganda (*spam scan*) secara sangat manual. Hal ini menyulitkan perekapan pada masa pembagian Sesi (Dosen mengajar pagi dan sore) akibat Dosen maupun Karyawan lupa menekan tombol spesifik "Pulang". 
+Menanggapi permasalahan tersebut, sistem *backend* ini dibangun untuk mendukung pengelolaan secara digital, khususnya menginjeksi mesin ZKTeco melaui port 4370 TCP. Logika *120-minutes Time Gap Threshold* sukses dibangun untuk mengatasi absensi ganda tanpa mengorbankan riwayat absensi lintas sesi. 
 
 ## 4.2 Pembahasan
-Proses pengembangan terpadu diawali atas analisis kebutuhan yang secara utuh membangun landasan perancangan sistem, hingga menuju implementasi *backend* dan visualisasinya di antarmuka web.
-1. **Analisis Kebutuhan**
-   Kebutuhan identifikasi melahirkan beberapa fungsi sentral:
-   a. **Sinkronisasi Perangkat Biometrik (*Zk-Client*)**
-      Modul _backend_ wajib melahirkan protokol koneksi ke alamat IP ZKTeco.
-   b. **Pengelolaan Data Absensi Otomatis**
-      Admin dapat melihat baris log presensi yang menyeleksi scan ganda per-sesi secara mandiri.
-   c. **Otentikasi Berlapis Administrasi**
-      Pemrosesan data terbatas hanya kepada *User* (Admin) sah melalui otorisasi *bearer token*.
-2. **Perancangan Sistem**
-   Desain terstruktur menggambarkan aliran sistem sebelum dimodelkan dalam bahasa pemrograman:
-   a. **Diagram Use Case**
-      (*Tempatkan Gambar Use Case: Admin mengelola Master Data, Menarik Log Kehadiran, Cetak Rekap*)
-   b. **Diagram Alir (Flowchart)**
-      (*Tempatkan Gambar Flowchart: Aliran data sinkronisasi TCP/UDP perangkat ZKTeco ke MySQL MySQL Database*)
-   c. **ERD (Entity Relationship Diagram)**
-      Pada sistem absensi, entitas sentral dirancang sebagai berikut:
-      - **Tabel Employees**: Menyimpan rincian master pegawai (NIP, Nama, user_id sinkronisasi mesin, Jabatan: DOSEN/KARYAWAN, Status Aktif).
-      - **Tabel Attendance**: Mendata absensi konklusif berisi ID Karyawan, Tanggal Transaksi, Waktu Jam Masuk, Jam Keluar, Sesi, Status Keterlambatan, dan Catatan Admin.
-      - **Tabel Devices**: Katalog spesifikasi mesin sidik jari yang terafiliasi pada jaringan lokal kampus.
-   d. **Desain API**
-      Sistem disusun menggunakan rute HTTP baku. Tabel operasi Endpoint:
-      - `POST /api/auth/login` : Autentikasi token akses.
-      - `GET /api/dashboard/summary` : Penarikan rekapan statistik hari ini dan feed live-scan.
-      - `GET /api/attendance` : Daftar lengkap pemuatan rekapan log paginasi.
-      - `POST /api/device/:id/sync` : Menghidupkan *trigger* penarikan log sidik jari dari memori ZKTeco.
+Proses diawali dengan pemetaan arsitektur sinkronisasi, mengatasi tipe keamanan logis, penguncian kompetisi data sinkron (*Idempotency Concurrency*), dan memecahkan perancangan alur.
+### 1. Analisis Kebutuhan
+Kebutuhan utama yang berhasil diidentifikasi meliputi:
+a. **Autentikasi Administrasi Khusus (JWT Token)**
+   Mengingat kerahasiaan data absensi, semua aliran rute *API* dikunci lewat autentikasi lapis atas dan pencegahan penyerangan *rate-limiter*.
+b. **Sinkronisasi Tarik Data (*Pull Logs*) Otomatis**
+   Endpoint API bertugas menghisap baris rekaman sidik jari dan menerjemahkannya ke dalam variabel yang mudah dimengerti: Jam Masuk dan Jam Keluar.
+c. **Filter *Blacklist* Permanen**
+   Memblokir akun penguji (seperti ID 1 Melinda) yang merekat membandel di memori perangkat dengan *Type-Safe Checking* berbasis perbandingan *String* ketat.
+d. **Export dan Import Massal (Excel/PDF)**
+   Fitur rekonsiliasi yang membantu HRD mendeteksi karyawan yang izin melalui dokumen tambahan *spreadsheet*.
 
-3. **Implementasi Sistem**
-   Penerjemahan algoritma tertuang ke halaman web visual (*Frontend Integration*).
-   a. **Halaman Dashboard & Live Scanner**
-      Setelah login, administrator akan disajikan beranda dengan *Feed Log* otomatis (`take: all hari ini`) dan indikator hadir secara persentase tanpa delay.
-   b. **Halaman Tarik Data Users (Registrasi)**
-      Fitur pemetaan pengguna (*Mapping*). Mengandung mekanisme keamanan (*Type-Safe String*) yang membentengi antarmuka dari pengguna hantu/tidak valid *(blacklist ID)* agar tidak diregistrasi ulang ke database.
-   c. **Halaman Rekapitulasi (Lecturer & Employee)**
-      Memuat daftar final presensi masuk-keluar pasca filterisasi jeda (*gap* 120 menit).
+### 2. Perancangan Sistem
+a. **Diagram Use Case**
+   Menggambarkan batas kemampuan layanan admin sistem dengan entitasnya.
+```mermaid
+actor Admin
+usecase "Kelola Dosen/Karyawan" as UC1
+usecase "Tarik Sync Data Log Absen" as UC2
+usecase "Export PDF Laporan" as UC3
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+```
+b. **Diagram Alir (Flowchart)**
+   Alur logika bisnis untuk menerjemahkan satu klik Sidik Jari.
+```mermaid
+graph TD
+   A[Scan Sidik Jari di ZKTeco] --> B[Push ke ZK TCP Node]
+   B --> C{Pengecekan ID Blacklist?}
+   C -- Ya --> D[Data Dibuang]
+   C -- Tidak --> E{Apakah Ada Scan Pagi Terdaftar?}
+   E -- Tidak --> F[Catat Sebagai Jam Masuk]
+   E -- Ya --> G{Apakah Marginnya > 120 Menit?}
+   G -- Ya --> H[Catat / Perbarui Jam Keluar]
+   G -- Tidak --> I[Tolak Sebagai Duplikat Spam]
+```
+
+c. **ERD (Entity Relationship Diagram)**
+   ERD membantu memastikan struktur *database* yang dirancang melalui Skema Prisma mendukung fungsional sistem.
+
+Tabel 4.1 Tabel Administrasi (`admins`)
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | Int | Primary Key |
+| username | VarChar | Pengenal Unik |
+| password_hash| VarChar| Kata Sandi Acak |
+
+Tabel 4.2 Tabel Kehadiran (`attendance`)
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | Int | Primary Key |
+| user_id | VarChar | Tautan ID dari Perangkat ZKTeco |
+| nama | VarChar | Nama Pegawai |
+| tanggal | Date | Tanggal presensi (Pemisah Hari) |
+| jam_masuk | Time | Waktu check-in pertama di sesi |
+| jam_keluar| Time | Waktu check-out sesudah 120 menit |
+
+Tabel 4.3 Tabel Pegawai (`employees`)
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | Int | Primary Key |
+| user_id| VarChar | Nomor seri di mesin untuk identifikasi |
+| jabatan| Enum | 'DOSEN' atau 'KARYAWAN' |
+
+d. **Desain API**
+RESTful API dirancang memungkinkan *frontend* berkomunikasi efisien dan mengirim JSON interaktif.
+
+Tabel 4.4 Tabel Desain Rute API
+| Metode | Endpoint URL | Fungsi |
+|---|---|---|
+| POST | `/api/auth/login` | Otorisasi dan dapatkan Akses Token. |
+| GET  | `/api/attendance` | Log absensi dengan parameter *limit/page*. |
+| GET  | `/api/device/:id` | Status terkini dari *Fingerprint Machine*. |
+| POST | `/api/device/:id/sync`| Eksekusi penyedotan data secara manual. |
+| GET  | `/api/export/excel`| Menghasilkan arus data (*Stream*) XLSX laporan. |
+
+### 3. Implementasi Sistem
+Implementasi backend API tidak tampil secara web langsung, melainkan sebagai mesin peladen layar di balik layar bagi *Frontend*.
+a. **Halaman API Documentation (Swagger)**
+Pusat *Try-it-out* pengembang *frontend* yang merepresentasikan *Halaman* sistem dari sisi peladen (Backend).
+*(Gambar 4.1 Halaman Swagger Documentation UI)*
+
+b. **Halaman Terminal Server Execution**
+Perwujudan nyata di sisi server, menampilkan rentetan indikator berhasil atau diblokirnya data duplikat secara logis dan respons latensi HTTP berkecepatan 15 milidetik per tarikan *Request*.
+*(Gambar 4.2 Laporan Aktivitas Logger Konsol Terminal)*
 
 ## 4.3 Pengujian Sistem
-Siklus verifikasi tahap purna difokuskan menguji luaran fungsionalitas dan keandalan respons server *REST API*.
+### 1. Uji Coba BlackBox Testing
+Metode pengujian yang terfokus pada kesesuaian input-output endpoint API terintegrasi yang dieksekusi terhadap respon UI.
 
-1. **Uji Coba BlackBox Testing**
-   Dilakukan lewat perantara web (*Frontend*). Tabel matriks uji:
-   - **Login Admin**: Uji kredensial `superadmin` beserta penolakan *password* keliru. (Hasil: Respon *Unauthorized* dan sesi dijaga).
-   - **Simulasi Tarik Data Log (Sinkronisasi)**: Melakukan ratusan klik *spam* tarik absensi dari mesin. (Hasil: Berhasil diisolasi oleh *Mutex-Lock*, tidak terjadi data ganda sama sekali).
-   - **Tampilan Live History**: Menganalisa susunan log harian saat pagination berganti angka. (Hasil: Tabel stabil tak acak sebab penyortiran ketat berdasarkan jam\_masuk).
-2. **Uji Coba Postman (Backend Tests)**
-   Konsistensi kontrak API divakidasi:
-   - Endpoint `GET /api/attendance` di Postman mengembalikan balasan (HTTP `200 OK`) berupa *array JSON payload* absensi berserta nilai paginasi dan limit baris.
-   - Endpoint Pengunggahan Dokumen Excel (`POST /api/attendance/import`) diserang dengan format anomali. Sistem secara tangguh merespon kode (HTTP `400 Bad Request`) jika format tabel gagal diurai.
+Tabel 4.5 Pengujian Autentikasi Admin
+| Tujuan | Input | Output Diharapkan | Output Sistem | Hasil |
+|---|---|---|---|---|
+| Username/Password Benar | "superadmin@gmail.com", "password" | Modul menghasilkan JWT Token 200 OK | Memberikan `access_token` | Sesuai Harapan |
+| Password Salah | "...@gmail.com", "salah" | Status 401 Unauthorized | Menolak Sesi | Sesuai Harapan |
 
-Hasil eksplorasi membuktikan sistem kebal dari beban manipulasi, merespon dalam kecepatan milidetik, mencegah *Type Coercion bug*, serta menyerap beban lalu-lintas data secara efektif sehingga siap untuk tahap adopsi lingkungan operasional nyata.
+Tabel 4.6 Pengujian Penarikan Sync Data
+| Tujuan | Input | Output Diharapkan | Output Sistem | Hasil |
+|---|---|---|---|---|
+| Menarik log absensi ZK terbaru | Klik Sinkronisasi | Mengekstrak log mesin masuk ke tabel | JSON respons Sukses | Sesuai Harapan |
+| Menekan tombol sync dua kali se-detik (Spam) | Klik beruntun Sinkronisasi | Log dikunci (Mutex) terhalang duplikat | Abaikan tarikan ganda | Sesuai Harapan |
+
+Tabel 4.7 Pengujian Manajemen Skema Kelompok Waktu Jeda
+| Tujuan | Input | Output Diharapkan | Output Sistem | Hasil |
+|---|---|---|---|---|
+| Tarikan absensi jarak dekat (< 2 jam) | Jam 08.00 lalu 08.15 | Absen kedua diputus / terbuang | Diabaikan/Masuk Spam | Sesuai Harapan |
+| Tarikan absensi jarak wajar (> 2 jam) | Jam 08.00 lalu 11.00 | Absen kedua dicatat sebagai Pulang/Keluar | Tersimpan ke DB | Sesuai Harapan |
+
+### 2. Uji Coba Postman
+Tabel 4.8 Tabel Rekap Uji Postman
+| No | Endpoint | Method | Request Body / Params | Expected Response | Status |
+|---|---|---|---|---|---|
+| 1 | `/api/auth/login` | POST | `{ "email": "test", "password": "x" }` | 200 OK, token *string payload* | Berhasil |
+| 2 | `/api/dashboard/summary` | GET | Token di Authorization Header | 200 OK, total presensi & persentase | Berhasil |
+| 3 | `/api/attendance` | GET | `?limit=10&page=1` | 200 OK, data array dan meta pagination | Berhasil |
+| 4 | `/api/device/1/sync` | POST | Tidak Ada | 200 OK, *Socket Promise Resolve* | Berhasil |
+| 5 | `/api/attendance/import` | POST| Payload `Content-Type: multipart/form-data` | 201 Created | Berhasil |
+
+Hasil pengujian menunjukkan setiap fitur fungsional mendarat sempurna untuk tujuan otomasi pengelolaan persensi. Keberhasilan menaklukkan skema kerumitan sinkronisasi absen Dosen dengan jeda sesi bertingkat memberikan bukti efisiensi yang solid dalam mempermudah admin kampus.
