@@ -167,78 +167,80 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
       const empMap = new Map(employees.map((e) => [e.user_id, e]));
 
       // Memproses record real-time dari mesin sidik jari
-      const liveRecords: SseAttendanceRecord[] = records.map((r) => {
-        const user_id = String(r.deviceUserId);
-        const emp = empMap.get(user_id);
-        const devName = client.getDeviceUserName(r.deviceUserId);
+      const liveRecords: SseAttendanceRecord[] = records
+        .filter((r) => String(r.deviceUserId) !== '1') // --- BLACKLIST MELINDA ---
+        .map((r) => {
+          const user_id = String(r.deviceUserId);
+          const emp = empMap.get(user_id);
+          const devName = client.getDeviceUserName(r.deviceUserId);
 
-        const resolvedName = emp?.nama ?? devName ?? `Pegawai ${r.deviceUserId}`;
-        const resolvedJabatan = emp?.jabatan ?? 'KARYAWAN';
+          const resolvedName = emp?.nama ?? devName ?? `Pegawai ${r.deviceUserId}`;
+          const resolvedJabatan = emp?.jabatan ?? 'KARYAWAN';
 
-        const scanTime = r.recordTime;
+          const scanTime = r.recordTime;
 
-        let jamMasuk: string | null = null;
-        let jamKeluar: string | null = null;
-        let status = 'HADIR';
-        let statusKeluar = 'HADIR';
+          let jamMasuk: string | null = null;
+          let jamKeluar: string | null = null;
+          let status = 'HADIR';
+          let statusKeluar = 'HADIR';
 
-        // Mengatur scanTime ke dalam ISO UTC agar konsisten di browser
-        const scanTimeIso = new Date(
-          Date.UTC(
-            scanTime.getUTCFullYear(),
-            scanTime.getUTCMonth(),
-            scanTime.getUTCDate(),
-            scanTime.getUTCHours(),
-            scanTime.getUTCMinutes(),
-            scanTime.getUTCSeconds()
-          )
-        );
+          // Mengatur scanTime ke dalam ISO UTC agar konsisten di browser
+          const scanTimeIso = new Date(
+            Date.UTC(
+              scanTime.getUTCFullYear(),
+              scanTime.getUTCMonth(),
+              scanTime.getUTCDate(),
+              scanTime.getUTCHours(),
+              scanTime.getUTCMinutes(),
+              scanTime.getUTCSeconds()
+            )
+          );
 
-        // Menentukan apakah scan merupakan masuk atau keluar berdasarkan kode dari ZKTeco
-        // Kode: 0=Check-In (Masuk), 1=Check-Out (Keluar), 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out (Lembur Keluar)
-        const isKeluar = r.attendanceType === 1 || r.attendanceType === 5;
+          // Menentukan apakah scan merupakan masuk atau keluar berdasarkan kode dari ZKTeco
+          // Kode: 0=Check-In (Masuk), 1=Check-Out (Keluar), 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out (Lembur Keluar)
+          const isKeluar = r.attendanceType === 1 || r.attendanceType === 5;
 
-        if (!isKeluar) {
-          // SCAN MASUK
-          jamMasuk = scanTimeIso.toISOString();
-          // Menentukan batas jam masuk berdasarkan shift pegawai, default ke 08:00
-          const shiftStartHour = emp?.shifts ? new Date(emp.shifts.jam_masuk).getUTCHours() : 8;
-          const shiftStartMinute = emp?.shifts ? new Date(emp.shifts.jam_masuk).getUTCMinutes() : 0;
-          const scanMinutes = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
-          const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
-          const localHour = scanTime.getUTCHours();
-          
-          // Toleransi keterlambatan 15 menit. Khusus shift malam/sore (jam 15 keatas) otomatis HADIR tanpa hitungan terlambat standar
-          const isNightSession = localHour >= 15;
-          status = isNightSession ? 'HADIR' : (scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR');
-        } else {
-          // SCAN KELUAR
-          jamKeluar = scanTimeIso.toISOString();
-          // Menentukan batas jam pulang berdasarkan shift pegawai, default ke 16:30 (990 menit)
-          const shiftEndHour = emp?.shifts ? new Date(emp.shifts.jam_keluar).getUTCHours() : 16;
-          const shiftEndMinute = emp?.shifts ? new Date(emp.shifts.jam_keluar).getUTCMinutes() : 0;
-          const scanMinutes = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
-          const targetMinutes = emp?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
-          
-          // Jika melakukan scan keluar sebelum jam pulang shift berakhir, status PULANG_CEPAT
-          statusKeluar = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
-        }
+          if (!isKeluar) {
+            // SCAN MASUK
+            jamMasuk = scanTimeIso.toISOString();
+            // Menentukan batas jam masuk berdasarkan shift pegawai, default ke 08:00
+            const shiftStartHour = emp?.shifts ? new Date(emp.shifts.jam_masuk).getUTCHours() : 8;
+            const shiftStartMinute = emp?.shifts ? new Date(emp.shifts.jam_masuk).getUTCMinutes() : 0;
+            const scanMinutes = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
+            const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
+            const localHour = scanTime.getUTCHours();
 
-        return {
-          userSn: r.userSn,
-          user_id: user_id,
-          nama: resolvedName,
-          jabatan: resolvedJabatan,
-          status,
-          statusKeluar,
-          jamMasuk,
-          jamKeluar,
-          recordTime: scanTimeIso.toISOString(),
-          ip: r.ip,
-          source: 'live',
-          is_active: emp?.is_active ?? false,
-        };
-      });
+            // Toleransi keterlambatan 15 menit. Khusus shift malam/sore (jam 15 keatas) otomatis HADIR tanpa hitungan terlambat standar
+            const isNightSession = localHour >= 15;
+            status = isNightSession ? 'HADIR' : (scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR');
+          } else {
+            // SCAN KELUAR
+            jamKeluar = scanTimeIso.toISOString();
+            // Menentukan batas jam pulang berdasarkan shift pegawai, default ke 16:30 (990 menit)
+            const shiftEndHour = emp?.shifts ? new Date(emp.shifts.jam_keluar).getUTCHours() : 16;
+            const shiftEndMinute = emp?.shifts ? new Date(emp.shifts.jam_keluar).getUTCMinutes() : 0;
+            const scanMinutes = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
+            const targetMinutes = emp?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
+
+            // Jika melakukan scan keluar sebelum jam pulang shift berakhir, status PULANG_CEPAT
+            statusKeluar = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
+          }
+
+          return {
+            userSn: r.userSn,
+            user_id: user_id,
+            nama: resolvedName,
+            jabatan: resolvedJabatan,
+            status,
+            statusKeluar,
+            jamMasuk,
+            jamKeluar,
+            recordTime: scanTimeIso.toISOString(),
+            ip: r.ip,
+            source: 'live',
+            is_active: emp?.is_active ?? false,
+          };
+        });
 
       // Kirim event absensi live ke frontend
       sseWrite(res, 'attendance', { records: liveRecords });
