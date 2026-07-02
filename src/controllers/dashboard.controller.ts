@@ -42,7 +42,7 @@ export class DashboardController {
       // Filter untuk membuang ID khusus testing (ID 5, 6, 7) agar tidak mengacaukan statistik dashboard
       const activeUserIds = activeEmployees
         .map((e) => e.user_id)
-        .filter((id) => !['5', '6', '7'].includes(id));
+        .filter((id) => !['1', '5', '6', '7'].includes(id));
 
       // Mengambil data log kehadiran hari ini untuk pegawai aktif yang tidak dihapus
       const todayAttendance = await prisma.attendance.findMany({

@@ -121,7 +121,7 @@ export class AttendanceController {
 
       // Memfilter scan yang tidak valid (seperti ID 5, 6, 7) dan mengabaikan absensi salah untuk Aziz (ID 8) pada 3 Juni 2026
       const filteredAttendance = attendance.filter((a) => {
-        if (['5', '6', '7'].includes(a.user_id)) return false;
+        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
         if (a.user_id === '8') {
           const t = a.tanggal;
           const dateStr =
@@ -246,7 +246,7 @@ export class AttendanceController {
 
       // Filter scan ID tidak valid dan kasus khusus Aziz
       const filteredAttendance = attendance.filter((a) => {
-        if (['5', '6', '7'].includes(a.user_id)) return false;
+        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
         if (a.user_id === '8') {
           const t = a.tanggal;
           const dateStr =
@@ -505,7 +505,7 @@ export class AttendanceController {
 
       // Filter scan tidak valid
       const filteredAttendance = attendance.filter((a) => {
-        if (['5', '6', '7'].includes(a.user_id)) return false;
+        if (['1', '5', '6', '7'].includes(a.user_id)) return false;
         if (a.user_id === '8') {
           const t = a.tanggal;
           const dateStr =
