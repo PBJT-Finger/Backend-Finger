@@ -183,6 +183,8 @@ export class AttendanceImportService {
     try {
       const user_id = String(row['NIK'] || row['ID'] || '').trim();
 
+      if (user_id === '1') return null; // BLACKLIST PERMANEN
+
       const nama = String(row['Nama'] || '').trim();
       const tanggalStr = String(row['Tanggal Absensi'] || row['Tanggal Ab'] || '').trim();
       const waktuStr = String(row['Waktu Absensi'] || row['Waktu Abs'] || '').trim();
@@ -361,6 +363,11 @@ export class AttendanceImportService {
     }
 
     const user_id = String(row['user_id']).trim();
+
+    if (user_id === '1') {
+      errors.push(`Baris ${rowNum}: User ID 1 (Melinda) diblacklist permanen`);
+      return { valid: false, errors, data: null };
+    }
 
     // Pastikan pegawai terdaftar di database
     let employee: any;

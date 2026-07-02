@@ -134,6 +134,7 @@ export class DeviceUsersService {
 
     // Gabungkan data cache mesin dengan status database
     const users: DeviceUserWithStatus[] = cachedUsers
+      .filter((u) => u.userId !== '1') // --- BLACKLIST MELINDA ---
       .map((u) => {
         const employee = employeeByUserId.get(u.userId) ?? null;
 
@@ -189,6 +190,10 @@ export class DeviceUsersService {
    */
   public async registerDeviceUser(dto: RegisterDeviceUserDto): Promise<RegisterResult> {
     const { deviceUserId, nama, jabatan, shiftId } = dto;
+
+    if (deviceUserId === '1') {
+      throw new Error(`User ID '1' (Melinda) diblacklist permanen.`);
+    }
 
     // 1. Periksa apakah pegawai dengan user_id ini sudah ada di database
     const existingEmployee = await prisma.employees.findUnique({
