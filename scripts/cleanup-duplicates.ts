@@ -4,65 +4,78 @@ const prisma = new PrismaClient();
 
 async function cleanupDuplicates() {
   console.log('Memulai pembersihan absensi ganda (double scan)...');
-  
-  // Ambil data yang ganda
-  const dups = await prisma.$queryRaw<any[]>`
-    SELECT user_id, tanggal, COUNT(*) as count 
+
+  // Ambil semua data pada hari yang memiliki duplikat berdasarkan tanggal dan user
+  const candidates = await prisma.$queryRaw<any[]>`
+    SELECT user_id, tanggal
     FROM attendance 
     GROUP BY user_id, tanggal 
-    HAVING count > 1
+    HAVING COUNT(*) > 1
   `;
 
-  if (dups.length === 0) {
-    console.log('✅ Tidak ditemukan absensi ganda di database.');
+  if (candidates.length === 0) {
+    console.log('✅ Tidak ditemukan grup tanggal yang duplikat di database.');
     return;
   }
 
-  console.log(`Ditemukan ${dups.length} pasang data ganda. Mulai memproses...`);
+  console.log(`Ditemukan kandidat ${candidates.length} pasang user & tanggal. Memeriksa detail per sesi...`);
 
   let totalDeleted = 0;
 
-  for (const dup of dups) {
-    const records = await prisma.attendance.findMany({
+  for (const cand of candidates) {
+    const rawRecords = await prisma.attendance.findMany({
       where: {
-        user_id: dup.user_id,
-        tanggal: dup.tanggal,
+        user_id: cand.user_id,
+        tanggal: cand.tanggal,
       },
-      orderBy: { created_at: 'asc' }, // Urutkan dari yang pertama kali direkam
+      orderBy: { created_at: 'asc' }, // Urutkan dari yang pertama direkam
     });
 
-    if (records.length <= 1) continue;
+    if (rawRecords.length <= 1) continue;
 
-    // Ambil record pertama sebagai data utama (untuk jam_masuk)
-    const primaryRecord = records[0]!;
+    // Kelompokkan record yang ada per sesi
+    const pagiRecords: any[] = [];
+    const malamRecords: any[] = [];
 
-    
-    // Cari jam keluar yang valid dari semua sisa duplikat (ambil yang paling akhir jika ada banyak)
-    let bestJamKeluar = primaryRecord.jam_keluar;
-    for (const r of records) {
-      if (r.jam_keluar) {
-        if (!bestJamKeluar || new Date(r.jam_keluar).getTime() > new Date(bestJamKeluar).getTime()) {
-          bestJamKeluar = r.jam_keluar;
+    rawRecords.forEach(r => {
+      const jam = r.jam_masuk ? new Date(r.jam_masuk).getUTCHours() : 8; // Default pagi jika bingung
+      if (jam >= 15 || jam < 6) {
+        malamRecords.push(r);
+      } else {
+        pagiRecords.push(r);
+      }
+    });
+
+    const mergeAndClean = async (records: any[], sesiName: string) => {
+      if (records.length <= 1) return;
+
+      const primaryRecord = records[0]!;
+      let bestJamKeluar = primaryRecord.jam_keluar;
+
+      for (const r of records) {
+        if (r.jam_keluar) {
+          if (!bestJamKeluar || new Date(r.jam_keluar).getTime() > new Date(bestJamKeluar).getTime()) {
+            bestJamKeluar = r.jam_keluar;
+          }
         }
       }
-    }
 
-    // Update primary record dengan jam_keluar terbaik
-    await prisma.attendance.update({
-      where: { id: primaryRecord.id },
-      data: {
-        jam_keluar: bestJamKeluar
-      }
-    });
+      await prisma.attendance.update({
+        where: { id: primaryRecord.id },
+        data: { jam_keluar: bestJamKeluar }
+      });
 
-    // Hapus semua sisanya
-    const idsToDelete = records.slice(1).map(r => r.id);
-    const delRes = await prisma.attendance.deleteMany({
-      where: { id: { in: idsToDelete } }
-    });
+      const idsToDelete = records.slice(1).map(r => r.id);
+      const delRes = await prisma.attendance.deleteMany({
+        where: { id: { in: idsToDelete } }
+      });
 
-    totalDeleted += delRes.count;
-    console.log(`- [${dup.user_id}] ${dup.tanggal.toISOString().split('T')[0]}: Menggabungkan ${records.length} baris, menghapus ${delRes.count} sampah.`);
+      totalDeleted += delRes.count;
+      console.log(`- [${cand.user_id}] ${cand.tanggal.toISOString().split('T')[0]} (${sesiName}): Menghapus ${delRes.count} sampah.`);
+    };
+
+    await mergeAndClean(pagiRecords, 'PAGI');
+    await mergeAndClean(malamRecords, 'MALAM');
   }
 
   console.log(`\n✅ Selesai! Total ${totalDeleted} baris data sampah berhasil dihapus.`);

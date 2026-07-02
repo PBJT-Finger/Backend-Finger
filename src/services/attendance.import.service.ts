@@ -182,7 +182,7 @@ export class AttendanceImportService {
   ): ParsedRow | null {
     try {
       const user_id = String(row['NIK'] || row['ID'] || '').trim();
-      
+
       // --- BLACKLIST MELINDA ---
       if (user_id === '1') {
         logger.warn(`[BLACKLIST] Mengabaikan data baris Fingerspot milik Melinda (ID 1)`);
@@ -255,17 +255,36 @@ export class AttendanceImportService {
     parsedRows.forEach((row) => {
       if (!row) return;
 
-      const y = row.tanggal.getUTCFullYear();
-      const m = String(row.tanggal.getUTCMonth() + 1).padStart(2, '0');
-      const d = String(row.tanggal.getUTCDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${d}`;
-      const key = `${row.user_id}_${dateStr}`; // Kunci pengelompokan (NIP_Tanggal)
+      // Menggabungkan tanggal dan jam scan untuk mendapatkan local time yang presisi
+      const [hours, minutes, seconds] = row.waktu.split(':');
+      const localHour = parseInt(hours || '0');
+
+      let y = row.tanggal.getUTCFullYear();
+      let m = row.tanggal.getUTCMonth(); // 0-indexed
+      let d = row.tanggal.getUTCDate();
+
+      let isNightSession = false;
+      let sessionDate = new Date(Date.UTC(y, m, d));
+
+      if (localHour < 6) {
+        sessionDate.setUTCDate(sessionDate.getUTCDate() - 1);
+        isNightSession = true;
+      } else if (localHour >= 15) {
+        isNightSession = true;
+      }
+
+      y = sessionDate.getUTCFullYear();
+      const formattedMonth = String(sessionDate.getUTCMonth() + 1).padStart(2, '0');
+      const formattedDate = String(sessionDate.getUTCDate()).padStart(2, '0');
+      const dateStr = `${y}-${formattedMonth}-${formattedDate}`;
+      const sesiPostfix = isNightSession ? 'MALAM' : 'PAGI';
+      const key = `${row.user_id}_${dateStr}_${sesiPostfix}`; // Kunci pengelompokan (NIP_Tanggal_Sesi)
 
       if (!grouped[key]) {
         grouped[key] = {
           user_id: row.user_id,
           nama: row.nama,
-          tanggal: row.tanggal,
+          tanggal: sessionDate,
           entries: [],
           verification_method: row.verifikasi,
           status: 'HADIR',
@@ -305,18 +324,25 @@ export class AttendanceImportService {
       let jam_keluar: Date | null = null;
 
       if (group.entries.length > 0) {
-        // Logika Pencegahan Duplikasi (Konsisten dengan zk-sync)
-        // Ambil elemen pertama sebagai jam_masuk terlepas dari jam berapapun
-        const first = group.entries[0];
-        if (first) {
-          jam_masuk = first.waktu;
+        // Yang muncul hanya "yang paling awal" untuk tipe MASUK
+        const masukEntries = group.entries.filter((e) => e.isCheckIn);
+        if (masukEntries.length > 0) {
+          jam_masuk = masukEntries[0]!.waktu; // Paling awal
+        } else {
+          // Fallback wajar jika di data anehnya tidak ada satupun yang bermarking masuk
+          jam_masuk = group.entries[0]!.waktu;
         }
 
-        // Cari elemen terakhir yang berjarak minimal 2 jam (120 menit) dari jam_masuk
-        // Jika semua scan dalam rentang 2 jam, maka tidak ada jam_keluar (mencegah duplikat sesi pagi jadi jam pulang)
-        const last = group.entries[group.entries.length - 1];
-        if (last && first && (last.waktu.getTime() - first.waktu.getTime() >= 120 * 60 * 1000)) {
-          jam_keluar = last.waktu;
+        // Yang muncul selanjute ini yang scan "Keluar" (PALING AWAL sesuai revisi baru)
+        const keluarEntries = group.entries.filter((e) => !e.isCheckIn);
+        if (keluarEntries.length > 0) {
+          jam_keluar = keluarEntries[0]!.waktu; // Paling awal
+        } else {
+          // Fallback: Jika user lupa tekan tombol Pulang sama sekali, tapi ada sisa scan yang > 2 jam
+          const last = group.entries[group.entries.length - 1];
+          if (last && jam_masuk && (last.waktu.getTime() - jam_masuk.getTime() >= 120 * 60 * 1000)) {
+            jam_keluar = last.waktu;
+          }
         }
       }
 
@@ -548,8 +574,8 @@ export class AttendanceImportService {
       logger.info(`Memulai pemrosesan impor Fingerspot dengan ${rows.length} baris`);
 
       const parsedRows = rows
-          .map((row, index) => this.parseFingerspotRow(row, index))
-          .filter((row): row is ParsedRow => row !== null);
+        .map((row, index) => this.parseFingerspotRow(row, index))
+        .filter((row): row is ParsedRow => row !== null);
 
       logger.info(`Berhasil mem-parsing ${parsedRows.length} baris valid format Fingerspot`);
 
@@ -624,27 +650,27 @@ export class AttendanceImportService {
         const nama = record.nama || employee.nama;
         const jamMasukUtc = record.jam_masuk
           ? new Date(
-              Date.UTC(
-                1970,
-                0,
-                1,
-                record.jam_masuk.getUTCHours(),
-                record.jam_masuk.getUTCMinutes(),
-                record.jam_masuk.getUTCSeconds()
-              )
+            Date.UTC(
+              1970,
+              0,
+              1,
+              record.jam_masuk.getUTCHours(),
+              record.jam_masuk.getUTCMinutes(),
+              record.jam_masuk.getUTCSeconds()
             )
+          )
           : null;
         const jamKeluarUtc = record.jam_keluar
           ? new Date(
-              Date.UTC(
-                1970,
-                0,
-                1,
-                record.jam_keluar.getUTCHours(),
-                record.jam_keluar.getUTCMinutes(),
-                record.jam_keluar.getUTCSeconds()
-              )
+            Date.UTC(
+              1970,
+              0,
+              1,
+              record.jam_keluar.getUTCHours(),
+              record.jam_keluar.getUTCMinutes(),
+              record.jam_keluar.getUTCSeconds()
             )
+          )
           : null;
 
         const mappedRecord = {

@@ -81,53 +81,78 @@ async function syncAttendance(): Promise<void> {
       }
 
       const scanTime = new Date(log.recordTime);
-      const tanggal = new Date(scanTime);
-      tanggal.setHours(0, 0, 0, 0); // Normalisasi ke tanggal tanpa jam (midnight)
+      const localHour = scanTime.getHours();
 
-      // Cari apakah catatan absensi pegawai bersangkutan pada tanggal tersebut sudah ada
-      const existing = await prisma.attendance.findFirst({
+      let sessionDate = new Date(scanTime);
+      sessionDate.setHours(0, 0, 0, 0); // Normalisasi ke tanggal tanpa jam (midnight)
+
+      // Penyesuaian tanggal untuk sesi malam yang melewati tengah malam (sebelum jam 6 pagi)
+      if (localHour < 6) {
+        sessionDate.setDate(sessionDate.getDate() - 1);
+      }
+
+      const isNightSession = localHour >= 15 || localHour < 6;
+
+      // Cari apakah catatan absensi pegawai bersangkutan pada tanggal sesi tersebut sudah ada
+      const existingRecords = await prisma.attendance.findMany({
         where: {
           user_id: employee.user_id,
-          tanggal: tanggal,
+          tanggal: sessionDate,
           is_deleted: false,
         },
       });
 
-      const hour = scanTime.getHours();
-      const isMasuk = hour < 12; // Scan sebelum jam 12.00 diidentifikasi sebagai absen masuk
+      let existing = null;
+      for (const rec of existingRecords) {
+        if (rec.jam_masuk) {
+          const recHour = new Date(rec.jam_masuk).getHours();
+          const recordIsNight = recHour >= 15 || recHour < 6;
+          if (recordIsNight === isNightSession) {
+            existing = rec;
+            break;
+          }
+        }
+      }
 
       if (existing) {
-        // Jika data hari ini sudah ada, perbarui jam masuk atau jam keluar yang masih kosong
-        if (isMasuk && !existing.jam_masuk) {
-          await prisma.attendance.update({
-            where: { id: existing.id },
-            data: { jam_masuk: scanTime, updated_at: new Date() },
-          });
-          successCount++;
-        } else if (!isMasuk && !existing.jam_keluar) {
-          await prisma.attendance.update({
-            where: { id: existing.id },
-            data: { jam_keluar: scanTime, updated_at: new Date() },
-          });
-          successCount++;
+        // Identifikasi jenis tombol dari mesin
+        const type = (log as any).attendanceType;
+        const isMachineMasuk = (type === 0 || type === 4);
+        // Fallback: anggap sebagai pulang jika bukan tombol masuk eksplicit
+        const isMachinePulang = !isMachineMasuk;
+
+        // Jika data sesi ini sudah ada, pastikan hanya memproses state "Pulang"
+        if (existing.jam_masuk) {
+          if (isMachineMasuk) {
+            // User menekan "Masuk" lagi padahal sudah ada jam_masuk. Abaikan.
+            // Karena yang ditunjukkan hanya "yang paling awal".
+            continue;
+          }
+
+          if (isMachinePulang) {
+            // Hanya update jika belum ada jam_keluar, menahan nilai absen pulang PALING AWAL
+            if (!existing.jam_keluar) {
+              await prisma.attendance.update({
+                where: { id: existing.id },
+                data: { jam_keluar: scanTime, updated_at: new Date() },
+              });
+              successCount++;
+            }
+          }
         }
       } else {
-        // Jika belum ada data sama sekali pada tanggal tersebut, buat baris catatan baru
+        // Jika belum ada data sama sekali pada sesi tersebut, buat baris catatan absensi baru
         const insertData: any = {
           user_id: employee.user_id,
           nama: employee.nama,
           jabatan: employee.jabatan === 'DOSEN' ? 'DOSEN' : 'KARYAWAN',
-          tanggal: tanggal,
+          tanggal: sessionDate,
           device_id: deviceIp,
           verification_method: 'SIDIK_JARI',
           status: 'HADIR',
+          jam_masuk: scanTime,
+          jam_keluar: null,
         };
-
-        if (isMasuk) {
-          insertData.jam_masuk = scanTime;
-        } else {
-          insertData.jam_keluar = scanTime;
-        }
 
         await prisma.attendance.create({ data: insertData });
         successCount++;
@@ -144,7 +169,7 @@ async function syncAttendance(): Promise<void> {
     // Memastikan koneksi soket mesin dan basis data ditutup dengan aman
     try {
       await zkInstance.disconnect();
-    } catch {}
+    } catch { }
     await prisma.$disconnect();
   }
 }

@@ -40,7 +40,7 @@ interface BatchResult {
 
 export class ZkSyncService {
   private readonly zkClient: ZkDeviceClient;
-  
+
   // Mutex lock in-memory untuk mencegah race condition (double scan) pada milidetik yang sama
   private processingLocks = new Set<string>();
 
@@ -117,22 +117,34 @@ export class ZkSyncService {
   }
 
   /**
-   * Logika penyimpanan (upsert/insert) untuk satu data rekaman absensi.
-   *
-   * Aturan Bisnis Pemetaan:
-   *   - Waktu scan yang datang dari mesin adalah waktu lokal mesin.
-   *   - zklib memparsingnya ke dalam objek Date UTC. Kita konversi kembali ke jam lokal
-   *     dan simpan ke database dengan format tanggal jam UTC Epoch 1970 untuk representasi waktu murni.
-   */
+ * Logika penyimpanan (upsert/insert) untuk satu data rekaman absensi.
+ *
+ * Aturan Bisnis Pemetaan:
+ *   - Waktu scan yang datang dari mesin adalah waktu lokal mesin.
+ *   - zklib memparsingnya ke dalam objek Date UTC. Kita konversi kembali ke jam lokal
+ *     dan simpan ke database dengan format tanggal jam UTC Epoch 1970 untuk representasi waktu murni.
+ */
   private async upsertAttendanceRecord(record: AttendanceRecord): Promise<void> {
     const t = new Date(record.recordTime);
     // Ekstrak waktu komponen lokal mesin dari data zklib
     const localYear = t.getUTCFullYear();
     const localMonth = t.getUTCMonth();
     const localDate = t.getUTCDate();
+    const localHour = t.getUTCHours();
+
+    // Penyesuaian tanggal untuk sesi malam yang melewati tengah malam (di bawah jam 06:00 pagi)
+    let sessionYear = localYear;
+    let sessionMonth = localMonth;
+    let sessionDay = localDate;
+    if (localHour < 6) {
+      const adjustedDate = new Date(Date.UTC(localYear, localMonth, localDate - 1));
+      sessionYear = adjustedDate.getUTCFullYear();
+      sessionMonth = adjustedDate.getUTCMonth();
+      sessionDay = adjustedDate.getUTCDate();
+    }
 
     // Field 'tanggal' diisi dengan waktu tengah malam UTC (Midnight) merepresentasikan tanggal tersebut
-    const tanggal = new Date(Date.UTC(localYear, localMonth, localDate));
+    const tanggal = new Date(Date.UTC(sessionYear, sessionMonth, sessionDay));
 
     // ID user di mesin dipetakan ke user_id
     const user_id = record.deviceUserId;
@@ -153,7 +165,7 @@ export class ZkSyncService {
     this.processingLocks.add(lockKey);
 
     try {
-      await this._doUpsertAttendanceRecord(record, t, localYear, localMonth, localDate, tanggal, user_id);
+      await this._doUpsertAttendanceRecord(record, t, sessionYear, sessionMonth, sessionDay, tanggal, user_id);
     } finally {
       this.processingLocks.delete(lockKey);
     }
@@ -186,31 +198,40 @@ export class ZkSyncService {
     // Simpan bagian jam saja ke dalam UTC Epoch 1970-01-01T[jam]:[menit]:[detik]
     const timePart = new Date(Date.UTC(1970, 0, 1, localHour, localMinute, localSecond));
 
-    // ─── Logika Pencegahan Duplikasi (Pak Dani) ───────────────────
-    // Aturan: Maksimal 1 scan untuk sesi pagi (Check-In) dan 1 scan untuk sesi sore (Check-Out).
-    // Implementasi:
-    // 1. Scan pertama di hari tersebut selalu menjadi jam_masuk.
-    // 2. Scan berikutnya yang berjarak kurang dari 2 jam (120 menit) dianggap duplikat (Abaikan).
-    // 3. Scan yang berjarak lebih dari 2 jam mengisi jam_keluar.
-    // 4. Jika jam_keluar sudah terisi, abaikan scan selanjutnya.
+    const isNightSession = localHour >= 15 || localHour < 6;
 
-    const existingRecord = await prisma.attendance.findFirst({
+    // ─── Logika Pencegahan Duplikasi Terpisah Pagi & Malam ───
+    const existingRecords = await prisma.attendance.findMany({
       where: {
         user_id: resolvedUserId,
         tanggal: tanggal,
       }
     });
 
+    let existingRecord = null;
+    for (const rec of existingRecords) {
+      if (rec.jam_masuk) {
+        const existingHour = new Date(rec.jam_masuk).getUTCHours();
+        const recordIsNight = existingHour >= 15 || existingHour < 6;
+        if (recordIsNight === isNightSession) {
+          existingRecord = rec;
+          break;
+        }
+      }
+    }
+
+    // Identifikasi pilihan tombol absen dari mesin fisik ZKTeco, jika didukung.
+    // Biasanya 0 (Check-In), 1 (Check-Out), 2 (Break-Out), 3 (Break-In), 4 (OT-In), 5 (OT-Out).
+    const type = record.attendanceType;
+    const isMachineMasuk = (type === 0 || type === 4);
+
     if (!existingRecord) {
-      // Belum ada data hari ini -> Buat sebagai Check-In (jam_masuk)
+      // Apapun tombol yang ditekan, catatan PERTAMA pada sesi ini SELALU dianggap Check-In (jam_masuk).
       const shiftStartHour = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCHours() : 8;
       const shiftStartMinute = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCMinutes() : 0;
       const scanMinutes = t.getUTCHours() * 60 + t.getUTCMinutes();
       const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
-      const isNightSession = localHour >= 15;
-      
-      // Keterlambatan dihitung jika scan lebih dari 15 menit melewati jam masuk shift kerja.
-      // Jam malam (Night Session, misal absen susulan/lembur malam) dianggap HADIR biasa.
+
       const morningStatus = isNightSession ? 'HADIR' : (scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR');
 
       await prisma.attendance.create({
@@ -230,41 +251,39 @@ export class ZkSyncService {
       return;
     }
 
-    // Jika data sudah ada, cek rentang waktu dengan jam_masuk
-    if (existingRecord.jam_masuk) {
-      const existingMasuk = new Date(existingRecord.jam_masuk);
-      const existingScanMinutes = existingMasuk.getUTCHours() * 60 + existingMasuk.getUTCMinutes();
-      const currentScanMinutes = localHour * 60 + localMinute;
-      const diffMinutes = Math.abs(currentScanMinutes - existingScanMinutes);
-
-      // Jika scan berjarak kurang dari 2 jam (120 menit), anggap sebagai duplikasi dari sesi yang sama (Abaikan)
-      if (diffMinutes < 120) {
-        return;
-      }
-    }
-
-    // Jika lebih dari 2 jam, maka ini adalah scan sesi akhir (Check-Out)
-    if (!existingRecord.jam_keluar) {
-      const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
-      const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
-      const scanMinutes = localHour * 60 + localMinute;
-      const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
-      
-      // Status pulang cepat dihitung jika scan pulang sebelum jam pulang shift kerja yang ditentukan
-      const afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
-
-      await prisma.attendance.update({
-        where: { id: existingRecord.id },
-        data: {
-          jam_keluar: timePart,
-          status_keluar: afternoonStatus,
-          device_id: record.ip,
-        },
-      });
-    } else {
-      // jam_keluar sudah terisi, artinya sudah ada 1 rekam pagi dan 1 rekam sore.
-      // Scan ketiga, keempat, dst pada sesi sore akan diabaikan.
+    // Jika data sudah ada, kita periksa status dari tombol mesin (Masuk/Pulang)
+    if (isMachineMasuk) {
+      // User memilih tombol ABSEN MASUK di alat, padahal untuk sesi ini JAM MASUK sudah ada.
+      // Maka scan "Masuk" yang kedua dan seterusnya dalam sesi yang sama HARUS kita ABAIKAN!
       return;
     }
+
+    // Jika tombolnya "Pulang", atau tombolnya tidak jelas (bukan masuk) tetapi sudah ada jam_masuk sebelumnya,
+    // maka kita jadikan scan ini sebagai jam_keluar (check-out).
+
+    // Kita cek jika jam_keluar sudah ada, maka kita abaikan karena yang dicatat adalah absen pulang PERTAMA.
+    if (existingRecord.jam_keluar) {
+      return;
+    }
+
+    const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
+    const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
+    const scanMinutes = localHour * 60 + localMinute;
+    const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
+
+    let afternoonStatus = 'HADIR';
+    if (!isNightSession) {
+      afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
+    }
+
+    await prisma.attendance.update({
+      where: { id: existingRecord.id },
+      data: {
+        jam_keluar: timePart,
+        status_keluar: afternoonStatus,
+        device_id: record.ip,
+        updated_at: new Date()
+      },
+    });
   }
 }
