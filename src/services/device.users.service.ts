@@ -134,7 +134,7 @@ export class DeviceUsersService {
 
     // Gabungkan data cache mesin dengan status database
     const users: DeviceUserWithStatus[] = cachedUsers
-      .filter((u) => u.userId !== '1') // --- BLACKLIST MELINDA ---
+      .filter((u) => String(u.userId) !== '1') // --- BLACKLIST MELINDA (TYPE SAFE) ---
       .map((u) => {
         const employee = employeeByUserId.get(u.userId) ?? null;
 
@@ -191,7 +191,7 @@ export class DeviceUsersService {
   public async registerDeviceUser(dto: RegisterDeviceUserDto): Promise<RegisterResult> {
     const { deviceUserId, nama, jabatan, shiftId } = dto;
 
-    if (deviceUserId === '1') {
+    if (String(deviceUserId) === '1') {
       throw new Error(`User ID '1' (Melinda) diblacklist permanen.`);
     }
 

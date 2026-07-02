@@ -147,9 +147,9 @@ export class ZkSyncService {
     const tanggal = new Date(Date.UTC(sessionYear, sessionMonth, sessionDay));
 
     // ID user di mesin dipetakan ke user_id
-    const user_id = record.deviceUserId;
+    const user_id = String(record.deviceUserId);
 
-    if (user_id === '1') return; // BLACKLIST PERMANEN
+    if (user_id === '1') return; // BLACKLIST PERMANEN (TYPE SAFE)
 
     // Mutex Lock Check: Jika thread/proses lain sedang memproses absensi user ini di hari yang sama saat ini juga
     const lockKey = `${user_id}_${tanggal.toISOString()}`;

@@ -191,7 +191,7 @@ async function main() {
 
   // Melakukan iterasi untuk setiap user dari perangkat fingerprint
   for (const u of rawUsers) {
-    if (u.userId === '1') continue; // BLACKLIST PERMANEN
+    if (String(u.userId) === '1') continue; // BLACKLIST PERMANEN (TYPE SAFE)
 
     // Membuat atau memperbarui data pegawai berdasarkan user_id mesin fingerprint
     const emp = await prisma.employees.upsert({
