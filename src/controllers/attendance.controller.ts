@@ -348,7 +348,11 @@ export class AttendanceController {
       // Mengambil data log absensi berpaginasi
       const attendance = await prisma.attendance.findMany({
         where: whereClause,
-        orderBy: { tanggal: 'desc' },
+        orderBy: [
+          { tanggal: 'desc' },
+          { jam_masuk: 'desc' },
+          { id: 'desc' },
+        ],
         skip: skip,
         take: limitNum,
       });
