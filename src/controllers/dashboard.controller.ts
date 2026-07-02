@@ -38,7 +38,7 @@ export class DashboardController {
         where: { is_active: true },
         select: { user_id: true }
       });
-      
+
       // Filter untuk membuang ID khusus testing (ID 5, 6, 7) agar tidak mengacaukan statistik dashboard
       const activeUserIds = activeEmployees
         .map((e) => e.user_id)
@@ -112,14 +112,20 @@ export class DashboardController {
         year: today.getFullYear(),
       };
 
-      // Mengambil 10 log absensi terbaru untuk ditampilkan di feed dashboard
+      // Mengambil SEMUA log absensi hari ini (dari pagi sampai malam) untuk feed dashboard, tanpa batasan (take dihapus)
       const recentAttendance = await prisma.attendance.findMany({
         where: {
           user_id: { in: activeUserIds },
           is_deleted: false,
+          tanggal: {
+            gte: today,
+            lt: tomorrow,
+          },
         },
-        orderBy: { created_at: 'desc' },
-        take: 10,
+        orderBy: [
+          { jam_masuk: 'desc' },
+          { created_at: 'desc' }
+        ],
       });
 
       return successResponse(
