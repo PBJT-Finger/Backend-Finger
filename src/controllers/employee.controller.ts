@@ -30,7 +30,7 @@ export default class EmployeeController {
       const skip = (page - 1) * limit; // Menghitung offset baris data yang dilewati
 
       const whereClause: Prisma.employeesWhereInput = {
-        user_id: { notIn: ['1', '5', '6', '7'] }
+        user_id: { notIn: ['1'] }
       }; // Objek kondisi query database
 
       // Jika ada kata kunci pencarian, cari kecocokan di nama pegawai ATAU user_id (NIDN/NIP)

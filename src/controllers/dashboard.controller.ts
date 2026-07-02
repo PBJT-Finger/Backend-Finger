@@ -35,7 +35,7 @@ export class DashboardController {
 
       // Mengambil daftar seluruh user_id pegawai aktif
       const activeEmployees = await prisma.employees.findMany({
-        where: { is_active: true, user_id: { notIn: ['1', '5', '6', '7'] } },
+        where: { is_active: true, user_id: { notIn: ['1'] } },
         select: { user_id: true }
       });
 
@@ -71,8 +71,8 @@ export class DashboardController {
 
       // Mengambil hitungan total dosen aktif, karyawan aktif, dan perangkat sidik jari yang aktif
       const [dosenCount, karyawanCount, deviceCount] = await Promise.all([
-        prisma.employees.count({ where: { jabatan: 'DOSEN', is_active: true, user_id: { notIn: ['1', '5', '6', '7'] } } }),
-        prisma.employees.count({ where: { jabatan: 'KARYAWAN', is_active: true, user_id: { notIn: ['1', '5', '6', '7'] } } }),
+        prisma.employees.count({ where: { jabatan: 'DOSEN', is_active: true, user_id: { notIn: ['1'] } } }),
+        prisma.employees.count({ where: { jabatan: 'KARYAWAN', is_active: true, user_id: { notIn: ['1'] } } }),
         prisma.devices.count({ where: { is_active: true } }),
       ]);
 
@@ -162,7 +162,7 @@ export class DashboardController {
 
       // Mengambil daftar seluruh user_id pegawai aktif
       const activeEmployees = await prisma.employees.findMany({
-        where: { is_active: true, user_id: { notIn: ['1', '5', '6', '7'] } },
+        where: { is_active: true, user_id: { notIn: ['1'] } },
         select: { user_id: true }
       });
       const activeUserIds = activeEmployees.map((e) => e.user_id);
