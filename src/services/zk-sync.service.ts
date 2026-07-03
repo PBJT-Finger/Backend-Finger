@@ -80,7 +80,7 @@ export class ZkSyncService {
     for (const record of records) {
       try {
         // Abaikan scan dari ID simulasi/dummy/testing
-        if (['1', '5', '6', '7'].includes(record.deviceUserId)) {
+        if (['1', '5', '6'].includes(record.deviceUserId)) {
           continue;
         }
 

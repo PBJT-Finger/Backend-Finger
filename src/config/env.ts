@@ -127,12 +127,12 @@ export const env = cleanEnv(process.env, {
     default: 10_000,
   }),
   POLLING_INTERVAL_MS: num({
-    desc: 'Jeda waktu antar siklus polling data mesin dalam milidetik. 30 detik = menjaga perangkat keras tetap dingin sambil tetap terasa realtime untuk dashboard.',
-    default: 30_000,
+    desc: 'Jeda waktu antar siklus polling data mesin dalam milidetik. 5 detik untuk realtime dashboard yang lebih responsif.',
+    default: 5_000,
   }),
   RECONNECT_DELAY_MS: num({
     desc: 'Jeda waktu untuk mencoba menghubungkan kembali mesin setelah gagal polling (dalam milidetik).',
-    default: 30_000,
+    default: 10_000,
   }),
   IN_PORT_TIMEOUT_MS: num({
     desc: 'Timeout internal soket ZKLib dalam milidetik.',
