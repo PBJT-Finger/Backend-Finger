@@ -44,10 +44,10 @@ export class DashboardController {
         .map((e) => e.user_id)
         .filter((id) => !['1'].includes(id));
 
-      // Mengambil data log kehadiran hari ini untuk pegawai aktif yang tidak dihapus
+      // Mengambil data log kehadiran hari ini untuk seluruh pegawai yang tidak dihapus dan bukan ID 1
       const todayAttendance = await prisma.attendance.findMany({
         where: {
-          user_id: { in: activeUserIds },
+          user_id: { not: '1' }, // Tetap blokir ID 1
           tanggal: {
             gte: today,
             lt: tomorrow,
@@ -65,7 +65,7 @@ export class DashboardController {
           hadir: todayAttendance.filter((a) => a.jam_masuk !== null).length, // Jumlah terisi jam masuk
           terlambat: todayAttendance.filter((a) => a.status === 'TERLAMBAT').length, // Jumlah terlambat
           dosen: todayAttendance.filter((a) => a.jabatan === 'DOSEN').length, // Jumlah dosen absen hari ini
-          karyawan: todayAttendance.filter((a) => a.jabatan === 'KARYAWAN').length, // Jumlah karyawan absen hari ini
+          karyawan: todayAttendance.filter((a) => (a.jabatan === 'KARYAWAN' || !a.jabatan)).length, // Termasuk default
         },
       };
 
@@ -97,7 +97,7 @@ export class DashboardController {
       // Menghitung total transaksi absensi dalam bulan berjalan saat ini
       const monthlyCount = await prisma.attendance.count({
         where: {
-          user_id: { in: activeUserIds },
+          user_id: { not: '1' },
           tanggal: {
             gte: firstDayOfMonth,
             lt: firstDayOfNextMonth,
@@ -115,7 +115,7 @@ export class DashboardController {
       // Mengambil SEMUA log absensi hari ini (dari pagi sampai malam) untuk feed dashboard, tanpa batasan (take dihapus)
       const recentAttendance = await prisma.attendance.findMany({
         where: {
-          user_id: { in: activeUserIds },
+          user_id: { not: '1' },
           is_deleted: false,
           tanggal: {
             gte: today,
