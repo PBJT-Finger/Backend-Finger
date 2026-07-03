@@ -168,7 +168,6 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
 
       // Memproses record real-time dari mesin sidik jari
       const liveRecords: SseAttendanceRecord[] = records
-        .filter((r) => String(r.deviceUserId) !== '1') // --- BLACKLIST MELINDA ---
         .map((r) => {
           const user_id = String(r.deviceUserId);
           const emp = empMap.get(user_id);

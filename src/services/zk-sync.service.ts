@@ -79,10 +79,7 @@ export class ZkSyncService {
 
     for (const record of records) {
       try {
-        // Abaikan scan dari ID simulasi/dummy/testing
-        if (['1', '5', '6'].includes(record.deviceUserId)) {
-          continue;
-        }
+
 
         // Abaikan log scan salah milik Aziz (ID 8) pada tanggal 2026-06-03
         const recordDateStr = record.recordTime.toISOString().substring(0, 10);
@@ -148,8 +145,6 @@ export class ZkSyncService {
 
     // ID user di mesin dipetakan ke user_id
     const user_id = String(record.deviceUserId);
-
-    if (user_id === '1') return; // BLACKLIST PERMANEN (TYPE SAFE)
 
     // Mutex Lock Check: Jika thread/proses lain sedang memproses absensi user ini di hari yang sama saat ini juga
     const lockKey = `${user_id}_${tanggal.toISOString()}`;
