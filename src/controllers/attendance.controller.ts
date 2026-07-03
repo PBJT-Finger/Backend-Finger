@@ -5,12 +5,18 @@
 // melakukan sinkronisasi dengan mesin fingerprint ZKTeco, serta mengimpor data dari file Excel/CSV.
 
 import { Request, Response } from 'express';
-import prisma from '../config/prisma'; // Mengimpor instance Prisma Client untuk akses database
-import { successResponse, errorResponse } from '../utils/responseFormatter'; // Util untuk format response API
-import logger from '../utils/logger'; // Util untuk mencatat log aplikasi
 import { env } from '../config/env'; // Konfigurasi environment variables yang sudah divalidasi
 import { ZkDeviceClient } from '../infrastructure/zk-client'; // Klien untuk berkomunikasi dengan mesin sidik jari
 import AttendanceImportService from '../services/attendance.import.service'; // Service untuk mengimpor data absensi
+import { successResponse, errorResponse } from '../utils/responseFormatter'; // Util untuk format response API
+import logger from '../utils/logger'; // Util untuk mencatat log aplikasi
+import { EmployeeRepository } from '../repositories/employee.repository';
+import { AttendanceRepository } from '../repositories/attendance.repository';
+import { HolidayRepository } from '../repositories/holiday.repository';
+
+const employeeRepo = new EmployeeRepository();
+const attendanceRepo = new AttendanceRepository();
+const holidayRepo = new HolidayRepository();
 import {
   transformDosenAttendance,
   transformKaryawanAttendance,
@@ -54,10 +60,7 @@ export class AttendanceController {
 
       // [FIX] Mengambil daftar pegawai yang AKTIF dan jabatannya adalah DOSEN.
       // Ini memastikan pengguna yang belum terdaftar di tabel pegawai tidak muncul di rekap dosen.
-      const activeDosenEmployees = await prisma.employees.findMany({
-        where: { jabatan: 'DOSEN', is_active: true, user_id: { notIn: ['1'] } },
-        select: { user_id: true, nama: true, jabatan: true },
-      });
+      const activeDosenEmployees = await employeeRepo.findActiveEmployees({ jabatan: 'DOSEN' });
       // Mengambil seluruh user_id dari dosen yang aktif
       const activeDosenUserIds = activeDosenEmployees.map((e) => e.user_id);
       // Membuat Map untuk pencarian nama/jabatan dosen berdasarkan user_id secara cepat
@@ -89,7 +92,7 @@ export class AttendanceController {
       }
 
       // Mengambil seluruh data mentah kehadiran dosen dari database (diurutkan berdasarkan tanggal terbaru)
-      const attendance = await prisma.attendance.findMany({
+      const attendance = await attendanceRepo.findMany({
         where: whereClause,
         orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }],
       });
@@ -103,10 +106,7 @@ export class AttendanceController {
         if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
         if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
       }
-      const holidays = await prisma.holidays.findMany({
-        where: holidayWhere,
-        select: { tanggal: true },
-      });
+      const holidays = await holidayRepo.findHolidaysInRange(startLocalDate, endLocalDate);
       // Menyimpan daftar tanggal libur ke dalam set string dengan format YYYY-MM-DD
       const holidaySet = new Set(
         holidays.map((h) => {
@@ -184,10 +184,7 @@ export class AttendanceController {
       const endDateStr = typeof end_date === 'string' ? end_date : null;
 
       // [FIX] Mengambil daftar pegawai aktif dengan jabatan KARYAWAN
-      const activeKaryawanEmployees = await prisma.employees.findMany({
-        where: { jabatan: 'KARYAWAN', is_active: true, user_id: { notIn: ['1'] } },
-        select: { user_id: true, nama: true, jabatan: true },
-      });
+      const activeKaryawanEmployees = await employeeRepo.findActiveEmployees({ jabatan: 'KARYAWAN' });
       const activeKaryawanUserIds = activeKaryawanEmployees.map((e) => e.user_id);
       const employeeMap = new Map(activeKaryawanEmployees.map((e) => [e.user_id, e]));
 
@@ -215,24 +212,14 @@ export class AttendanceController {
       }
 
       // Mengambil data kehadiran dari database
-      const attendance = await prisma.attendance.findMany({
+      const attendance = await attendanceRepo.findMany({
         where: whereClause,
         orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }],
       });
 
-      // Mengambil data libur nasional
-      const holidayWhere: any = {};
       const startLocalDate = startDateStr ? parseLocalDate(startDateStr) : null;
       const endLocalDate = endDateStr ? parseLocalDate(endDateStr) : null;
-      if (startLocalDate || endLocalDate) {
-        holidayWhere.tanggal = {};
-        if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
-        if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
-      }
-      const holidays = await prisma.holidays.findMany({
-        where: holidayWhere,
-        select: { tanggal: true },
-      });
+      const holidays = await holidayRepo.findHolidaysInRange(startLocalDate, endLocalDate);
       const holidaySet = new Set(
         holidays.map((h) => {
           const t = h.tanggal;
@@ -339,14 +326,14 @@ export class AttendanceController {
       }
 
       // Menghitung jumlah total data absensi untuk paginasi
-      const total = await prisma.attendance.count({ where: whereClause });
+      const total = await attendanceRepo.count(whereClause);
 
       const pageNum = parseInt(page as string) || 1;
       const limitNum = parseInt(limit as string) || 50;
       const skip = (pageNum - 1) * limitNum;
 
       // Mengambil data log absensi berpaginasi
-      const attendance = await prisma.attendance.findMany({
+      const attendance = await attendanceRepo.findMany({
         where: whereClause,
         orderBy: [
           { tanggal: 'desc' },
@@ -358,10 +345,7 @@ export class AttendanceController {
       });
 
       // Mengambil daftar pegawai untuk memetakan nama yang paling update secara langsung
-      const employees = await prisma.employees.findMany({
-        where: { user_id: { notIn: ['1'] } },
-        select: { user_id: true, nama: true, jabatan: true, is_active: true },
-      });
+      const employees = await employeeRepo.findActiveEmployees();
       const employeeMap = new Map(employees.map((e) => [e.user_id, e]));
 
       const mappedAttendance = attendance.map((a) => {
@@ -430,18 +414,9 @@ export class AttendanceController {
         );
       }
 
-      // Menentukan pegawai yang akan dihitung ringkasannya (hanya yang aktif)
-      const employeeWhere: Record<string, any> = { is_active: true, user_id: { notIn: ['1'] } };
-      if (id || user_id) employeeWhere['user_id'] = id || user_id;
-      if (jabatan) {
-        employeeWhere['jabatan'] = jabatan;
-      } else {
-        employeeWhere['jabatan'] = { in: ['DOSEN', 'KARYAWAN'] };
-      }
-
-      const activeEmployees = await prisma.employees.findMany({
-        where: employeeWhere,
-        select: { user_id: true, nama: true, jabatan: true },
+      const activeEmployees = await employeeRepo.findActiveEmployees({
+        ...(id || user_id ? { user_id: (id || user_id) as string } : {}),
+        ...(jabatan ? { jabatan: jabatan as 'DOSEN' | 'KARYAWAN' } : {}),
       });
 
       if (activeEmployees.length === 0) {
@@ -477,20 +452,9 @@ export class AttendanceController {
         user_id: { in: activeEmployeeUserIds },
       };
 
-      // Mengambil libur nasional dalam periode ini
-      const holidayWhere: any = {};
       const startLocalDate = parseLocalDate(startDate as string);
       const endLocalDate = parseLocalDate(endDate as string);
-      if (startLocalDate || endLocalDate) {
-        holidayWhere.tanggal = {};
-        if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
-        if (endLocalDate) holidayWhere.tanggal.lte = endLocalDate;
-      }
-
-      const holidays = await prisma.holidays.findMany({
-        where: holidayWhere,
-        select: { tanggal: true },
-      });
+      const holidays = await holidayRepo.findHolidaysInRange(startLocalDate, endLocalDate);
       const _holidaySet = new Set(
         holidays.map((h) => {
           const t = h.tanggal;
@@ -499,7 +463,7 @@ export class AttendanceController {
       );
 
       // Mengambil data absensi terurut untuk pemetaan check-in pertama dan check-out terakhir
-      const attendance = await prisma.attendance.findMany({
+      const attendance = await attendanceRepo.findMany({
         where: whereClause,
         orderBy: [{ tanggal: 'desc' }, { jam_keluar: 'desc' }, { jam_masuk: 'desc' }],
       });
@@ -684,19 +648,14 @@ export class AttendanceController {
       }
 
       // Pastikan data yang akan dihapus memang ada di database
-      const attendance = await prisma.attendance.findUnique({
-        where: { id: attendanceId },
-      });
+      const attendance = await attendanceRepo.findById(attendanceId);
 
       if (!attendance) {
         return errorResponse(res, 'Data absensi tidak ditemukan', 404);
       }
 
       // Mengubah field is_deleted menjadi true
-      await prisma.attendance.update({
-        where: { id: attendanceId },
-        data: { is_deleted: true },
-      });
+      await attendanceRepo.update(attendanceId, { is_deleted: true });
 
       const actorId = (req as any).user?.id ?? 0;
       // Mencatat log audit penghapusan data untuk keamanan
@@ -729,19 +688,14 @@ export class AttendanceController {
         return errorResponse(res, 'ID Absensi tidak valid', 400);
       }
 
-      const attendance = await prisma.attendance.findUnique({
-        where: { id: attendanceId },
-      });
+      const attendance = await attendanceRepo.findById(attendanceId);
 
       if (!attendance) {
         return errorResponse(res, 'Data absensi tidak ditemukan', 404);
       }
 
       // Memperbarui kolom admin_notes di database
-      const updated = await prisma.attendance.update({
-        where: { id: attendanceId },
-        data: { admin_notes: note },
-      });
+      const updated = await attendanceRepo.update(attendanceId, { admin_notes: note });
 
       const actorId = (req as any).user?.id ?? 0;
       logger.audit('ADMIN_NOTE_UPDATED', actorId, {
