@@ -11,7 +11,8 @@ import logger from '../utils/logger'; // Logger aplikasi
 import ExcelJS from 'exceljs'; // Library untuk generate file Excel
 import PDFDocument from 'pdfkit'; // Library untuk generate file PDF
 import path from 'path'; // Module internal Node.js untuk resolusi path file
-import fs from 'fs'; // Module internal Node.js untuk operasi file system
+import fs from 'fs';
+import { ExportRepository } from '../repositories/export.repository';
 
 import {
   extractTimeString,
@@ -58,33 +59,12 @@ export class ExportController {
       }
 
       // Query raw SQL untuk grouping absensi per tanggal per pegawai agar tidak ada duplikasi data scan masuk/keluar
-      let sql = `
-        SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
-               MIN(a.jam_masuk) AS jam_masuk,
-               MAX(a.jam_keluar) AS jam_keluar,
-               MAX(a.status) AS status
-        FROM attendance a
-        WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
-      `;
-
-      const params: any[] = [startDate, endDate];
-
-      // Tambahkan filter jabatan jika ada
-      if (jabatan) {
-        sql += ' AND a.jabatan = ?';
-        params.push(jabatan);
-      }
-
-      // Tambahkan filter user_id jika ada
-      if (id || user_id) {
-        sql += ' AND a.user_id = ?';
-        params.push(id || user_id);
-      }
-
-      sql += ' GROUP BY a.tanggal, a.user_id, a.nama, a.jabatan';
-      sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
-
-      const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
+      const attendance = await ExportRepository.getGroupedAttendance(
+        startDate,
+        endDate,
+        typeof jabatan === 'string' ? jabatan : undefined,
+        typeof id === 'string' ? id : (typeof user_id === 'string' ? user_id : undefined)
+      );
 
       // Jika data tidak ditemukan, batalkan proses ekspor
       if (attendance.length === 0) {
@@ -239,31 +219,12 @@ export class ExportController {
       }
 
       // Query data absensi detail harian dari DB
-      let sql = `
-        SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
-               MIN(a.jam_masuk) AS jam_masuk,
-               MAX(a.jam_keluar) AS jam_keluar,
-               MAX(a.status) AS status
-        FROM attendance a
-        WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
-      `;
-
-      const params: any[] = [startDate, endDate];
-
-      if (jabatan) {
-        sql += ' AND a.jabatan = ?';
-        params.push(jabatan);
-      }
-
-      if (id || user_id) {
-        sql += ' AND a.user_id = ?';
-        params.push(id || user_id);
-      }
-
-      sql += ' GROUP BY a.tanggal, a.user_id, a.nama, a.jabatan';
-      sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
-
-      const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
+      const attendance = await ExportRepository.getGroupedAttendance(
+        startDate,
+        endDate,
+        typeof jabatan === 'string' ? jabatan : undefined,
+        typeof id === 'string' ? id : (typeof user_id === 'string' ? user_id : undefined)
+      );
 
       if (attendance.length === 0) {
         return errorResponse(res, 'Data tidak ditemukan untuk diekspor', 404);
@@ -365,31 +326,12 @@ export class ExportController {
       }
 
       // Query data absensi
-      let sql = `
-        SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
-               MIN(a.jam_masuk) AS jam_masuk,
-               MAX(a.jam_keluar) AS jam_keluar,
-               MAX(a.status) AS status
-        FROM attendance a
-        WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
-      `;
-
-      const params: any[] = [startDate, endDate];
-
-      if (jabatan) {
-        sql += ' AND a.jabatan = ?';
-        params.push(jabatan);
-      }
-
-      if (id || user_id) {
-        sql += ' AND a.user_id = ?';
-        params.push(id || user_id);
-      }
-
-      sql += ' GROUP BY a.tanggal, a.user_id, a.nama, a.jabatan';
-      sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
-
-      const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
+      const attendance = await ExportRepository.getGroupedAttendance(
+        startDate,
+        endDate,
+        typeof jabatan === 'string' ? jabatan : undefined,
+        typeof id === 'string' ? id : (typeof user_id === 'string' ? user_id : undefined)
+      );
 
       if (attendance.length === 0) {
         return errorResponse(res, 'Data tidak ditemukan untuk diekspor', 404);
@@ -801,31 +743,12 @@ export class ExportController {
       }
 
       // Query data absensi
-      let sql = `
-        SELECT a.tanggal, a.user_id, a.nama, a.jabatan,
-               MIN(a.jam_masuk) AS jam_masuk,
-               MAX(a.jam_keluar) AS jam_keluar,
-               MAX(a.status) AS status
-        FROM attendance a
-        WHERE a.tanggal >= ? AND a.tanggal <= ? AND a.is_deleted = 0
-      `;
-
-      const params: any[] = [startDate, endDate];
-
-      if (jabatan) {
-        sql += ' AND a.jabatan = ?';
-        params.push(jabatan);
-      }
-
-      if (id || user_id) {
-        sql += ' AND a.user_id = ?';
-        params.push(id || user_id);
-      }
-
-      sql += ' GROUP BY a.tanggal, a.user_id, a.nama, a.jabatan';
-      sql += ' ORDER BY a.tanggal DESC, jam_masuk ASC';
-
-      const attendance = await prisma.$queryRawUnsafe<RawAttendanceRecord[]>(sql, ...params);
+      const attendance = await ExportRepository.getGroupedAttendance(
+        startDate,
+        endDate,
+        typeof jabatan === 'string' ? jabatan : undefined,
+        typeof id === 'string' ? id : (typeof user_id === 'string' ? user_id : undefined)
+      );
 
       if (attendance.length === 0) {
         return errorResponse(res, 'Data tidak ditemukan untuk diekspor', 404);

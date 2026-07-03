@@ -1,9 +1,7 @@
 // src/services/attendance.service.ts
-// Layanan (Service) untuk mengolah data kehadiran (attendance),
-// seperti memproduksi data ringkasan kehadiran (total hadir, terlambat, persentase kehadiran)
-// untuk seluruh pegawai, mendeteksi status terlambat, serta menarik detail log absensi per individu.
 
-import prisma from '../config/prisma'; // Prisma client untuk melakukan query database
+import { EmployeeRepository } from '../repositories/employee.repository';
+import { AttendanceRepository } from '../repositories/attendance.repository';
 import logger from '../utils/logger'; // Logger internal aplikasi
 
 export interface AttendanceSummaryFilters {
@@ -18,56 +16,49 @@ export interface EmployeeSummary {
   nama: string;
   jabatan: string;
   shift: string | null;
-  total_working_days: number; // Target hari kerja efektif dalam periode
-  total_hadir: number; // Total kehadiran terdeteksi
-  total_terlambat: number; // Total keterlambatan (khusus karyawan reguler)
-  persentase_kehadiran: number; // Persentase kehadiran (%)
+  total_working_days: number;
+  total_hadir: number;
+  total_terlambat: number;
+  persentase_kehadiran: number;
 }
 
+const employeeRepo = new EmployeeRepository();
+const attendanceRepo = new AttendanceRepository();
+
 export class AttendanceService {
-  /**
-   * Mengambil data ringkasan kehadiran pegawai (Summary/Rekap) berdasarkan filter.
-   * Digunakan sebagai endpoint rekap absensi di dashboard admin.
-   */
   public static async getAttendanceSummary(
     filters: AttendanceSummaryFilters = {}
   ): Promise<EmployeeSummary[]> {
     try {
       const { startDate, endDate, user_id, jabatan } = filters;
 
-      const whereClause: Record<string, unknown> = {
-        is_active: true, // Hanya pegawai yang aktif
+      const whereClause: any = {
+        is_active: true,
       };
 
-      // Filter berdasarkan NIDN/NIP (user_id) jika disediakan
       if (user_id) {
         whereClause['user_id'] = user_id;
       }
-
-      // Filter berdasarkan jabatan (Dosen atau Karyawan) jika disediakan
       if (jabatan) {
         whereClause['jabatan'] = jabatan;
       }
 
-      // Tarik daftar pegawai dari database yang cocok dengan filter
-      const employees = await prisma.employees.findMany({
-        where: whereClause,
-        include: {
-          shifts: true, // Sertakan relasi shift jam kerjanya
-        },
+      // Use employee repository instead of direct prisma call
+      const [_, employees] = await employeeRepo.findAll({
+        skip: 0,
+        take: 999999, // Fetch all for summary
+        whereClause,
       });
 
       if (!startDate || !endDate) {
         throw new Error('Tanggal mulai dan tanggal akhir wajib diisi');
       }
 
-      // Hitung total target hari kerja efektif (mengabaikan Sabtu & Minggu)
       const totalWorkingDays = this.calculateWorkingDaysWeekendOnly(
         new Date(startDate),
         new Date(endDate)
       );
 
-      // Ambil summary rekap kehadiran untuk masing-masing pegawai secara paralel
       const summaries = await Promise.all(
         employees.map((employee) =>
           this.getEmployeeSummary(
@@ -79,7 +70,6 @@ export class AttendanceService {
         )
       );
 
-      // Kembalikan daftar summary yang bernilai valid (tidak null)
       return summaries.filter((summary): summary is EmployeeSummary => summary !== null);
     } catch (error) {
       logger.error('Error saat mengambil summary absensi:', {
@@ -89,9 +79,6 @@ export class AttendanceService {
     }
   }
 
-  /**
-   * Menghitung dan menghasilkan ringkasan (summary) kehadiran untuk satu pegawai.
-   */
   public static async getEmployeeSummary(
     employee: any,
     startDate: Date,
@@ -99,22 +86,21 @@ export class AttendanceService {
     totalWorkingDays: number
   ): Promise<EmployeeSummary | null> {
     try {
-      // Mengambil seluruh log absensi pegawai yang bersangkutan dalam periode tanggal target
-      const attendanceRecords = await prisma.attendance.findMany({
+      // Use attendance repository instead of direct prisma call
+      const attendanceRecords = await attendanceRepo.findMany({
         where: {
           user_id: employee.user_id,
           tanggal: {
             gte: startDate,
             lte: endDate,
           },
-          is_deleted: false, // Log yang tidak dihapus
+          is_deleted: false,
         },
         orderBy: {
           tanggal: 'asc',
         },
       });
 
-      // Menyiapkan struktur objek data ringkasan kehadiran awal
       const stats: EmployeeSummary = {
         user_id: employee.user_id,
         nama: employee.nama,
@@ -126,19 +112,16 @@ export class AttendanceService {
         persentase_kehadiran: 0,
       };
 
-      // Melakukan kalkulasi total hadir & terlambat dari log absensi
       attendanceRecords.forEach((record) => {
         if (record.jam_masuk) {
-          stats.total_hadir++; // Tambah total hadir jika ada scan masuk
+          stats.total_hadir++;
         }
 
-        // Penghitungan telat hanya berlaku bagi KARYAWAN reguler (tidak berlaku untuk DOSEN)
         if (employee.jabatan === 'KARYAWAN' && record.status === 'TERLAMBAT') {
           stats.total_terlambat++;
         }
       });
 
-      // Hitung persentase kehadiran pegawai (dibulatkan)
       stats.persentase_kehadiran =
         totalWorkingDays > 0 ? Math.round((stats.total_hadir / totalWorkingDays) * 100) : 0;
 
@@ -151,10 +134,6 @@ export class AttendanceService {
     }
   }
 
-  /**
-   * Memvalidasi apakah waktu absensi masuk tergolong terlambat dibanding jam shift kerja.
-   * Catatan: Logika telat utama saat ini sudah tersimpan langsung di database lewat field status.
-   */
   public static isLate(
     waktuAbsensi: string | null,
     shiftTime: string | null,
@@ -162,25 +141,22 @@ export class AttendanceService {
   ): boolean {
     if (!waktuAbsensi || !shiftTime) return false;
 
-    // Membandingkan jam scan dengan jam shift + toleransi keterlambatan
     const waktu = new Date(`1970-01-01T${waktuAbsensi}`);
     const shift = new Date(`1970-01-01T${shiftTime}`);
 
-    shift.setMinutes(shift.getMinutes() + toleransiMenit); // Menambahkan toleransi menit ke jam shift
+    shift.setMinutes(shift.getMinutes() + toleransiMenit);
 
     return waktu > shift;
   }
 
-  /**
-   * Mengambil detail log absensi harian untuk satu orang pegawai dalam rentang tanggal tertentu.
-   */
   public static async getEmployeeAttendanceDetail(
     user_id: string,
     startDate: string,
     endDate: string
   ): Promise<any[]> {
     try {
-      const attendance = await prisma.attendance.findMany({
+      // Use attendance repository instead of direct prisma call
+      const attendance = await attendanceRepo.findMany({
         where: {
           user_id: user_id,
           tanggal: {
@@ -190,7 +166,7 @@ export class AttendanceService {
           is_deleted: false,
         },
         orderBy: {
-          tanggal: 'desc', // Mengurutkan dari hari terbaru
+          tanggal: 'desc',
         },
       });
 
@@ -203,23 +179,18 @@ export class AttendanceService {
     }
   }
 
-  /**
-   * Menghitung total hari kerja efektif dalam suatu periode dengan mengecualikan akhir pekan (Sabtu & Minggu).
-   */
   public static calculateWorkingDaysWeekendOnly(startDate: Date, endDate: Date): number {
     let workingDays = 0;
     const currentDate = new Date(startDate);
 
-    // Lakukan perulangan hari dari tanggal mulai hingga tanggal selesai
     while (currentDate <= endDate) {
       const dayOfWeek = currentDate.getDay();
 
-      // Mengecualikan hari Minggu (0) dan Sabtu (6)
       if (dayOfWeek !== 0 && dayOfWeek !== 6) {
         workingDays++;
       }
 
-      currentDate.setDate(currentDate.getDate() + 1); // Melangkah ke hari berikutnya
+      currentDate.setDate(currentDate.getDate() + 1);
     }
 
     return workingDays;
