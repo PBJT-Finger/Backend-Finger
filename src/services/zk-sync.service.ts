@@ -44,6 +44,9 @@ export class ZkSyncService {
   // Mutex lock in-memory untuk mencegah race condition (double scan) pada milidetik yang sama
   private processingLocks = new Set<string>();
 
+  // Mutex lock tingkat batch untuk mencegah siklus polling bertumpuk yang menyebabkan duplikasi row
+  private isProcessingBatch = false;
+
   constructor(zkClient: ZkDeviceClient) {
     this.zkClient = zkClient;
   }
@@ -53,10 +56,20 @@ export class ZkSyncService {
    * Dipanggil sekali saat server startup pertama kali.
    */
   public start(): void {
-    this.zkClient.on('attendance', (records: AttendanceRecord[]) => {
+    this.zkClient.on('attendance', async (records: AttendanceRecord[]) => {
       // Jalankan fungsi penyimpanan secara asinkron tanpa harus di-await (fire-and-forget),
       // agar tidak menghalangi atau memblokir antrean event loop Node.js.
-      void this.persistAttendanceBatch(records);
+      if (this.isProcessingBatch) {
+        console.log('[ZkSyncService] Batch sebelumnya masih berjalan, mengabaikan siklus polling saat ini untuk mencegah race condition.');
+        return;
+      }
+
+      this.isProcessingBatch = true;
+      try {
+        await this.persistAttendanceBatch(records);
+      } finally {
+        this.isProcessingBatch = false;
+      }
     });
 
     console.log('[ZkSyncService] Listener sinkronisasi absensi mesin berhasil ditempelkan.');
