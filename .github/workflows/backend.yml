@@ -285,6 +285,10 @@ jobs:
 
              docker run --rm --pull always --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
+               \"\$BACKEND_IMAGE\" npx prisma migrate resolve --applied 20260630000000_update_schema_user_id || true
+
+             docker run --rm --pull always --network finger-net \
+               -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
                \"\$BACKEND_IMAGE\" npx prisma migrate deploy \
                && echo '✅ Migrations complete' \
                || { echo '❌ Migration failed!'; exit 1; }
