@@ -232,8 +232,30 @@ export class ZkSyncService {
         const shiftStartHour = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCHours() : 8;
         const shiftStartMinute = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCMinutes() : 0;
         const scanMinutes = localHour * 60 + localMinute;
-        const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
-        const morningStatus = isNightSession ? 'HADIR' : (scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR');
+        // Logika Status Check-In berdasarkan Shift ID
+        let morningStatus = 'HADIR';
+        const shiftId = employee?.shifts?.id;
+        
+        if (shiftId === 3) {
+            // Shift Dosen Malam (Target 16:00)
+            const targetMalam = 16 * 60;
+            morningStatus = scanMinutes > targetMalam + 15 ? 'TERLAMBAT' : 'HADIR';
+        } else if (shiftId === 4) {
+            // Shift Dosen Keduanya (Pagi & Malam)
+            if (localHour < 12) {
+                // Datang pagi, target 08:00
+                const targetPagi = 8 * 60;
+                morningStatus = scanMinutes > targetPagi + 15 ? 'TERLAMBAT' : 'HADIR';
+            } else {
+                // Datang sore, target 16:00
+                const targetMalam = 16 * 60;
+                morningStatus = scanMinutes > targetMalam + 15 ? 'TERLAMBAT' : 'HADIR';
+            }
+        } else {
+            // Default (Karyawan atau Shift Pagi)
+            const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
+            morningStatus = scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR';
+        }
 
         await prisma.attendance.create({
           data: {
@@ -255,8 +277,23 @@ export class ZkSyncService {
       const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
       const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
       const scanMinutes = localHour * 60 + localMinute;
-      const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
-      let afternoonStatus = isNightSession ? 'HADIR' : (scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR');
+
+      // Logika Status Check-Out berdasarkan Shift ID
+      let afternoonStatus = 'HADIR';
+      const shiftId = employee?.shifts?.id;
+      
+      if (shiftId === 3) {
+          // Shift Dosen Malam (Target Pulang 21:00)
+          const target = 21 * 60;
+          afternoonStatus = scanMinutes < target ? 'PULANG_CEPAT' : 'HADIR';
+      } else if (shiftId === 4) {
+          // Shift Keduanya. Karena fleksibel, abaikan pulang cepat.
+          afternoonStatus = 'HADIR';
+      } else {
+          // Default
+          const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
+          afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
+      }
 
       if (targetRecord) {
         // Abaikan duplikat < 120 menit jika sudah punya jam keluar

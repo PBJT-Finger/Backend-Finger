@@ -37,6 +37,51 @@ async function main() {
   // Menampilkan pesan log bahwa data shift berhasil dibuat atau di-upsert
   console.log(`Upserted shift: ${shift.nama_shift}`);
 
+  // 1a. Membuat Shift Khusus Dosen (Pagi)
+  const shiftPagi = await prisma.shifts.upsert({
+    where: { id: 2 },
+    update: {},
+    create: {
+      id: 2,
+      nama_shift: 'Shift Dosen Pagi',
+      jam_masuk: new Date('1970-01-01T08:00:00Z'),
+      jam_keluar: new Date('1970-01-01T16:00:00Z'),
+      deskripsi: 'Jadwal Pagi untuk Dosen',
+      is_active: true,
+    },
+  });
+  console.log(`Upserted shift: ${shiftPagi.nama_shift}`);
+
+  // 1b. Membuat Shift Khusus Dosen (Malam)
+  const shiftMalam = await prisma.shifts.upsert({
+    where: { id: 3 },
+    update: {},
+    create: {
+      id: 3,
+      nama_shift: 'Shift Dosen Malam',
+      jam_masuk: new Date('1970-01-01T16:00:00Z'),
+      jam_keluar: new Date('1970-01-01T21:00:00Z'),
+      deskripsi: 'Jadwal Malam untuk Dosen',
+      is_active: true,
+    },
+  });
+  console.log(`Upserted shift: ${shiftMalam.nama_shift}`);
+
+  // 1c. Membuat Shift Khusus Dosen (Pagi & Malam / Fleksibel)
+  const shiftKeduanya = await prisma.shifts.upsert({
+    where: { id: 4 },
+    update: {},
+    create: {
+      id: 4,
+      nama_shift: 'Shift Dosen Keduanya',
+      jam_masuk: new Date('1970-01-01T08:00:00Z'),
+      jam_keluar: new Date('1970-01-01T21:00:00Z'),
+      deskripsi: 'Jadwal Fleksibel (Pagi/Malam) untuk Dosen',
+      is_active: true,
+    },
+  });
+  console.log(`Upserted shift: ${shiftKeduanya.nama_shift}`);
+
   // 2. Membuat atau memperbarui data Perangkat (Fingerprint Device) default
   const device = await prisma.devices.upsert({
     // Menentukan pencarian perangkat berdasarkan ID perangkat 'FP-GEDUNG-A-001'
