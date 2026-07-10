@@ -87,7 +87,9 @@ export class EmployeeService {
 
     if (data.shift_id !== undefined) {
       if (data.shift_id === null) {
-        updateData.shifts = { disconnect: true };
+        if (employee.shift_id !== null) {
+          updateData.shifts = { disconnect: true };
+        }
       } else {
         updateData.shifts = { connect: { id: Number(data.shift_id) } };
       }

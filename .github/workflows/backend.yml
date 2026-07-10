@@ -279,32 +279,32 @@ jobs:
 
              echo '🗄️ Running database migrations...'
              echo 'Mencoba baselining database...'
-             docker run --rm --network finger-net \
+             docker run --rm --pull always --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
                \"\$BACKEND_IMAGE\" npx prisma migrate resolve --applied 20260227000000_init || true
 
-             docker run --rm --network finger-net \
+             docker run --rm --pull always --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
                \"\$BACKEND_IMAGE\" npx prisma migrate deploy \
                && echo '✅ Migrations complete' \
                || { echo '❌ Migration failed!'; exit 1; }
 
              echo '🌱 Running database seeding...'
-             docker run --rm --network finger-net \
+             docker run --rm --pull always --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
                \"\$BACKEND_IMAGE\" npx prisma db seed \
                && echo '✅ Seeding complete' \
                || { echo '❌ Seeding failed!'; exit 1; }
 
              echo '🧹 Running cleanup for double scans...'
-             docker run --rm --network finger-net \
+             docker run --rm --pull always --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
                \"\$BACKEND_IMAGE\" node dist/scripts/cleanup-duplicates.js \
                && echo '✅ Cleanup complete' \
                || { echo '⚠️ Cleanup failed or skipped'; }
 
              echo '🧹 Removing Melinda data anomaly...'
-             docker run --rm --network finger-net \
+             docker run --rm --pull always --network finger-net \
                -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
                \"\$BACKEND_IMAGE\" node dist/scripts/remove-melinda.js \
                && echo '✅ Anomaly removed' \
