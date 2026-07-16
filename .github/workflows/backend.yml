@@ -99,6 +99,7 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          version: '1.68.1'
 
       - name: Setup SSH key
         env:
