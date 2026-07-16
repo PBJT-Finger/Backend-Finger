@@ -96,10 +96,9 @@ jobs:
     steps:
       # ── Tailscale ──────────────────────────────────────────────
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v3
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          version: '1.68.1'
 
       - name: Setup SSH key
         env:
