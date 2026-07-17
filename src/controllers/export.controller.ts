@@ -648,8 +648,8 @@ export class ExportController {
 
       // 2. Jabatan
       doc
-        .font('Helvetica')
-        .fontSize(10)
+        .font('Times-Roman')
+        .fontSize(11)
         .fillColor('#334155')
         .text('Wadir I Bidang Akademik dan Kepegawaian,', rightAlignX, doc.y + 2, {
           width: signatureWidth,
