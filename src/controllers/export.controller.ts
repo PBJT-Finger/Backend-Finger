@@ -650,7 +650,7 @@ export class ExportController {
       const wardirText = 'Wadir ';
       const romawiText = 'I';
       const wardirWidth = doc.font('Helvetica').fontSize(10).widthOfString(wardirText);
-      const romawiWidth = doc.font('Times-Roman').fontSize(11).widthOfString(romawiText);
+      const romawiWidth = doc.font('Times-Roman').fontSize(10).widthOfString(romawiText);
       const totalWidth = wardirWidth + romawiWidth;
       const jabatanStartX = rightAlignX + (signatureWidth - totalWidth) / 2;
       const jabatanY = doc.y + 2;
@@ -665,7 +665,7 @@ export class ExportController {
 
       doc
         .font('Times-Roman')
-        .fontSize(11)
+        .fontSize(10)
         .text(romawiText);
 
       // 2b. Jabatan (Baris 2: Bidang Akademik dan Kepegawaian)
@@ -679,7 +679,7 @@ export class ExportController {
         });
 
       // 3. Ruang TTD
-      doc.moveDown(8);
+      doc.moveDown(6);
 
       // 4. Nama (Bold, Tanda Kurung)
       const nameText = '( Aziz Azindani, M. Kom )';
