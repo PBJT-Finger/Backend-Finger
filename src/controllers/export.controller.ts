@@ -651,7 +651,7 @@ export class ExportController {
         .font('Helvetica')
         .fontSize(10)
         .fillColor('#334155')
-        .text('Pimpinan,', rightAlignX, doc.y + 2, {
+        .text('Wadir I Bidang Akademik dan Kepegawaian,', rightAlignX, doc.y + 2, {
           width: signatureWidth,
           align: 'center',
         });
