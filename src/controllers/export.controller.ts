@@ -652,14 +652,14 @@ export class ExportController {
       const wardirWidth = doc.font('Helvetica').fontSize(10).widthOfString(wardirText);
       const romawiWidth = doc.font('Times-Roman').fontSize(11).widthOfString(romawiText);
       const totalWidth = wardirWidth + romawiWidth;
-      const startX = rightAlignX + (signatureWidth - totalWidth) / 2;
+      const jabatanStartX = rightAlignX + (signatureWidth - totalWidth) / 2;
       const jabatanY = doc.y + 2;
 
       doc
         .font('Helvetica')
         .fontSize(10)
         .fillColor('#334155')
-        .text(wardirText, startX, jabatanY, {
+        .text(wardirText, jabatanStartX, jabatanY, {
           continued: true,
         });
 

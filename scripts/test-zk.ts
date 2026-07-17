@@ -7,7 +7,7 @@ async function run() {
   
   zk.on('attendance', (records) => {
     console.log('Received attendance records:', records.length);
-    const atiekRecords = records.filter(r => r.deviceUserId === '7' || r.deviceUserId === '15' || r.deviceUserId === '11');
+    const atiekRecords = records.filter((r: any) => r.deviceUserId === '7' || r.deviceUserId === '15' || r.deviceUserId === '11');
     console.log('Atiek records:', atiekRecords);
   });
   

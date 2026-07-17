@@ -7,7 +7,7 @@ async function run() {
   });
   console.log('Employee:', atiek);
 
-  if (atiek.length > 0) {
+  if (atiek.length > 0 && atiek[0]) {
     const att = await prisma.attendance.findMany({
       where: { user_id: atiek[0].user_id }
     });
