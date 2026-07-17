@@ -646,18 +646,40 @@ export class ExportController {
           align: 'center',
         });
 
-      // 2. Jabatan
+      // 2. Jabatan (Baris 1: Wadir I — font Romawi khusus untuk angka "I")
+      const wardirText = 'Wadir ';
+      const romawiText = 'I';
+      const wardirWidth = doc.font('Helvetica').fontSize(10).widthOfString(wardirText);
+      const romawiWidth = doc.font('Times-Roman').fontSize(11).widthOfString(romawiText);
+      const totalWidth = wardirWidth + romawiWidth;
+      const startX = rightAlignX + (signatureWidth - totalWidth) / 2;
+      const jabatanY = doc.y + 2;
+
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#334155')
+        .text(wardirText, startX, jabatanY, {
+          continued: true,
+        });
+
       doc
         .font('Times-Roman')
         .fontSize(11)
+        .text(romawiText);
+
+      // 2b. Jabatan (Baris 2: Bidang Akademik dan Kepegawaian)
+      doc
+        .font('Helvetica')
+        .fontSize(10)
         .fillColor('#334155')
-        .text('Wadir I Bidang Akademik dan Kepegawaian,', rightAlignX, doc.y + 2, {
+        .text('Bidang Akademik dan Kepegawaian,', rightAlignX, doc.y, {
           width: signatureWidth,
           align: 'center',
         });
 
       // 3. Ruang TTD
-      doc.moveDown(6.5);
+      doc.moveDown(8);
 
       // 4. Nama (Bold, Tanda Kurung)
       const nameText = '( Aziz Azindani, M. Kom )';
