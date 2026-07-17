@@ -657,7 +657,7 @@ export class ExportController {
         });
 
       // 3. Ruang TTD
-      doc.moveDown(4.0);
+      doc.moveDown(6.5);
 
       // 4. Nama (Bold, Tanda Kurung)
       const nameText = '( Aziz Azindani, M. Kom )';
