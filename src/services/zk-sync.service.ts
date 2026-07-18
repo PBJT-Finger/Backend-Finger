@@ -201,11 +201,10 @@ export class ZkSyncService {
     // Simpan bagian jam saja ke dalam UTC Epoch 1970-01-01T[jam]:[menit]:[detik]
     const timePart = new Date(Date.UTC(1970, 0, 1, localHour, localMinute, localSecond));
 
+    // Menentukan sesi absen saat ini berdasarkan jam (Pagi = 06:00 - 14:59, Malam = 15:00 - 05:59)
     const isNightSession = localHour >= 15 || localHour < 6;
 
-    const isKeluar = record.attendanceType === 1 || record.attendanceType === 5;
-
-    // ─── Logika Strict 1 Hari 1 Row Per User Mencegah Duplikasi ───
+    // ─── Logika Auto Check-Out & Multi-Sesi (Double Shift) ───
     const existingRecords = await prisma.attendance.findMany({
       where: {
         user_id: resolvedUserId,
@@ -214,96 +213,78 @@ export class ZkSyncService {
       orderBy: { id: 'desc' }
     });
 
-    const targetRecord = existingRecords.length > 0 ? existingRecords[0] : null;
-
-    if (!isKeluar) {
-      // ---- PENGGUNA MENEKAN TOMBOL CHECK-IN DENGAN SENGAJA ----
-      if (targetRecord) {
-        if (!targetRecord.jam_masuk) {
-          // Lupa masuk, sekarang masuk
-          await prisma.attendance.update({
-            where: { id: targetRecord.id },
-            data: { jam_masuk: timePart, updated_at: new Date() }
-          });
+    let targetRecord = null;
+    for (const rec of existingRecords) {
+      if (rec.jam_masuk) {
+        const h = new Date(rec.jam_masuk).getUTCHours();
+        const recIsNight = h >= 15 || h < 6;
+        if (recIsNight === isNightSession) {
+          targetRecord = rec;
+          break;
         }
-        return; // Apapun yang terjadi (sudah ada jam masuk atau tidak), KITA JANGAN BUAT ROW BARU. Tidak boleh duplikat.
-      } else {
-        // Belum ada row hari ini. Buat Check-in.
-        const shiftStartHour = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCHours() : 8;
-        const shiftStartMinute = employee?.shifts ? new Date(employee.shifts.jam_masuk).getUTCMinutes() : 0;
-        const scanMinutes = localHour * 60 + localMinute;
-        // Logika Status Check-In berdasarkan Shift ID
-        let morningStatus = 'HADIR';
-        const shiftId = employee?.shifts?.id;
-        
-        if (shiftId === 3) {
-            // Shift Dosen Malam (Target 16:00)
-            const targetMalam = 16 * 60;
-            morningStatus = scanMinutes > targetMalam + 15 ? 'TERLAMBAT' : 'HADIR';
-        } else if (shiftId === 4) {
-            // Shift Dosen Keduanya (Pagi & Malam)
-            if (localHour < 12) {
-                // Datang pagi, target 08:00
-                const targetPagi = 8 * 60;
-                morningStatus = scanMinutes > targetPagi + 15 ? 'TERLAMBAT' : 'HADIR';
-            } else {
-                // Datang sore, target 16:00
-                const targetMalam = 16 * 60;
-                morningStatus = scanMinutes > targetMalam + 15 ? 'TERLAMBAT' : 'HADIR';
-            }
-        } else {
-            // Default (Karyawan atau Shift Pagi)
-            const shiftMinutes = shiftStartHour * 60 + shiftStartMinute;
-            morningStatus = scanMinutes > shiftMinutes + 15 ? 'TERLAMBAT' : 'HADIR';
+      } else if (rec.jam_keluar) {
+        const h = new Date(rec.jam_keluar).getUTCHours();
+        const recIsNight = h >= 15 || h < 6;
+        if (recIsNight === isNightSession) {
+          targetRecord = rec;
+          break;
         }
-
-        await prisma.attendance.create({
-          data: {
-            user_id: resolvedUserId,
-            nama: resolvedName,
-            jabatan: resolvedJabatan,
-            tanggal: tanggal,
-            jam_masuk: timePart,
-            jam_keluar: null,
-            device_id: record.ip,
-            verification_method: 'SIDIK_JARI',
-            status: morningStatus,
-            status_keluar: 'HADIR',
-          },
-        });
       }
+    }
+
+    const scanMinutes = localHour * 60 + localMinute;
+
+    // Logika Status Check-In:
+    // Dosen Malam & Karyawan tidak ada terlambat. Dosen Pagi batas 08:00 (toleransi 15 menit).
+    let morningStatus = 'HADIR';
+    if (resolvedJabatan === 'DOSEN' && !isNightSession) {
+      const targetPagi = 8 * 60;
+      morningStatus = scanMinutes > targetPagi + 15 ? 'TERLAMBAT' : 'HADIR';
+    }
+
+    const afternoonStatus = 'HADIR';
+
+    if (!targetRecord) {
+      // Pertama kali scan di sesi ini -> Buat jam_masuk
+      await prisma.attendance.create({
+        data: {
+          user_id: resolvedUserId,
+          nama: resolvedName,
+          jabatan: resolvedJabatan as any,
+          tanggal: tanggal,
+          jam_masuk: timePart,
+          jam_keluar: null,
+          device_id: record.ip,
+          verification_method: 'SIDIK_JARI',
+          status: morningStatus,
+          status_keluar: afternoonStatus,
+        },
+      });
     } else {
-      // ---- PENGGUNA MENEKAN TOMBOL CHECK-OUT DENGAN SENGAJA ----
-      const shiftEndHour = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCHours() : 16;
-      const shiftEndMinute = employee?.shifts ? new Date(employee.shifts.jam_keluar).getUTCMinutes() : 30;
-      const scanMinutes = localHour * 60 + localMinute;
-
-      // Logika Status Check-Out berdasarkan Shift ID
-      let afternoonStatus = 'HADIR';
-      const shiftId = employee?.shifts?.id;
-      
-      if (shiftId === 3) {
-          // Shift Dosen Malam (Target Pulang 21:00)
-          const target = 21 * 60;
-          afternoonStatus = scanMinutes < target ? 'PULANG_CEPAT' : 'HADIR';
-      } else if (shiftId === 4) {
-          // Shift Keduanya. Karena fleksibel, abaikan pulang cepat.
-          afternoonStatus = 'HADIR';
+      if (!targetRecord.jam_masuk) {
+        await prisma.attendance.update({
+          where: { id: targetRecord.id },
+          data: { jam_masuk: timePart, status: morningStatus, updated_at: new Date() }
+        });
       } else {
-          // Default
-          const targetMinutes = employee?.shifts ? shiftEndHour * 60 + shiftEndMinute : 990;
-          afternoonStatus = scanMinutes < targetMinutes ? 'PULANG_CEPAT' : 'HADIR';
-      }
+        // Sudah ada jam masuk, scan berikutnya menjadi jam_keluar (Auto-Inference)
+        const masuk = new Date(targetRecord.jam_masuk);
+        const masukMinutes = masuk.getUTCHours() * 60 + masuk.getUTCMinutes();
+        
+        let diffMinutes = scanMinutes - masukMinutes;
+        if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle cross midnight
+        
+        // Beri jeda minimal 1 jam (60 menit) untuk scan pulang agar tidak double tap
+        if (diffMinutes < 60 && !targetRecord.jam_keluar) return;
 
-      if (targetRecord) {
-        // Abaikan duplikat < 120 menit jika sudah punya jam keluar
         if (targetRecord.jam_keluar) {
           const ex = new Date(targetRecord.jam_keluar);
-          const diffMinutes = Math.abs(scanMinutes - (ex.getUTCHours() * 60 + ex.getUTCMinutes()));
-          if (diffMinutes < 120) return;
+          const exMinutes = ex.getUTCHours() * 60 + ex.getUTCMinutes();
+          let diffEx = scanMinutes - exMinutes;
+          if (diffEx < 0) diffEx += 24 * 60;
+          if (diffEx < 5) return; // Abaikan spam tap berdekatan
         }
 
-        // Memperbarui jam pulang dari row hari ini
         await prisma.attendance.update({
           where: { id: targetRecord.id },
           data: {
@@ -311,23 +292,6 @@ export class ZkSyncService {
             status_keluar: afternoonStatus,
             device_id: record.ip,
             updated_at: new Date()
-          },
-        });
-      } else {
-        // Dia lupa Check-In (baru pertama kali scan hari ini dan statusnya Check-out)
-        // Kita hargai & buat row 1 hari ini agar tetap terlihat di rekapan.
-        await prisma.attendance.create({
-          data: {
-            user_id: resolvedUserId,
-            nama: resolvedName,
-            jabatan: resolvedJabatan,
-            tanggal: tanggal,
-            jam_masuk: null,
-            jam_keluar: timePart,
-            device_id: record.ip,
-            verification_method: 'SIDIK_JARI',
-            status: 'TIDAK_HADIR',
-            status_keluar: afternoonStatus,
           },
         });
       }

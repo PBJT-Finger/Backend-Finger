@@ -106,7 +106,7 @@ export class ExportController {
       );
 
       // Menghitung total hari kerja efektif dalam periode ekspor
-      const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
+      const totalWorkingDays = await calculateWorkingDays(startDate, endDate, typeof jabatan === 'string' ? jabatan : undefined);
 
       // Transformasi data absensi berdasarkan jabatan (Dosen atau Karyawan)
       let transformedData: any[];
@@ -370,7 +370,7 @@ export class ExportController {
         })
       );
 
-      const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
+      const totalWorkingDays = await calculateWorkingDays(startDate, endDate, typeof jabatan === 'string' ? jabatan : undefined);
 
       // Transformasi data absensi
       let transformedData: any[];
@@ -809,7 +809,7 @@ export class ExportController {
         })
       );
 
-      const totalWorkingDays = await calculateWorkingDays(startDate, endDate);
+      const totalWorkingDays = await calculateWorkingDays(startDate, endDate, typeof jabatan === 'string' ? jabatan : undefined);
 
       // Transformasi data
       let transformedData: any[];

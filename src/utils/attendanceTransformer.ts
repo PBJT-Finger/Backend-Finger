@@ -111,7 +111,8 @@ export function toUTCDate(timeValue: string | Date | null): Date | null {
  */
 export async function calculateWorkingDays(
   startDate: string | Date,
-  endDate: string | Date
+  endDate: string | Date,
+  role?: string
 ): Promise<number> {
   if (!startDate || !endDate) {
     return 0;
@@ -160,8 +161,22 @@ export async function calculateWorkingDays(
     const dayOfWeek = current.getDay();
     const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
 
-    // Kecualikan hari Minggu (0), Sabtu (6), dan tanggal libur nasional
-    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidaySet.has(dateStr)) {
+    const isHoliday = holidaySet.has(dateStr);
+    const isSunday = dayOfWeek === 0;
+    const isSaturday = dayOfWeek === 6;
+
+    let isWorkingDay = false;
+    if (!isHoliday && !isSunday) {
+      if (role === 'KARYAWAN') {
+        // Karyawan masuk hari Sabtu
+        isWorkingDay = true;
+      } else {
+        // Dosen (atau default) libur hari Sabtu
+        if (!isSaturday) isWorkingDay = true;
+      }
+    }
+
+    if (isWorkingDay) {
       count++;
     }
     current.setDate(current.getDate() + 1);

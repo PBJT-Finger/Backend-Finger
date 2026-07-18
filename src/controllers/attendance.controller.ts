@@ -117,7 +117,7 @@ export class AttendanceController {
 
       // Menghitung jumlah hari kerja efektif (tidak termasuk Sabtu & Minggu) dalam rentang waktu tersebut
       const totalWorkingDays =
-        startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
+        startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr, 'DOSEN') : 0;
 
       // Memfilter scan yang tidak valid (seperti ID 5, 6, 7) dan mengabaikan absensi salah untuk Aziz (ID 8) pada 3 Juni 2026
       const filteredAttendance = attendance.filter((a) => {
@@ -229,7 +229,7 @@ export class AttendanceController {
 
       // Menghitung jumlah hari kerja efektif
       const totalWorkingDays =
-        startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr) : 0;
+        startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr, 'KARYAWAN') : 0;
 
       // Filter scan ID tidak valid dan kasus khusus Aziz
       const filteredAttendance = attendance.filter((a) => {
@@ -586,17 +586,15 @@ export class AttendanceController {
         return `${startDay} ${startMonth || ''} ${startYear} - ${endDay} ${endMonth || ''} ${endYear}`;
       };
 
-      const totalWorkingDaysInPeriod = await calculateWorkingDays(
-        startDate as string,
-        endDate as string
-      );
+      const totalWorkingDaysDosen = await calculateWorkingDays(startDate as string, endDate as string, 'DOSEN');
+      const totalWorkingDaysKaryawan = await calculateWorkingDays(startDate as string, endDate as string, 'KARYAWAN');
 
       // Memetakan ke bentuk objek final rekap untuk API response
       const summary = Object.values(employeeStats)
         .map((emp) => {
           const attendanceDatesArray = Array.from(emp.attendanceDates as Set<string>).sort();
           const totalHadir = attendanceDatesArray.length;
-          const totalHariKerja = totalWorkingDaysInPeriod;
+          const totalHariKerja = emp.jabatan === 'DOSEN' ? totalWorkingDaysDosen : totalWorkingDaysKaryawan;
           const tidakHadir = Math.max(0, totalHariKerja - totalHadir);
 
           return {
