@@ -212,7 +212,7 @@ export class ZkSyncService {
 
     let targetRecord = null;
     if (existingRecords.length > 0) {
-      const latestRecord = existingRecords[0];
+      const latestRecord = existingRecords[0]!;
       
       if (latestRecord.jam_masuk && !latestRecord.jam_keluar) {
         // Ada sesi terbuka (belum check-out), jadikan target untuk check-out/spam prevention
