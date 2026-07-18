@@ -201,9 +201,6 @@ export class ZkSyncService {
     // Simpan bagian jam saja ke dalam UTC Epoch 1970-01-01T[jam]:[menit]:[detik]
     const timePart = new Date(Date.UTC(1970, 0, 1, localHour, localMinute, localSecond));
 
-    // Menentukan sesi absen saat ini berdasarkan jam (Pagi = 06:00 - 14:59, Malam = 15:00 - 05:59)
-    const isNightSession = localHour >= 15 || localHour < 6;
-
     // ─── Logika Auto Check-Out & Multi-Sesi (Double Shift) ───
     const existingRecords = await prisma.attendance.findMany({
       where: {
@@ -214,20 +211,38 @@ export class ZkSyncService {
     });
 
     let targetRecord = null;
-    for (const rec of existingRecords) {
-      if (rec.jam_masuk) {
-        const h = new Date(rec.jam_masuk).getUTCHours();
-        const recIsNight = h >= 15 || h < 6;
-        if (recIsNight === isNightSession) {
-          targetRecord = rec;
-          break;
-        }
-      } else if (rec.jam_keluar) {
-        const h = new Date(rec.jam_keluar).getUTCHours();
-        const recIsNight = h >= 15 || h < 6;
-        if (recIsNight === isNightSession) {
-          targetRecord = rec;
-          break;
+    if (existingRecords.length > 0) {
+      const latestRecord = existingRecords[0];
+      
+      if (latestRecord.jam_masuk && !latestRecord.jam_keluar) {
+        // Ada sesi terbuka (belum check-out), jadikan target untuk check-out/spam prevention
+        targetRecord = latestRecord;
+      } else if (latestRecord.jam_masuk && latestRecord.jam_keluar) {
+        // Sesi terakhir sudah check-out. Apakah ini spam check-out atau shift baru?
+        const ex = new Date(latestRecord.jam_keluar);
+        const exMinutes = ex.getUTCHours() * 60 + ex.getUTCMinutes();
+        const scanMinutes = localHour * 60 + localMinute;
+        
+        let diffEx = scanMinutes - exMinutes;
+        if (diffEx < 0) diffEx += 24 * 60;
+        
+        if (diffEx < 60) {
+          // Baru saja check-out kurang dari 1 jam yang lalu -> anggap update/spam
+          targetRecord = latestRecord;
+        } else {
+          // Sudah lebih dari 1 jam sejak check-out terakhir
+          // Cek apakah ini sesi yang berbeda (Double Shift)
+          const isNightSession = localHour >= 15 || localHour < 6;
+          const h = new Date(latestRecord.jam_masuk).getUTCHours();
+          const recIsNight = h >= 15 || h < 6;
+          
+          if (recIsNight === isNightSession) {
+             // Masih di sesi (pagi/malam) yang sama, jadikan target untuk update jam_keluar terakhir
+             targetRecord = latestRecord;
+          } else {
+             // Beda sesi! Waktunya buat Check-in baru untuk shift baru
+             targetRecord = null;
+          }
         }
       }
     }
@@ -237,6 +252,7 @@ export class ZkSyncService {
     // Logika Status Check-In:
     // Dosen Malam & Karyawan tidak ada terlambat. Dosen Pagi batas 08:00 (toleransi 15 menit).
     let morningStatus = 'HADIR';
+    const isNightSession = localHour >= 15 || localHour < 6;
     if (resolvedJabatan === 'DOSEN' && !isNightSession) {
       const targetPagi = 8 * 60;
       morningStatus = scanMinutes > targetPagi + 15 ? 'TERLAMBAT' : 'HADIR';
