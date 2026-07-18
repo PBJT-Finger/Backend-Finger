@@ -232,15 +232,15 @@ export class ZkSyncService {
         } else {
           // Sudah lebih dari 1 jam sejak check-out terakhir
           // Cek apakah ini sesi yang berbeda (Double Shift)
-          const isNightSession = localHour >= 15 || localHour < 6;
+          const isNightSession = resolvedJabatan === 'DOSEN' ? (localHour >= 15 || localHour < 6) : false;
           const h = new Date(latestRecord.jam_masuk).getUTCHours();
-          const recIsNight = h >= 15 || h < 6;
+          const recIsNight = resolvedJabatan === 'DOSEN' ? (h >= 15 || h < 6) : false;
           
           if (recIsNight === isNightSession) {
-             // Masih di sesi (pagi/malam) yang sama, jadikan target untuk update jam_keluar terakhir
+             // Masih di sesi yang sama, jadikan target untuk update jam_keluar terakhir
              targetRecord = latestRecord;
           } else {
-             // Beda sesi! Waktunya buat Check-in baru untuk shift baru
+             // Beda sesi! Waktunya buat Check-in baru untuk shift baru (Khusus Dosen)
              targetRecord = null;
           }
         }
