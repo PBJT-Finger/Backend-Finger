@@ -232,9 +232,9 @@ export class ZkSyncService {
         } else {
           // Sudah lebih dari 1 jam sejak check-out terakhir
           // Cek apakah ini sesi yang berbeda (Double Shift)
-          const isNightSession = localHour >= 15 || localHour < 6;
+          const isNightSession = localHour >= 15;
           const h = new Date(latestRecord.jam_masuk).getUTCHours();
-          const recIsNight = h >= 15 || h < 6;
+          const recIsNight = h >= 15;
           
           if (recIsNight === isNightSession) {
              // Masih di sesi yang sama, jadikan target untuk update jam_keluar terakhir
@@ -252,7 +252,7 @@ export class ZkSyncService {
     // Logika Status Check-In:
     // Dosen Malam & Karyawan tidak ada terlambat. Dosen Pagi batas 08:00 (toleransi 15 menit).
     let morningStatus = 'HADIR';
-    const isNightSession = localHour >= 15 || localHour < 6;
+    const isNightSession = localHour >= 15;
     if (resolvedJabatan === 'DOSEN' && !isNightSession) {
       const targetPagi = 8 * 60;
       morningStatus = scanMinutes > targetPagi + 15 ? 'TERLAMBAT' : 'HADIR';
