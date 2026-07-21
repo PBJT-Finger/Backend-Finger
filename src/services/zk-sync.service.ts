@@ -285,6 +285,10 @@ export class ZkSyncService {
         let diffMinutes = scanMinutes - masukMinutes;
         if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle cross midnight
         
+        // Proteksi re-processing: jika scan identik atau sangat dekat dengan jam_masuk
+        // (< 5 menit), abaikan. Ini mencegah data jam_keluar rusak saat Backend restart.
+        if (diffMinutes < 5) return;
+
         // Beri jeda minimal 1 jam (60 menit) untuk scan pulang agar tidak double tap
         if (diffMinutes < 60 && !targetRecord.jam_keluar) return;
 
