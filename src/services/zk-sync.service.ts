@@ -142,16 +142,11 @@ export class ZkSyncService {
     const localDate = t.getUTCDate();
     const localHour = t.getUTCHours();
 
-    // Penyesuaian tanggal untuk sesi malam yang melewati tengah malam (di bawah jam 06:00 pagi)
-    let sessionYear = localYear;
-    let sessionMonth = localMonth;
-    let sessionDay = localDate;
-    if (localHour < 6) {
-      const adjustedDate = new Date(Date.UTC(localYear, localMonth, localDate - 1));
-      sessionYear = adjustedDate.getUTCFullYear();
-      sessionMonth = adjustedDate.getUTCMonth();
-      sessionDay = adjustedDate.getUTCDate();
-    }
+    // Sesi malam berakhir pukul 23:59. Scan setelah 00:00 langsung masuk hari baru.
+    // Tidak ada penyesuaian tanggal (date adjustment) untuk jam dini hari.
+    const sessionYear = localYear;
+    const sessionMonth = localMonth;
+    const sessionDay = localDate;
 
     // Field 'tanggal' diisi dengan waktu tengah malam UTC (Midnight) merepresentasikan tanggal tersebut
     const tanggal = new Date(Date.UTC(sessionYear, sessionMonth, sessionDay));
