@@ -297,7 +297,7 @@ export class ZkSyncService {
           const exMinutes = ex.getUTCHours() * 60 + ex.getUTCMinutes();
           let diffEx = scanMinutes - exMinutes;
           if (diffEx < 0) diffEx += 24 * 60;
-          if (diffEx < 5) return; // Abaikan spam tap berdekatan
+          if (diffEx < 60) return; // Abaikan scan dalam 60 menit sejak pulang terakhir
         }
 
         await prisma.attendance.update({
