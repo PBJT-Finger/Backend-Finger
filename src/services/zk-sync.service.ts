@@ -1,5 +1,5 @@
 /**
- * src/services/zk-sync.service.ts — Updated threshold 2 hours
+ * src/services/zk-sync.service.ts — Attendance session threshold: 2 hours
  *
  * Menghubungkan ZkDeviceClient (lapisan perangkat keras mesin) dengan database Prisma (lapisan penyimpanan data).
  *
