@@ -220,7 +220,7 @@ export class ZkSyncService {
 
     if (openSession) {
       // Jika ada open session (bisa hari ini atau kemarin), periksa kelayakannya
-      const masukTime = new Date(openSession.jam_masuk);
+      const masukTime = new Date(openSession.jam_masuk!);
       
       // Hitung selisih jam antara waktu scan sekarang dengan waktu check-in
       // (Kita gunakan representasi menit total dalam sehari untuk perbandingan aman)
@@ -261,7 +261,7 @@ export class ZkSyncService {
       } else if (!isExplicitPulang) {
         // Jika scan biasa tanpa tombol, gunakan logika pembagian sesi pagi/malam
         const isNightSession = localHour >= 15;
-        const h = new Date(latestRecord.jam_masuk).getUTCHours();
+        const h = latestRecord.jam_masuk ? new Date(latestRecord.jam_masuk).getUTCHours() : 0;
         const recIsNight = h >= 15;
         
         if (recIsNight === isNightSession) {
