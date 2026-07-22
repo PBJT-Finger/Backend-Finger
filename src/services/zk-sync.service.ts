@@ -255,8 +255,8 @@ export class ZkSyncService {
         diffEx += 24 * 60;
       }
       
-      // Jika kurang dari 1 jam sejak check-out terakhir, anggap update/spam
-      if (diffEx < 60) {
+      // Jika kurang dari 2 jam sejak check-out terakhir, anggap update/spam
+      if (diffEx < 120) {
         targetRecord = latestRecord;
       } else if (!isExplicitPulang) {
         // Jika scan biasa tanpa tombol, gunakan logika pembagian sesi pagi/malam
@@ -352,8 +352,8 @@ export class ZkSyncService {
         // Proteksi re-processing: jika scan identik atau sangat dekat dengan jam_masuk (< 5 menit), abaikan.
         if (diffMinutes < 5) return;
 
-        // Beri jeda minimal 1 jam (60 menit) untuk scan pulang jika scan biasa tanpa tombol pulang
-        if (diffMinutes < 60 && !targetRecord.jam_keluar && !isExplicitPulang) return;
+        // Beri jeda minimal 2 jam (120 menit) untuk scan pulang jika scan biasa tanpa tombol pulang
+        if (diffMinutes < 120 && !targetRecord.jam_keluar && !isExplicitPulang) return;
 
         if (targetRecord.jam_keluar) {
           const ex = new Date(targetRecord.jam_keluar);
@@ -364,7 +364,7 @@ export class ZkSyncService {
           } else if (diffEx < 0) {
             diffEx += 24 * 60;
           }
-          if (diffEx < 60 && !isExplicitPulang) return; // Abaikan spam pulang kecuali tombol ditekan
+          if (diffEx < 120 && !isExplicitPulang) return; // Abaikan spam pulang kecuali tombol ditekan
         }
 
         await prisma.attendance.update({

@@ -166,6 +166,37 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
       });
       const empMap = new Map(employees.map((e) => [e.user_id, e]));
 
+      // Ambil open session (jam_masuk ada, jam_keluar null) dari DB untuk hari ini dan kemarin
+      // agar bisa menentukan apakah scan ini adalah "Absen Masuk" atau "Absen Pulang" secara akurat
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+      const openSessions = await prisma.attendance.findMany({
+        where: {
+          user_id: { in: userIds },
+          tanggal: { in: [today, yesterday] },
+          jam_masuk: { not: null },
+          jam_keluar: null,
+          is_deleted: false,
+        },
+        select: { user_id: true, jam_masuk: true, tanggal: true },
+      });
+
+      // Buat map: user_id → data open session (jam_masuk paling baru)
+      const openSessionMap = new Map<string, { masukMinutes: number }>();
+      for (const s of openSessions) {
+        if (!s.jam_masuk) continue;
+        const masuk = new Date(s.jam_masuk);
+        const masukMinutes = masuk.getUTCHours() * 60 + masuk.getUTCMinutes();
+        const existing = openSessionMap.get(s.user_id);
+        // Simpan sesi dengan jam_masuk paling baru jika ada beberapa
+        if (!existing || masukMinutes > existing.masukMinutes) {
+          openSessionMap.set(s.user_id, { masukMinutes });
+        }
+      }
+
       // Memproses record real-time dari mesin sidik jari
       const liveRecords: SseAttendanceRecord[] = records
         .map((r) => {
@@ -195,9 +226,17 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
             )
           );
 
-          // Menentukan apakah scan merupakan masuk atau keluar berdasarkan kode dari ZKTeco
-          // Kode: 0=Check-In (Masuk), 1=Check-Out (Keluar), 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out (Lembur Keluar)
-          const isKeluar = r.attendanceType === 1 || r.attendanceType === 5;
+          // Menentukan apakah scan merupakan masuk atau keluar:
+          // Prioritas 1 — Tombol eksplisit di mesin (attendanceType 1/5 = Keluar)
+          // Prioritas 2 — Cek DB: jika ada open session dan selisih >= 2 jam → Pulang
+          // Prioritas 3 — Default: Masuk
+          // Kode: 0=Check-In, 1=Check-Out, 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out
+          const isExplicitKeluar = r.attendanceType === 1 || r.attendanceType === 5;
+          const openSession = openSessionMap.get(user_id);
+          const scanMinutesOfDay = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
+          let diffFromMasuk = openSession ? scanMinutesOfDay - openSession.masukMinutes : -1;
+          if (diffFromMasuk < 0) diffFromMasuk += 24 * 60; // Tangani lintas tengah malam
+          const isKeluar = isExplicitKeluar || (openSession !== undefined && diffFromMasuk >= 120);
 
           if (!isKeluar) {
             // SCAN MASUK
