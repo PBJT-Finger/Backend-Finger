@@ -27,7 +27,7 @@ import {
  * Mengubah string tanggal lokal (YYYY-MM-DD) menjadi objek Date UTC.
  * Hal ini penting agar Prisma tidak menggeser tanggal ke belakang akibat perbedaan zona waktu.
  */
-function parseLocalDate(d: string | null): Date | null {
+function parseLocalDate(d: string | null, isEnd: boolean = false): Date | null {
   // Jika input null atau kosong, kembalikan null
   if (!d) return null;
   // Pastikan formatnya hanya berupa bagian tanggal saja (tanpa waktu/ISO)
@@ -40,8 +40,11 @@ function parseLocalDate(d: string | null): Date | null {
   const day = Number(parts[2] || '0');
   // Jika ada bagian tanggal yang tidak valid, kembalikan null
   if (!y || !m || !day) return null;
-  // Membuat objek Date menggunakan UTC agar waktu diatur tepat pada pukul 00:00:00 UTC
-  return new Date(Date.UTC(y, m - 1, day));
+  // Membuat objek Date menggunakan UTC agar waktu diatur tepat pada pukul 00:00:00 UTC (awal hari) atau 23:59:59.999 UTC (akhir hari)
+  if (isEnd) {
+    return new Date(Date.UTC(y, m - 1, day, 23, 59, 59, 999));
+  }
+  return new Date(Date.UTC(y, m - 1, day, 0, 0, 0, 0));
 }
 
 export class AttendanceController {
@@ -73,7 +76,6 @@ export class AttendanceController {
 
       // Menyiapkan kondisi pencarian (where clause) untuk Prisma
       const whereClause: Record<string, any> = {
-        jabatan: 'DOSEN',
         is_deleted: false, // Hanya ambil data yang belum dihapus secara logis
         user_id: { in: activeDosenUserIds }, // Filter hanya untuk dosen yang aktif
       };
@@ -81,8 +83,8 @@ export class AttendanceController {
       // Jika rentang tanggal diisi, tambahkan filter rentang tanggal pada query database
       if (startDateStr && endDateStr) {
         whereClause['tanggal'] = {
-          gte: parseLocalDate(startDateStr), // Lebih besar atau sama dengan tanggal mulai
-          lte: parseLocalDate(endDateStr),   // Lebih kecil atau sama dengan tanggal akhir
+          gte: parseLocalDate(startDateStr, false), // Lebih besar atau sama dengan awal tanggal mulai
+          lte: parseLocalDate(endDateStr, true),   // Lebih kecil atau sama dengan akhir tanggal akhir (23:59:59)
         };
       }
 
@@ -99,8 +101,8 @@ export class AttendanceController {
 
       // Mengambil daftar hari libur nasional dalam rentang tanggal yang dipilih
       const holidayWhere: any = {};
-      const startLocalDate = startDateStr ? parseLocalDate(startDateStr) : null;
-      const endLocalDate = endDateStr ? parseLocalDate(endDateStr) : null;
+      const startLocalDate = startDateStr ? parseLocalDate(startDateStr, false) : null;
+      const endLocalDate = endDateStr ? parseLocalDate(endDateStr, true) : null;
       if (startLocalDate || endLocalDate) {
         holidayWhere.tanggal = {};
         if (startLocalDate) holidayWhere.tanggal.gte = startLocalDate;
@@ -195,15 +197,14 @@ export class AttendanceController {
 
       // Menyiapkan parameter filter database untuk karyawan
       const whereClause: Record<string, any> = {
-        jabatan: 'KARYAWAN',
         is_deleted: false,
         user_id: { in: activeKaryawanUserIds },
       };
 
       if (startDateStr && endDateStr) {
         whereClause['tanggal'] = {
-          gte: parseLocalDate(startDateStr),
-          lte: parseLocalDate(endDateStr),
+          gte: parseLocalDate(startDateStr, false),
+          lte: parseLocalDate(endDateStr, true),
         };
       }
 
@@ -217,8 +218,8 @@ export class AttendanceController {
         orderBy: [{ tanggal: 'desc' }, { jam_masuk: 'asc' }],
       });
 
-      const startLocalDate = startDateStr ? parseLocalDate(startDateStr) : null;
-      const endLocalDate = endDateStr ? parseLocalDate(endDateStr) : null;
+      const startLocalDate = startDateStr ? parseLocalDate(startDateStr, false) : null;
+      const endLocalDate = endDateStr ? parseLocalDate(endDateStr, true) : null;
       const holidays = await holidayRepo.findHolidaysInRange(startLocalDate, endLocalDate);
       const holidaySet = new Set(
         holidays.map((h) => {
@@ -308,8 +309,8 @@ export class AttendanceController {
 
       if (startDateStr && endDateStr) {
         whereClause['tanggal'] = {
-          gte: parseLocalDate(startDateStr),
-          lte: parseLocalDate(endDateStr),
+          gte: parseLocalDate(startDateStr, false),
+          lte: parseLocalDate(endDateStr, true),
         };
       }
 
@@ -445,15 +446,15 @@ export class AttendanceController {
 
       const whereClause: Record<string, any> = {
         tanggal: {
-          gte: parseLocalDate(startDate as string),
-          lte: parseLocalDate(endDate as string),
+          gte: parseLocalDate(startDate as string, false),
+          lte: parseLocalDate(endDate as string, true),
         },
         is_deleted: false,
         user_id: { in: activeEmployeeUserIds },
       };
 
-      const startLocalDate = parseLocalDate(startDate as string);
-      const endLocalDate = parseLocalDate(endDate as string);
+      const startLocalDate = parseLocalDate(startDate as string, false);
+      const endLocalDate = parseLocalDate(endDate as string, true);
       const holidays = await holidayRepo.findHolidaysInRange(startLocalDate, endLocalDate);
       const _holidaySet = new Set(
         holidays.map((h) => {
