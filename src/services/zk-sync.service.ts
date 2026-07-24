@@ -233,7 +233,7 @@ export class ZkSyncService {
         diffMinutes += 24 * 60;
       }
 
-      // Validasi: open session masih valid jika di bawah 20 jam (shift kerja normal + lembur)
+      // Validasi: open session masih valid jika di bawah 20 jam (shift kerja normal)
       // ATAU jika user menekan tombol PULANG secara eksplisit
       if (diffMinutes < 20 * 60 || isExplicitPulang) {
         targetRecord = openSession;
@@ -241,16 +241,17 @@ export class ZkSyncService {
     }
 
     // Jika tidak ditemukan open session, tetapi user menekan tombol PULANG
-    // kita tetap carikan record HARI INI yang barangkali sudah ada jam_keluar untuk diupdate (jika jaraknya dekat)
-    const todayRecords = existingRecords.filter((r) => r.tanggal.getTime() === tanggal.getTime());
-    if (!targetRecord && todayRecords.length > 0) {
-      const latestRecord = todayRecords[0]!;
+    // kita tetap carikan record terakhir yang barangkali sudah ada jam_keluar untuk diupdate (jika jaraknya dekat)
+    if (!targetRecord && existingRecords.length > 0) {
+      const latestRecord = existingRecords[0]!;
       const ex = latestRecord.jam_keluar ? new Date(latestRecord.jam_keluar) : null;
       const exMinutes = ex ? ex.getUTCHours() * 60 + ex.getUTCMinutes() : 0;
       const scanMinutes = localHour * 60 + localMinute;
       
       let diffEx = scanMinutes - exMinutes;
-      if (diffEx < 0) {
+      if (latestRecord.tanggal.getTime() === tanggalKemarin.getTime()) {
+        diffEx += 24 * 60;
+      } else if (diffEx < 0) {
         diffEx += 24 * 60;
       }
       

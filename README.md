@@ -1,4 +1,4 @@
-# 🖐 Backend Finger — Technical Product Requirements & Architecture Document
+# 🖐 Backend Finger — Technical Product Requirements & Architecture Document <!-- Deployment check: 2026-07-24 -->
 
 > Backend REST API untuk sistem absensi biometrik berbasis ZKTeco X100-C.
 > Terhubung **langsung** ke perangkat fingerprint melalui protokol ZKTeco proprietari (UDP port 4370) — tanpa ADMS, tanpa cloud intermediary.

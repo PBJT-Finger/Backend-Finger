@@ -14,6 +14,7 @@ on:
       - 'public/**'
       - 'fingerprint_db.sql'
       - 'scripts/**'
+      - 'README.md'
   pull_request:
     branches: [main]
     paths:
