@@ -97,9 +97,10 @@ jobs:
     steps:
       # ── Tailscale ──────────────────────────────────────────────
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
+        uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          tags: tag:ci
 
       - name: Setup SSH key
         env:
@@ -127,10 +128,16 @@ jobs:
           : "${SSH_HOST:?❌ Secret SSH_HOST is not set!}"
           PORT="${SSH_PORT:-22}"
           mkdir -p ~/.ssh
-          ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || {
+          for i in 1 2 3; do
+            echo "Attempt $i: keyscan ${SSH_HOST}:${PORT}"
+            ssh-keyscan -T 10 -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null && break
+            echo "Retrying in 5s..."
+            sleep 5
+          done
+          if [ ! -s ~/.ssh/known_hosts ]; then
             echo "❌ ssh-keyscan failed — host unreachable or port closed"
             exit 1
-          }
+          fi
           chmod 644 ~/.ssh/known_hosts
           echo "✅ SSH known host added"
 
@@ -307,13 +314,6 @@ jobs:
                \"\$BACKEND_IMAGE\" node dist/scripts/cleanup-duplicates.js \
                && echo '✅ Cleanup complete' \
                || { echo '⚠️ Cleanup failed or skipped'; }
-
-             echo '🧹 Removing Melinda data anomaly...'
-             docker run --rm --pull always --network finger-net \
-               -e DATABASE_URL=\"\$(grep '^DATABASE_URL=' .env.docker | cut -d= -f2-)\" \
-               \"\$BACKEND_IMAGE\" node dist/scripts/remove-melinda.js \
-               && echo '✅ Anomaly removed' \
-               || { echo '⚠️ Anomaly removal failed'; }
 
              echo '🚀 Updating swarm service finger-be_redis...'
              docker service update finger-be_redis \
