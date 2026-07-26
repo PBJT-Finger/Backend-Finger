@@ -24,6 +24,7 @@
 
 import { v4 as uuidv4 } from 'uuid'; // Pembuat string UUID acak untuk pelacakan batch
 import prisma from '../config/prisma'; // Prisma client untuk query DB
+import logger from '../utils/logger'; // Logger aplikasi
 import { ZkDeviceClient, AttendanceRecord } from '../infrastructure/zk-client'; // Client konektivitas ZKTeco
 
 // ─── Tipe Data ────────────────────────────────────────────────────────────────
