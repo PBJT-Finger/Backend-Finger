@@ -200,11 +200,12 @@ export class ZkSyncService {
     const tanggalKemarin = new Date(tanggal);
     tanggalKemarin.setUTCDate(tanggalKemarin.getUTCDate() - 1);
 
-    // Cari record hari ini dan kemarin
+    // Cari record hari ini dan kemarin yang belum dihapus
     const existingRecords = await prisma.attendance.findMany({
       where: {
         user_id: resolvedUserId,
         tanggal: { in: [tanggal, tanggalKemarin] },
+        is_deleted: false,
       },
       orderBy: [
         { tanggal: 'desc' },
@@ -212,64 +213,8 @@ export class ZkSyncService {
       ]
     });
 
-    let targetRecord = null;
-    const isExplicitPulang = record.attendanceType === 1 || record.attendanceType === 5;
-
     // Cari open session (punya jam_masuk tapi belum ada jam_keluar)
     const openSession = existingRecords.find(r => r.jam_masuk && !r.jam_keluar);
-
-    if (openSession) {
-      // Jika ada open session (bisa hari ini atau kemarin), periksa kelayakannya
-      const masukTime = new Date(openSession.jam_masuk!);
-      
-      // Hitung selisih jam antara waktu scan sekarang dengan waktu check-in
-      // (Kita gunakan representasi menit total dalam sehari untuk perbandingan aman)
-      const masukMinutes = masukTime.getUTCHours() * 60 + masukTime.getUTCMinutes();
-      const scanMinutes = localHour * 60 + localMinute;
-      
-      let diffMinutes = scanMinutes - masukMinutes;
-      // Jika record adalah tanggal kemarin, tambahkan 24 jam ke selisihnya
-      if (openSession.tanggal.getTime() === tanggalKemarin.getTime()) {
-        diffMinutes += 24 * 60;
-      }
-
-      // Validasi: open session masih valid jika di bawah 20 jam (shift kerja normal)
-      // ATAU jika user menekan tombol PULANG secara eksplisit
-      if (diffMinutes < 20 * 60 || isExplicitPulang) {
-        targetRecord = openSession;
-      }
-    }
-
-    // Jika tidak ditemukan open session, tetapi user menekan tombol PULANG
-    // kita tetap carikan record terakhir yang barangkali sudah ada jam_keluar untuk diupdate (jika jaraknya dekat)
-    if (!targetRecord && existingRecords.length > 0) {
-      const latestRecord = existingRecords[0]!;
-      const ex = latestRecord.jam_keluar ? new Date(latestRecord.jam_keluar) : null;
-      const exMinutes = ex ? ex.getUTCHours() * 60 + ex.getUTCMinutes() : 0;
-      const scanMinutes = localHour * 60 + localMinute;
-      
-      let diffEx = scanMinutes - exMinutes;
-      if (latestRecord.tanggal.getTime() === tanggalKemarin.getTime()) {
-        diffEx += 24 * 60;
-      } else if (diffEx < 0) {
-        diffEx += 24 * 60;
-      }
-      
-      // Jika kurang dari 2 jam sejak check-out terakhir, anggap update/spam
-      if (diffEx < 120) {
-        targetRecord = latestRecord;
-      } else if (!isExplicitPulang) {
-        // Jika scan biasa tanpa tombol, gunakan logika pembagian sesi pagi/malam
-        const isNightSession = localHour >= 15;
-        const h = latestRecord.jam_masuk ? new Date(latestRecord.jam_masuk).getUTCHours() : 0;
-        const recIsNight = h >= 15;
-        
-        if (recIsNight === isNightSession) {
-          targetRecord = latestRecord;
-        }
-      }
-    }
-
     const scanMinutes = localHour * 60 + localMinute;
 
     // Logika Status Check-In:
@@ -283,99 +228,56 @@ export class ZkSyncService {
 
     const afternoonStatus = 'HADIR';
 
-    if (!targetRecord) {
-      // Jika tidak ada target record dan tombol yang ditekan adalah PULANG,
-      // ini aneh (absen pulang tanpa absen masuk). Namun untuk keamanan data, kita tetap
-      // catat ini sebagai rekap baru namun jam_masuk-nya null (hanya jam_keluar).
-      if (isExplicitPulang) {
-        try {
-          await prisma.attendance.create({
-            data: {
-              user_id: resolvedUserId,
-              nama: resolvedName,
-              jabatan: resolvedJabatan as any,
-              tanggal: tanggal,
-              jam_masuk: null,
-              jam_keluar: timePart,
-              device_id: record.ip,
-              verification_method: 'SIDIK_JARI',
-              status: 'HADIR',
-              status_keluar: afternoonStatus,
-            },
-          });
-        } catch (createErr: any) {
-          const isDuplicate = createErr?.code === 'P2002' ||
-            (typeof createErr?.message === 'string' && createErr.message.includes('Unique constraint'));
-          if (!isDuplicate) throw createErr;
-        }
-      } else {
-        // Pertama kali scan biasa di sesi ini -> Buat jam_masuk
-        try {
-          await prisma.attendance.create({
-            data: {
-              user_id: resolvedUserId,
-              nama: resolvedName,
-              jabatan: resolvedJabatan as any,
-              tanggal: tanggal,
-              jam_masuk: timePart,
-              jam_keluar: null,
-              device_id: record.ip,
-              verification_method: 'SIDIK_JARI',
-              status: morningStatus,
-              status_keluar: afternoonStatus,
-            },
-          });
-        } catch (createErr: any) {
-          const isDuplicate = createErr?.code === 'P2002' ||
-            (typeof createErr?.message === 'string' && createErr.message.includes('Unique constraint'));
-          if (!isDuplicate) throw createErr;
-        }
+    if (openSession) {
+      // ADA OPEN SESSION: Hitung selisih waktu dari jam_masuk
+      const masukTime = new Date(openSession.jam_masuk!);
+      const masukMinutes = masukTime.getUTCHours() * 60 + masukTime.getUTCMinutes();
+      
+      let diffMinutes = scanMinutes - masukMinutes;
+      if (openSession.tanggal.getTime() === tanggalKemarin.getTime()) {
+        diffMinutes += 24 * 60;
+      } else if (diffMinutes < 0) {
+        diffMinutes += 24 * 60;
       }
+
+      // ATURAN 1: Jika selisih < 2 jam (120 menit), abaikan (dianggap spam / re-scan < 2 jam)
+      if (diffMinutes < 120) {
+        logger.info(`[ZK Sync] Re-scan diabaikan karena selisih < 2 jam (${diffMinutes} mnt) untuk user ${resolvedUserId}`);
+        return;
+      }
+
+      // ATURAN 2: Jika selisih >= 2 jam, TUTUP SESI (Absen Pulang)
+      await prisma.attendance.update({
+        where: { id: openSession.id },
+        data: {
+          jam_keluar: timePart,
+          status_keluar: afternoonStatus,
+          device_id: record.ip,
+          updated_at: new Date()
+        },
+      });
     } else {
-      if (!targetRecord.jam_masuk) {
-        await prisma.attendance.update({
-          where: { id: targetRecord.id },
-          data: { jam_masuk: timePart, status: morningStatus, updated_at: new Date() }
-        });
-      } else {
-        // Sudah ada jam masuk, scan berikutnya menjadi jam_keluar
-        const masuk = new Date(targetRecord.jam_masuk);
-        const masukMinutes = masuk.getUTCHours() * 60 + masuk.getUTCMinutes();
-        
-        let diffMinutes = scanMinutes - masukMinutes;
-        if (targetRecord.tanggal.getTime() === tanggalKemarin.getTime()) {
-          diffMinutes += 24 * 60;
-        } else if (diffMinutes < 0) {
-          diffMinutes += 24 * 60;
-        }
-        
-        // Proteksi re-processing: jika scan identik atau sangat dekat dengan jam_masuk (< 5 menit), abaikan.
-        if (diffMinutes < 5) return;
-
-        // Beri jeda minimal 2 jam (120 menit) untuk scan pulang jika scan biasa tanpa tombol pulang
-        if (diffMinutes < 120 && !targetRecord.jam_keluar && !isExplicitPulang) return;
-
-        if (targetRecord.jam_keluar) {
-          const ex = new Date(targetRecord.jam_keluar);
-          const exMinutes = ex.getUTCHours() * 60 + ex.getUTCMinutes();
-          let diffEx = scanMinutes - exMinutes;
-          if (targetRecord.tanggal.getTime() === tanggalKemarin.getTime()) {
-            diffEx += 24 * 60;
-          } else if (diffEx < 0) {
-            diffEx += 24 * 60;
-          }
-          if (diffEx < 120 && !isExplicitPulang) return; // Abaikan spam pulang kecuali tombol ditekan
-        }
-
-        await prisma.attendance.update({
-          where: { id: targetRecord.id },
+      // TIDAK ADA OPEN SESSION (record baru / sesi sebelumnya sudah ditutup):
+      // Wajib buat Absen Masuk (jam_masuk) sesi baru
+      try {
+        await prisma.attendance.create({
           data: {
-            jam_keluar: timePart,
-            status_keluar: afternoonStatus,
+            user_id: resolvedUserId,
+            nama: resolvedName,
+            jabatan: resolvedJabatan as any,
+            tanggal: tanggal,
+            jam_masuk: timePart,
+            jam_keluar: null,
             device_id: record.ip,
-            updated_at: new Date()
+            verification_method: 'SIDIK_JARI',
+            status: morningStatus,
+            status_keluar: afternoonStatus,
           },
         });
+      } catch (createErr: any) {
+        const isDuplicate = createErr?.code === 'P2002' ||
+          (typeof createErr?.message === 'string' && createErr.message.includes('Unique constraint'));
+        if (!isDuplicate) throw createErr;
       }
     }
   }

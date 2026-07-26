@@ -227,16 +227,12 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
           );
 
           // Menentukan apakah scan merupakan masuk atau keluar:
-          // Prioritas 1 — Tombol eksplisit di mesin (attendanceType 1/5 = Keluar)
-          // Prioritas 2 — Cek DB: jika ada open session dan selisih >= 2 jam → Pulang
-          // Prioritas 3 — Default: Masuk
-          // Kode: 0=Check-In, 1=Check-Out, 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out
-          const isExplicitKeluar = r.attendanceType === 1 || r.attendanceType === 5;
+          // Scan merupakan Absen Pulang HANYA JIKA ada open session DAN selisih waktu >= 2 jam (120 menit)
           const openSession = openSessionMap.get(user_id);
           const scanMinutesOfDay = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
           let diffFromMasuk = openSession ? scanMinutesOfDay - openSession.masukMinutes : -1;
           if (diffFromMasuk < 0) diffFromMasuk += 24 * 60; // Tangani lintas tengah malam
-          const isKeluar = isExplicitKeluar || (openSession !== undefined && diffFromMasuk >= 120);
+          const isKeluar = openSession !== undefined && diffFromMasuk >= 120;
 
           if (!isKeluar) {
             // SCAN MASUK
