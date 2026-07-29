@@ -31,7 +31,26 @@ router.get('/stream', (req, res, next) => {
   streamDeviceEvents(req, res).catch(next);
 });
 
-// ── Manajemen User Perangkat (Memerlukan Token & Role Admin) ─────────────────
+// ── Manajemen User & Log Perangkat (Memerlukan Token & Role Admin) ───────────
+
+/**
+ * @swagger
+ * /api/device/logs/clear:
+ *   delete:
+ *     summary: Bersihkan seluruh log absensi dari memori perangkat secara manual
+ *     tags: [Device]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Berhasil membersihkan log absensi di mesin fisik
+ *       500:
+ *         description: Gagal membersihkan log absensi pada mesin
+ */
+// Menghapus log absensi dari memori mesin fisik (DELETE /api/device/logs/clear)
+router.delete('/logs/clear', authenticateToken, requireAdmin, (req, res, next) => {
+  DeviceController.clearDeviceLogs(req, res).catch(next);
+});
 
 /**
  * @swagger

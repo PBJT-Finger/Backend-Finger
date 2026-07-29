@@ -7,6 +7,7 @@ import { successResponse, errorResponse } from '../utils/responseFormatter'; // 
 import logger from '../utils/logger'; // Logger aplikasi
 import { ZkDeviceClient } from '../infrastructure/zk-client'; // Klien Daemon ZKTeco untuk sinkronisasi data
 import { DeviceService } from '../services/device.service';
+import { DeviceCleanupService } from '../services/device.cleanup.service';
 
 const deviceService = new DeviceService();
 
@@ -127,6 +128,22 @@ export class DeviceController {
       );
     } catch (error) {
       return DeviceController.handleError(res, error, 'Gagal memicu sinkronisasi perangkat');
+    }
+  }
+
+  /**
+   * Memicu pembersihan log absensi fisik pada mesin ZKTeco secara manual.
+   * DELETE /api/device/logs/clear
+   */
+  public static async clearDeviceLogs(req: Request, res: Response): Promise<Response> {
+    try {
+      const result = await DeviceCleanupService.executeCleanupPipeline(true);
+      if (!result.success) {
+        return errorResponse(res, result.message, 500);
+      }
+      return successResponse(res, result, result.message);
+    } catch (error) {
+      return DeviceController.handleError(res, error, 'Gagal membersihkan log absensi pada mesin');
     }
   }
 }

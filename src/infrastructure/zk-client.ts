@@ -172,6 +172,40 @@ export class ZkDeviceClient extends EventEmitter {
     console.log('[ZkDeviceClient] Polling dihentikan.');
   }
 
+  /**
+   * Menghapus seluruh catatan absensi dari memori perangkat ZKTeco fisik
+   * dan menyetel ulang pointer log lokal (lastKnownLogCount) ke 0.
+   * ⚠️ PERINGATAN: Operasi ini destruktif pada memori fisik mesin.
+   */
+  public async clearDeviceAttendanceLog(): Promise<{
+    success: boolean;
+    clearedCount?: number | undefined;
+    error?: string | undefined;
+  }> {
+    try {
+      let clearedCount = this.lastKnownLogCount;
+      try {
+        const info = await this.zkInstance.getInfo();
+        if (typeof info?.logCounts === 'number') {
+          clearedCount = info.logCounts;
+        }
+      } catch {
+        // Abaikan kegagalan pengambilan info logCounts jika alat sibuk
+      }
+
+      await this.zkInstance.clearAttendanceLog();
+      this.lastKnownLogCount = 0;
+      console.log(
+        `[ZkDeviceClient] ✓ Log absensi di memori mesin berhasil dibersihkan (${clearedCount} log dihapus). Pointer di-reset ke 0.`
+      );
+      return { success: true, clearedCount };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error('[ZkDeviceClient] ✗ Gagal membersihkan log absensi di memori mesin:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+
   // ─── Pembantu Privat (Private Helpers) ───────────────────────────────────────
 
   private scheduleNextPoll(delayMs: number): void {

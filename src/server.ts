@@ -18,6 +18,9 @@ import { ZkDeviceClient } from './infrastructure/zk-client';
 // Mengimpor layanan sinkronisasi data absensi dari mesin ke MySQL
 import { ZkSyncService } from './services/zk-sync.service';
 
+// Mengimpor layanan pembersihan otomatis log absensi pada mesin fisik
+import { DeviceCleanupService } from './services/device.cleanup.service';
+
 /**
  * Fungsi untuk menginisialisasi semua ketergantungan aplikasi (Database dan Koneksi Hardware)
  */
@@ -33,6 +36,9 @@ const initializeApp = async (): Promise<void> => {
     zkSync.start();                                // Memulai loop sinkronisasi/polling data absensi
     await zkClient.start();                        // Menyalakan koneksi soket ke mesin fingerprint fisik
     logger.info('✅ Client Biometrik ZKTeco berhasil dinyalakan (Integrasi Hardware Langsung)');
+
+    // 3. Mendaftarkan jadwal otomatis harian tengah malam (00:00 / Jam 12 Malam) untuk pembersihan log mesin
+    DeviceCleanupService.scheduleDailyMidnightCleanup();
 
     logger.info('✅ Aplikasi berhasil diinisialisasi sepenuhnya');
   } catch (error: any) {
