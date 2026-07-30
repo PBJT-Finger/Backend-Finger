@@ -214,8 +214,28 @@ export class ZkSyncService {
       ]
     });
 
+    // Cek apakah tombol yang ditekan di mesin secara eksplisit adalah tombol 'Pulang/Check-Out'
+    const isExplicitCheckOut = record.attendanceType === 1 || record.attendanceType === 4 || record.attendanceType === 5;
+
     // Cari open session (punya jam_masuk tapi belum ada jam_keluar)
-    const openSession = existingRecords.find(r => r.jam_masuk && !r.jam_keluar);
+    const openSession = existingRecords.find(r => {
+      if (!r.jam_masuk || r.jam_keluar) return false;
+
+      const isTodaySession = r.tanggal.getTime() === tanggal.getTime();
+      if (isTodaySession) return true;
+
+      const isYesterdaySession = r.tanggal.getTime() === tanggalKemarin.getTime();
+      if (isYesterdaySession) {
+        // Izinkan menutup sesi kemarin HANYA JIKA:
+        // 1. User menekan tombol Pulang secara manual di mesin (isExplicitCheckOut === true)
+        // 2. ATAU ini adalah shift malam yang menyeberang tengah malam (masuk >= 17:00 dan scan hari ini < 05:00)
+        const masukTime = new Date(r.jam_masuk);
+        const isNightShiftCrossMidnight = masukTime.getUTCHours() >= 17 && localHour < 5;
+        return isExplicitCheckOut || isNightShiftCrossMidnight;
+      }
+
+      return false;
+    });
     const scanMinutes = localHour * 60 + localMinute;
 
     // Logika Status Check-In:

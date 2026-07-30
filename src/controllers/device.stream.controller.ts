@@ -193,16 +193,18 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
         select: { user_id: true, jam_masuk: true, tanggal: true },
       });
 
-      // Buat map: user_id → data open session (jam_masuk paling baru)
-      const openSessionMap = new Map<string, { masukMinutes: number }>();
+      // Buat map: user_id → data open session (jam_masuk paling baru + tanggal)
+      const openSessionMap = new Map<string, { masukMinutes: number; isToday: boolean; masukHour: number }>();
       for (const s of openSessions) {
         if (!s.jam_masuk) continue;
         const masuk = new Date(s.jam_masuk);
-        const masukMinutes = masuk.getUTCHours() * 60 + masuk.getUTCMinutes();
+        const masukHour = masuk.getUTCHours();
+        const masukMinutes = masukHour * 60 + masuk.getUTCMinutes();
+        const isToday = s.tanggal.getTime() === today.getTime();
         const existing = openSessionMap.get(s.user_id);
-        // Simpan sesi dengan jam_masuk paling baru jika ada beberapa
-        if (!existing || masukMinutes > existing.masukMinutes) {
-          openSessionMap.set(s.user_id, { masukMinutes });
+        // Utamakan sesi hari ini jika ada
+        if (!existing || isToday || masukMinutes > existing.masukMinutes) {
+          openSessionMap.set(s.user_id, { masukMinutes, isToday, masukHour });
         }
       }
 
@@ -240,12 +242,30 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
           );
 
           // Menentukan apakah scan merupakan masuk atau keluar:
-          // Scan merupakan Absen Pulang HANYA JIKA ada open session DAN selisih waktu >= 2 jam (120 menit)
+          const isExplicitCheckOut = r.attendanceType === 1 || r.attendanceType === 4 || r.attendanceType === 5;
           const openSession = openSessionMap.get(user_id);
-          const scanMinutesOfDay = scanTime.getUTCHours() * 60 + scanTime.getUTCMinutes();
-          let diffFromMasuk = openSession ? scanMinutesOfDay - openSession.masukMinutes : -1;
-          if (diffFromMasuk < 0) diffFromMasuk += 24 * 60; // Tangani lintas tengah malam
-          const isKeluar = openSession !== undefined && diffFromMasuk >= 120;
+          const scanHour = scanTime.getUTCHours();
+          const scanMinutesOfDay = scanHour * 60 + scanTime.getUTCMinutes();
+          
+          let isValidOpenSession = false;
+          let diffFromMasuk = -1;
+
+          if (openSession) {
+            if (openSession.isToday) {
+              isValidOpenSession = true;
+            } else {
+              // Jika open session dari kemarin:
+              const isNightShiftCrossMidnight = openSession.masukHour >= 17 && scanHour < 5;
+              isValidOpenSession = isExplicitCheckOut || isNightShiftCrossMidnight;
+            }
+
+            if (isValidOpenSession) {
+              diffFromMasuk = scanMinutesOfDay - openSession.masukMinutes;
+              if (diffFromMasuk < 0) diffFromMasuk += 24 * 60; // Tangani lintas tengah malam
+            }
+          }
+
+          const isKeluar = isValidOpenSession && (diffFromMasuk >= 120 || isExplicitCheckOut);
 
           if (!isKeluar) {
             // SCAN MASUK
