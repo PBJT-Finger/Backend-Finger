@@ -102,47 +102,56 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
       clearTimeout(historyTimeout); // Batalkan timer pengaman timeout karena query selesai tepat waktu
       const empMap = new Map(employees.map((e) => [e.user_id, e]));
 
-      // Memetakan log absensi database ke format objek SSE yang seragam
-      const history: SseAttendanceRecord[] = recentLogs.map((row) => {
-        // Fungsi pembantu untuk menggabungkan field tanggal dan jam secara presisi dalam format UTC
-        const combineDateTime = (tanggal: Date, timePart: Date | null): string => {
-          if (!timePart) return tanggal.toISOString();
-          const combined = new Date(
-            Date.UTC(
-              tanggal.getUTCFullYear(),
-              tanggal.getUTCMonth(),
-              tanggal.getUTCDate(),
-              timePart.getUTCHours(),
-              timePart.getUTCMinutes(),
-              timePart.getUTCSeconds()
-            )
+      // Memetakan log absensi database ke format objek SSE yang seragam (menyaring scan jam 22:00 ke atas)
+      const history: SseAttendanceRecord[] = recentLogs
+        .filter((row) => {
+          if (row.jam_masuk) {
+            const h = new Date(row.jam_masuk).getUTCHours();
+            if (h >= 22 && h < 24) return false;
+          }
+          return true;
+        })
+        .map((row) => {
+          // Fungsi pembantu untuk menggabungkan field tanggal dan jam secara presisi dalam format UTC
+          const combineDateTime = (tanggal: Date, timePart: Date | null): string => {
+            if (!timePart) return tanggal.toISOString();
+            const combined = new Date(
+              Date.UTC(
+                tanggal.getUTCFullYear(),
+                tanggal.getUTCMonth(),
+                tanggal.getUTCDate(),
+                timePart.getUTCHours(),
+                timePart.getUTCMinutes(),
+                timePart.getUTCSeconds()
+              )
+            );
+            return combined.toISOString();
+          };
+
+          const jamKeluarValid = row.jam_keluar && new Date(row.jam_keluar).getUTCHours() < 22 ? row.jam_keluar : null;
+          const recordTimeStr = combineDateTime(
+            row.tanggal,
+            jamKeluarValid || row.jam_masuk || row.created_at
           );
-          return combined.toISOString();
-        };
 
-        const recordTimeStr = combineDateTime(
-          row.tanggal,
-          row.jam_keluar || row.jam_masuk || row.created_at
-        );
+          const emp = empMap.get(row.user_id);
+          const isActive = emp?.is_active ?? false;
 
-        const emp = empMap.get(row.user_id);
-        const isActive = emp?.is_active ?? false;
-
-        return {
-          userSn: row.id,
-          user_id: row.user_id,
-          nama: row.nama,
-          jabatan: row.jabatan,
-          status: row.status ?? 'HADIR',
-          statusKeluar: row.status_keluar ?? 'HADIR',
-          jamMasuk: row.jam_masuk ? combineDateTime(row.tanggal, row.jam_masuk) : null,
-          jamKeluar: row.jam_keluar ? combineDateTime(row.tanggal, row.jam_keluar) : null,
-          recordTime: recordTimeStr,
-          ip: row.device_id ?? 'DB',
-          source: 'history',
-          is_active: isActive,
-        };
-      });
+          return {
+            userSn: row.id,
+            user_id: row.user_id,
+            nama: row.nama,
+            jabatan: row.jabatan,
+            status: row.status ?? 'HADIR',
+            statusKeluar: row.status_keluar ?? 'HADIR',
+            jamMasuk: row.jam_masuk ? combineDateTime(row.tanggal, row.jam_masuk) : null,
+            jamKeluar: jamKeluarValid ? combineDateTime(row.tanggal, jamKeluarValid) : null,
+            recordTime: recordTimeStr,
+            ip: row.device_id ?? 'DB',
+            source: 'history',
+            is_active: isActive,
+          };
+        });
       // Kirim riwayat absensi ke frontend
       sseWrite(res, 'history', { records: history });
     })
@@ -197,8 +206,12 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
         }
       }
 
-      // Memproses record real-time dari mesin sidik jari
+      // Memproses record real-time dari mesin sidik jari (menyaring scan jam 22:00 ke atas)
       const liveRecords: SseAttendanceRecord[] = records
+        .filter((r) => {
+          const h = r.recordTime.getUTCHours();
+          return !(h >= 22 && h < 24);
+        })
         .map((r) => {
           const user_id = String(r.deviceUserId);
           const emp = empMap.get(user_id);

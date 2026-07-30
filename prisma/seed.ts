@@ -55,12 +55,14 @@ async function main() {
   // 1b. Membuat Shift Khusus Dosen (Malam)
   const shiftMalam = await prisma.shifts.upsert({
     where: { id: 3 },
-    update: {},
+    update: {
+      jam_keluar: new Date('1970-01-01T22:00:00Z'),
+    },
     create: {
       id: 3,
       nama_shift: 'Shift Dosen Malam',
       jam_masuk: new Date('1970-01-01T16:00:00Z'),
-      jam_keluar: new Date('1970-01-01T21:00:00Z'),
+      jam_keluar: new Date('1970-01-01T22:00:00Z'),
       deskripsi: 'Jadwal Malam untuk Dosen',
       is_active: true,
     },
@@ -70,12 +72,14 @@ async function main() {
   // 1c. Membuat Shift Khusus Dosen (Pagi & Malam / Fleksibel)
   const shiftKeduanya = await prisma.shifts.upsert({
     where: { id: 4 },
-    update: {},
+    update: {
+      jam_keluar: new Date('1970-01-01T22:00:00Z'),
+    },
     create: {
       id: 4,
       nama_shift: 'Shift Dosen Keduanya',
       jam_masuk: new Date('1970-01-01T08:00:00Z'),
-      jam_keluar: new Date('1970-01-01T21:00:00Z'),
+      jam_keluar: new Date('1970-01-01T22:00:00Z'),
       deskripsi: 'Jadwal Fleksibel (Pagi/Malam) untuk Dosen',
       is_active: true,
     },

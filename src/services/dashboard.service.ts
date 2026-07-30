@@ -15,8 +15,15 @@ export class DashboardService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // 1. Ambil data absen hari ini
-    const todayAttendance = await this.attendanceRepo.findRecordsByPeriod(today, tomorrow);
+    const isScanAfter22 = (d: Date | null): boolean => {
+      if (!d) return false;
+      const h = new Date(d).getUTCHours();
+      return h >= 22 && h < 24;
+    };
+
+    // 1. Ambil data absen hari ini (menyaring scan jam 22:00 ke atas)
+    const rawTodayAttendance = await this.attendanceRepo.findRecordsByPeriod(today, tomorrow);
+    const todayAttendance = rawTodayAttendance.filter((a) => !(a.jam_masuk && isScanAfter22(a.jam_masuk)));
 
     // 2. Ambil total karyawan, dosen, device
     const counts = await this.attendanceRepo.getEmployeeCounts();
@@ -53,7 +60,8 @@ export class DashboardService {
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-    const weekAttendance = await this.attendanceRepo.findRecordsByPeriod(sevenDaysAgo, tomorrow);
+    const rawWeekAttendance = await this.attendanceRepo.findRecordsByPeriod(sevenDaysAgo, tomorrow);
+    const weekAttendance = rawWeekAttendance.filter((a) => !(a.jam_masuk && isScanAfter22(a.jam_masuk)));
 
     const dailyStatsMap = new Map<string, any>();
     for (let i = 6; i >= 0; i--) {
@@ -82,13 +90,15 @@ export class DashboardService {
       }
     });
 
-    const recentRaw = await this.attendanceRepo.getRecentAttendance(10);
-    const recent = recentRaw.map(record => ({
-      ...record,
-      // Fallback null to undefined for type safety in strictly typed environments
-      jam_masuk: record.jam_masuk || undefined,
-      jam_keluar: record.jam_keluar || undefined
-    }));
+    const recentRaw = await this.attendanceRepo.getRecentAttendance(15);
+    const recent = recentRaw
+      .filter((a) => !(a.jam_masuk && isScanAfter22(a.jam_masuk)))
+      .slice(0, 10)
+      .map(record => ({
+        ...record,
+        jam_masuk: record.jam_masuk || undefined,
+        jam_keluar: (record.jam_keluar && !isScanAfter22(record.jam_keluar)) ? record.jam_keluar : undefined
+      }));
 
     return {
       stats,

@@ -47,6 +47,21 @@ function parseLocalDate(d: string | null, isEnd: boolean = false): Date | null {
   return new Date(Date.UTC(y, m - 1, day, 0, 0, 0, 0));
 }
 
+/**
+ * Memeriksa apakah waktu scan berada pada atau setelah pukul 22:00:00 hingga 23:59:59.
+ */
+function isScanAfter22(timeValue: Date | string | null): boolean {
+  if (!timeValue) return false;
+  let hour = -1;
+  if (typeof timeValue === 'string') {
+    const match = timeValue.match(/^(\d{2}):/);
+    if (match) hour = parseInt(match[1] || '0', 10);
+  } else if (timeValue instanceof Date) {
+    hour = timeValue.getUTCHours();
+  }
+  return hour >= 22 && hour < 24;
+}
+
 export class AttendanceController {
   /**
    * Mengambil data rekap kehadiran Dosen.
@@ -121,19 +136,25 @@ export class AttendanceController {
       const totalWorkingDays =
         startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr, 'DOSEN') : 0;
 
-      // Memfilter scan yang tidak valid (seperti ID 5, 6, 7) dan mengabaikan absensi salah untuk Aziz (ID 8) pada 3 Juni 2026
-      const filteredAttendance = attendance.filter((a) => {
-        if (['1'].includes(a.user_id)) return false;
-        if (a.user_id === '8') {
-          const t = a.tanggal;
-          const dateStr =
-            typeof (t as any) === 'string'
-              ? (t as any).split('T')[0]
-              : `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
-          if (dateStr === '2026-06-03') return false;
-        }
-        return true;
-      });
+      // Memfilter scan yang tidak valid (seperti ID 5, 6, 7) dan mengabaikan absensi salah untuk Aziz (ID 8) pada 3 Juni 2026, serta menyaring scan jam 22:00 ke atas
+      const filteredAttendance = attendance
+        .map((a) => ({
+          ...a,
+          jam_keluar: isScanAfter22(a.jam_keluar) ? null : a.jam_keluar,
+        }))
+        .filter((a) => {
+          if (['1'].includes(a.user_id)) return false;
+          if (a.user_id === '8') {
+            const t = a.tanggal;
+            const dateStr =
+              typeof (t as any) === 'string'
+                ? (t as any).split('T')[0]
+                : `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+            if (dateStr === '2026-06-03') return false;
+          }
+          if (a.jam_masuk && isScanAfter22(a.jam_masuk)) return false;
+          return true;
+        });
 
       // Mentransformasikan data kehadiran mentah menjadi data rekap teragregasi
       const transformedData = transformDosenAttendance(
@@ -232,19 +253,25 @@ export class AttendanceController {
       const totalWorkingDays =
         startDateStr && endDateStr ? await calculateWorkingDays(startDateStr, endDateStr, 'KARYAWAN') : 0;
 
-      // Filter scan ID tidak valid dan kasus khusus Aziz
-      const filteredAttendance = attendance.filter((a) => {
-        if (['1'].includes(a.user_id)) return false;
-        if (a.user_id === '8') {
-          const t = a.tanggal;
-          const dateStr =
-            typeof (t as any) === 'string'
-              ? (t as any).split('T')[0]
-              : `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
-          if (dateStr === '2026-06-03') return false;
-        }
-        return true;
-      });
+      // Filter scan ID tidak valid, kasus khusus Aziz, serta menyaring scan jam 22:00 ke atas
+      const filteredAttendance = attendance
+        .map((a) => ({
+          ...a,
+          jam_keluar: isScanAfter22(a.jam_keluar) ? null : a.jam_keluar,
+        }))
+        .filter((a) => {
+          if (['1'].includes(a.user_id)) return false;
+          if (a.user_id === '8') {
+            const t = a.tanggal;
+            const dateStr =
+              typeof (t as any) === 'string'
+                ? (t as any).split('T')[0]
+                : `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+            if (dateStr === '2026-06-03') return false;
+          }
+          if (a.jam_masuk && isScanAfter22(a.jam_masuk)) return false;
+          return true;
+        });
 
       // Transformasi data rekap karyawan menggunakan formatter khusus karyawan
       const transformedData = transformKaryawanAttendance(
@@ -349,15 +376,18 @@ export class AttendanceController {
       const employees = await employeeRepo.findActiveEmployees();
       const employeeMap = new Map(employees.map((e) => [e.user_id, e]));
 
-      const mappedAttendance = attendance.map((a) => {
-        const emp = employeeMap.get(a.user_id);
-        return {
-          ...a,
-          nama: emp?.nama ?? a.nama,
-          jabatan: emp?.jabatan ?? a.jabatan,
-          is_active: emp?.is_active ?? false,
-        };
-      });
+      const mappedAttendance = attendance
+        .filter((a) => !(a.jam_masuk && isScanAfter22(a.jam_masuk)))
+        .map((a) => {
+          const emp = employeeMap.get(a.user_id);
+          return {
+            ...a,
+            jam_keluar: isScanAfter22(a.jam_keluar) ? null : a.jam_keluar,
+            nama: emp?.nama ?? a.nama,
+            jabatan: emp?.jabatan ?? a.jabatan,
+            is_active: emp?.is_active ?? false,
+          };
+        });
 
       return successResponse(
         res,
@@ -514,11 +544,11 @@ export class AttendanceController {
             stats.attendanceDates.add(dateStr);
           }
 
-          if (!stats.last_check_in && record.jam_masuk) {
+          if (!stats.last_check_in && record.jam_masuk && !isScanAfter22(record.jam_masuk)) {
             stats.last_check_in = record.jam_masuk;
           }
 
-          if (!stats.last_check_out && record.jam_keluar) {
+          if (!stats.last_check_out && record.jam_keluar && !isScanAfter22(record.jam_keluar)) {
             stats.last_check_out = record.jam_keluar;
           }
 
@@ -526,7 +556,7 @@ export class AttendanceController {
             stats.terlambat_dates.add(dateStr);
           }
 
-          if (record.jam_masuk) {
+          if (record.jam_masuk && !isScanAfter22(record.jam_masuk)) {
             let hour = -1;
             if (typeof record.jam_masuk === 'string') {
               const match = (record.jam_masuk as string).match(/^(\d{2}):/);
@@ -536,7 +566,7 @@ export class AttendanceController {
             }
             if (hour >= 0) {
               if (hour >= 6 && hour < 15) stats.hadir_pagi.add(dateStr);
-              else if (hour >= 15 && hour <= 22) stats.hadir_malam.add(dateStr);
+              else if (hour >= 15 && hour < 22) stats.hadir_malam.add(dateStr);
             }
           }
         }
