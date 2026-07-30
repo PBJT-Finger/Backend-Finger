@@ -48,18 +48,42 @@ function parseLocalDate(d: string | null, isEnd: boolean = false): Date | null {
 }
 
 /**
- * Memeriksa apakah waktu scan berada pada atau setelah pukul 22:00:00 hingga 23:59:59.
+ * Memeriksa apakah waktu scan berada setelah pukul 22:00:00 (diabaikan mulai 22:00:01 / 22:01:00 hingga 23:59:59).
+ * Waktu tepat pukul 22:00:00 tetap dianggap valid.
  */
 function isScanAfter22(timeValue: Date | string | null): boolean {
   if (!timeValue) return false;
   let hour = -1;
+  let minute = 0;
+  let second = 0;
+
   if (typeof timeValue === 'string') {
-    const match = timeValue.match(/^(\d{2}):/);
-    if (match) hour = parseInt(match[1] || '0', 10);
+    if (timeValue.includes('T')) {
+      const dt = new Date(timeValue);
+      if (isNaN(dt.getTime())) return false;
+      hour = dt.getUTCHours();
+      minute = dt.getUTCMinutes();
+      second = dt.getUTCSeconds();
+    } else {
+      const match = timeValue.match(/^(\d{2}):(\d{2})(?::(\d{2}))?/);
+      if (match) {
+        hour = parseInt(match[1] || '0', 10);
+        minute = parseInt(match[2] || '0', 10);
+        second = parseInt(match[3] || '0', 10);
+      }
+    }
   } else if (timeValue instanceof Date) {
+    if (isNaN(timeValue.getTime())) return false;
     hour = timeValue.getUTCHours();
+    minute = timeValue.getUTCMinutes();
+    second = timeValue.getUTCSeconds();
   }
-  return hour >= 22 && hour < 24;
+
+  if (hour < 0) return false;
+  if (hour > 22 && hour < 24) return true;
+  if (hour === 22 && (minute > 0 || second > 0)) return true;
+
+  return false;
 }
 
 export class AttendanceController {

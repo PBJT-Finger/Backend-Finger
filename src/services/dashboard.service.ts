@@ -15,10 +15,16 @@ export class DashboardService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const isScanAfter22 = (d: Date | null): boolean => {
+    const isScanAfter22 = (d: Date | string | null): boolean => {
       if (!d) return false;
-      const h = new Date(d).getUTCHours();
-      return h >= 22 && h < 24;
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return false;
+      const h = dt.getUTCHours();
+      const m = dt.getUTCMinutes();
+      const s = dt.getUTCSeconds();
+      if (h > 22 && h < 24) return true;
+      if (h === 22 && (m > 0 || s > 0)) return true;
+      return false;
     };
 
     // 1. Ambil data absen hari ini (menyaring scan jam 22:00 ke atas)
