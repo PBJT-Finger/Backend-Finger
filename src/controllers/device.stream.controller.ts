@@ -193,6 +193,18 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
         select: { user_id: true, jam_masuk: true, tanggal: true },
       });
 
+      const toDateStr = (d: Date | string): string => {
+        if (typeof d === 'string') return d.substring(0, 10);
+        if (d instanceof Date && !isNaN(d.getTime())) {
+          const y = d.getUTCFullYear();
+          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(d.getUTCDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        }
+        return '';
+      };
+      const todayStr = toDateStr(today);
+
       // Buat map: user_id → data open session (jam_masuk paling baru + tanggal)
       const openSessionMap = new Map<string, { masukMinutes: number; isToday: boolean; masukHour: number }>();
       for (const s of openSessions) {
@@ -200,7 +212,7 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
         const masuk = new Date(s.jam_masuk);
         const masukHour = masuk.getUTCHours();
         const masukMinutes = masukHour * 60 + masuk.getUTCMinutes();
-        const isToday = s.tanggal.getTime() === today.getTime();
+        const isToday = toDateStr(s.tanggal) === todayStr;
         const existing = openSessionMap.get(s.user_id);
         // Utamakan sesi hari ini jika ada
         if (!existing || isToday || masukMinutes > existing.masukMinutes) {

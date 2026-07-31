@@ -217,14 +217,30 @@ export class ZkSyncService {
     // Cek apakah tombol yang ditekan di mesin secara eksplisit adalah tombol 'Pulang/Check-Out'
     const isExplicitCheckOut = record.attendanceType === 1 || record.attendanceType === 4 || record.attendanceType === 5;
 
+    // Format tanggal ke YYYY-MM-DD string untuk perbandingan aman tanpa gangguan timezone offset
+    const toDateStr = (d: Date | string): string => {
+      if (typeof d === 'string') return d.substring(0, 10);
+      if (d instanceof Date && !isNaN(d.getTime())) {
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+      return '';
+    };
+
+    const targetDateStr = toDateStr(tanggal);
+    const kemarinDateStr = toDateStr(tanggalKemarin);
+
     // Cari open session (punya jam_masuk tapi belum ada jam_keluar)
     const openSession = existingRecords.find(r => {
       if (!r.jam_masuk || r.jam_keluar) return false;
 
-      const isTodaySession = r.tanggal.getTime() === tanggal.getTime();
+      const rDateStr = toDateStr(r.tanggal);
+      const isTodaySession = rDateStr === targetDateStr;
       if (isTodaySession) return true;
 
-      const isYesterdaySession = r.tanggal.getTime() === tanggalKemarin.getTime();
+      const isYesterdaySession = rDateStr === kemarinDateStr;
       if (isYesterdaySession) {
         // Izinkan menutup sesi kemarin HANYA JIKA:
         // 1. User menekan tombol Pulang secara manual di mesin (isExplicitCheckOut === true)
