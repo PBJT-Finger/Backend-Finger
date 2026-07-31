@@ -101,6 +101,19 @@ export class ZkSyncService {
           continue;
         }
 
+        // Abaikan scan di luar jam operasional: 22:01 - 04:59 (jam dini hari)
+        const scanHour = record.recordTime.getUTCHours();
+        const scanMinute = record.recordTime.getUTCMinutes();
+        const scanSecond = record.recordTime.getUTCSeconds();
+        const isOutOfHour =
+          (scanHour > 22 && scanHour < 24) ||
+          (scanHour === 22 && (scanMinute > 0 || scanSecond > 0)) ||
+          (scanHour >= 0 && scanHour < 5);
+        if (isOutOfHour) {
+          logger.info(`[ZK Sync] Scan diabaikan (jam di luar operasional 22:01-05:00): user=${record.deviceUserId} jam=${record.recordTime.toISOString()}`);
+          continue;
+        }
+
         await this.upsertAttendanceRecord(record);
         created++;
       } catch (err) {

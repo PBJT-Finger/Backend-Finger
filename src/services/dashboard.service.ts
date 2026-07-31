@@ -24,6 +24,7 @@ export class DashboardService {
       const s = dt.getUTCSeconds();
       if (h > 22 && h < 24) return true;
       if (h === 22 && (m > 0 || s > 0)) return true;
+      if (h >= 0 && h < 5) return true;
       return false;
     };
 

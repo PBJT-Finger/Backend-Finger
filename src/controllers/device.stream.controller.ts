@@ -102,13 +102,23 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
       clearTimeout(historyTimeout); // Batalkan timer pengaman timeout karena query selesai tepat waktu
       const empMap = new Map(employees.map((e) => [e.user_id, e]));
 
-      // Memetakan log absensi database ke format objek SSE yang seragam (menyaring scan jam 22:00 ke atas)
+      const isIgnoredHour = (d: Date | string | null): boolean => {
+        if (!d) return false;
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return false;
+        const h = dt.getUTCHours();
+        const m = dt.getUTCMinutes();
+        const s = dt.getUTCSeconds();
+        if (h > 22 && h < 24) return true;
+        if (h === 22 && (m > 0 || s > 0)) return true;
+        if (h >= 0 && h < 5) return true;
+        return false;
+      };
+
+      // Memetakan log absensi database ke format objek SSE yang seragam (menyaring scan 22:01 - 05:00)
       const history: SseAttendanceRecord[] = recentLogs
         .filter((row) => {
-          if (row.jam_masuk) {
-            const h = new Date(row.jam_masuk).getUTCHours();
-            if (h >= 22 && h < 24) return false;
-          }
+          if (row.jam_masuk && isIgnoredHour(row.jam_masuk)) return false;
           return true;
         })
         .map((row) => {
@@ -128,7 +138,7 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
             return combined.toISOString();
           };
 
-          const jamKeluarValid = row.jam_keluar && new Date(row.jam_keluar).getUTCHours() < 22 ? row.jam_keluar : null;
+          const jamKeluarValid = row.jam_keluar && !isIgnoredHour(row.jam_keluar) ? row.jam_keluar : null;
           const recordTimeStr = combineDateTime(
             row.tanggal,
             jamKeluarValid || row.jam_masuk || row.created_at
@@ -220,11 +230,16 @@ export const streamDeviceEvents = async (req: Request, res: Response): Promise<v
         }
       }
 
-      // Memproses record real-time dari mesin sidik jari (menyaring scan jam 22:00 ke atas)
+      // Memprotes record real-time dari mesin sidik jari (menyaring scan jam 22:01 - 05:00)
       const liveRecords: SseAttendanceRecord[] = records
         .filter((r) => {
           const h = r.recordTime.getUTCHours();
-          return !(h >= 22 && h < 24);
+          const m = r.recordTime.getUTCMinutes();
+          const s = r.recordTime.getUTCSeconds();
+          if (h > 22 && h < 24) return false;
+          if (h === 22 && (m > 0 || s > 0)) return false;
+          if (h >= 0 && h < 5) return false;
+          return true;
         })
         .map((r) => {
           const user_id = String(r.deviceUserId);

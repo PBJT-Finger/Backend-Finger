@@ -80,8 +80,10 @@ function isScanAfter22(timeValue: Date | string | null): boolean {
   }
 
   if (hour < 0) return false;
+  // Diabaikan mulai pukul 22:00:01 hingga 04:59:59 (22:01 s/d 05:00 pagi)
   if (hour > 22 && hour < 24) return true;
   if (hour === 22 && (minute > 0 || second > 0)) return true;
+  if (hour >= 0 && hour < 5) return true;
 
   return false;
 }
