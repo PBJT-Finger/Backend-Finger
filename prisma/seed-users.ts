@@ -45,7 +45,7 @@ async function main() {
 
   for (const user of usersToSeed) {
     // Normalisasi: Ganti semua underscore dengan spasi
-    const normalizeName = (name) => name.replace(/_/g, ' ').trim().toLowerCase();
+    const normalizeName = (name: string) => name.replace(/_/g, ' ').trim().toLowerCase();
     const normalizedUserName = normalizeName(user.nama);
 
     // Cari employee dengan pencocokan nama yang dinormalisasi
