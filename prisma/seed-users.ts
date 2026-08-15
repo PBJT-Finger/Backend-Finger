@@ -44,13 +44,17 @@ async function main() {
   let notFoundCount = 0;
 
   for (const user of usersToSeed) {
-    // Cari employee dengan nama persis atau mengandung nama tsb
-    let emp = employees.find(e => e.nama.trim().toLowerCase() === user.nama.trim().toLowerCase());
-    
-    // Jika tidak ketemu exact match, coba partial match
-    if (!emp) {
-      emp = employees.find(e => e.nama.toLowerCase().includes(user.nama.toLowerCase()) || user.nama.toLowerCase().includes(e.nama.toLowerCase()));
-    }
+    // Normalisasi: Ganti semua underscore dengan spasi
+    const normalizeName = (name) => name.replace(/_/g, ' ').trim().toLowerCase();
+    const normalizedUserName = normalizeName(user.nama);
+
+    // Cari employee dengan pencocokan nama yang dinormalisasi
+    let emp = employees.find(e => {
+      const normalizedEmpName = normalizeName(e.nama);
+      return normalizedEmpName === normalizedUserName || 
+             normalizedEmpName.includes(normalizedUserName) || 
+             normalizedUserName.includes(normalizedEmpName);
+    });
 
     if (!emp) {
       console.warn(`[WARNING] Karyawan bernama '${user.nama}' tidak ditemukan di tabel employees. Akun tidak dibuat.`);
