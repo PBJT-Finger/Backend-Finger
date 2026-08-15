@@ -186,11 +186,9 @@ async function main() {
       // Jika ada baris SQL yang perlu dimasukkan untuk tabel saat ini
       if (tableInserts) {
         try {
-          // Penanganan khusus keamanan: Bersihkan data admin lama sebelum memproses seeding
+          // Penanganan khusus keamanan: Jangan hapus tabel admins agar akun Dosen/Karyawan tidak hilang
           if (table === 'admins') {
-            console.log('Cleaning up existing admins table before seeding...');
-            // Menjalankan query SQL mentah secara aman untuk mengosongkan tabel admins
-            await prisma.$executeRawUnsafe('DELETE FROM `admins`');
+            console.log('Skipping deletion of admins table to preserve Dosen/Karyawan accounts...');
           }
 
           // Menampilkan log jumlah batch yang akan dimasukkan ke tabel
