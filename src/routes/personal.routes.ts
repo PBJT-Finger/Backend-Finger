@@ -4,9 +4,9 @@ import { authenticateToken, requireRole } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Middleware: Harus login. Semua role diizinkan (Dosen, Karyawan, Admin, Pimpinan)
-// karena controller akan memvalidasi apakah akun tersebut memiliki employee_id
-const restrictToPegawai = requireRole('DOSEN', 'KARYAWAN', 'ADMIN', 'PIMPINAN');
+// Middleware: Harus login. Otorisasi ketat hanya untuk DOSEN dan KARYAWAN
+// Admin dan Pimpinan tidak diizinkan masuk ke rute personal ini
+const restrictToPegawai = requireRole('DOSEN', 'KARYAWAN');
 
 /**
  * @swagger
