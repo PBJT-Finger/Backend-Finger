@@ -23,18 +23,31 @@ export class WebPushService {
    */
   public static async broadcastToAdmins(payload: any): Promise<void> {
     try {
-      // Ambil seluruh langganan notifikasi aktif dari database
-      const subscriptions = await prisma.push_subscriptions.findMany();
+      // Ambil seluruh langganan notifikasi aktif beserta relasi admin-nya
+      const subscriptions = await prisma.push_subscriptions.findMany({
+        include: { admins: true }
+      });
 
       if (subscriptions.length === 0) {
-        return; // Tidak ada admin yang berlangganan
+        return; // Tidak ada yang berlangganan
       }
 
       const payloadString = JSON.stringify(payload);
       const invalidSubscriptionIds: number[] = [];
+      const targetUserId = payload.data?.userId;
 
-      // Mengirim push ke seluruh langganan secara asinkron paralel
+      // Mengirim push secara asinkron paralel
       const pushPromises = subscriptions.map(async (sub) => {
+        // Filter Privasi: 
+        // 1. Kirim ke Admin atau Pimpinan
+        // 2. Kirim ke Karyawan/Dosen ITU SENDIRI (konfirmasi absen pribadi)
+        const isAdminOrPimpinan = sub.admins?.role === 'ADMIN' || sub.admins?.role === 'PIMPINAN';
+        const isSelf = sub.admins?.employee_id === targetUserId;
+
+        if (!isAdminOrPimpinan && !isSelf) {
+          return; // Abaikan, jangan kirim notifikasi absen orang lain ke karyawan biasa
+        }
+
         const pushSubscription = {
           endpoint: sub.endpoint,
           keys: {
