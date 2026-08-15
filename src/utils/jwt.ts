@@ -9,6 +9,7 @@ export interface UserTokenPayload {
   id: number;
   username: string;
   role: string;
+  employee_id?: string | null;
 }
 
 const JWT_ACCESS_SECRET = env.JWT_ACCESS_SECRET as string;
@@ -76,6 +77,7 @@ export const generateTokens = (user: any): { accessToken: string; refreshToken: 
     id: user.id,
     username: user.username,
     role: user.role,
+    employee_id: user.employee_id,
   };
 
   const accessToken = generateAccessToken(payload);

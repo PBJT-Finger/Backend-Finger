@@ -21,6 +21,9 @@ import { ZkSyncService } from './services/zk-sync.service';
 // Mengimpor layanan pembersihan otomatis log absensi pada mesin fisik
 import { DeviceCleanupService } from './services/device.cleanup.service';
 
+// Mengimpor layanan pengingat (reminder)
+import { ReminderService } from './services/reminder.service';
+
 /**
  * Fungsi untuk menginisialisasi semua ketergantungan aplikasi (Database dan Koneksi Hardware)
  */
@@ -39,6 +42,9 @@ const initializeApp = async (): Promise<void> => {
 
     // 3. Mendaftarkan jadwal otomatis harian tengah malam (00:00 / Jam 12 Malam) untuk pembersihan log mesin
     DeviceCleanupService.scheduleDailyMidnightCleanup();
+
+    // 4. Mendaftarkan jadwal otomatis pengingat absensi (Reminder Cron Job)
+    ReminderService.init();
 
     logger.info('✅ Aplikasi berhasil diinisialisasi sepenuhnya');
   } catch (error: any) {

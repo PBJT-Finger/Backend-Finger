@@ -27,6 +27,7 @@ interface JwtPayload {
   id: number;
   username: string;
   role: string;
+  employee_id?: string | null;
   iat?: number;
   exp?: number;
 }
@@ -114,6 +115,7 @@ export const authenticateToken = async (
       id: decoded.id,
       username: decoded.username,
       role: decoded.role,
+      employee_id: decoded.employee_id || null,
     };
 
     req.user = user;

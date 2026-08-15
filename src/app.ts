@@ -260,6 +260,12 @@ app.get('/finger-api/docs-json', (req: Request, res: Response) => {
 // Mengimpor rute pengoperasian mesin fingerprint
 import deviceRoutes from './routes/device.routes';
 
+// Mengimpor rute notifikasi Push API
+import pushRoutes from './routes/push.routes';
+
+// Mengimpor rute personal (Dosen/Karyawan)
+import personalRoutes from './routes/personal.routes';
+
 // Menyambungkan semua rute utama API aplikasi backend
 app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);
@@ -268,6 +274,8 @@ app.use('/api/export', exportRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/device', deviceRoutes);
+app.use('/api/notifications', pushRoutes);
+app.use('/api/personal', personalRoutes);
 
 // Mengimpor middleware penanganan error tersentralisasi
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler.middleware';

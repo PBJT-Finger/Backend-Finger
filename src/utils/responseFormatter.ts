@@ -65,7 +65,8 @@ export const loginResponse = (
         email: user.email,
         username: user.username,
         role: user.role,
-        name: user.username,
+        employee_id: user.employee_id,
+        name: user.full_name || user.username,
       },
       tokens: {
         access_token: token,

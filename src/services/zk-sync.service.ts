@@ -26,6 +26,7 @@ import { v4 as uuidv4 } from 'uuid'; // Pembuat string UUID acak untuk pelacakan
 import prisma from '../config/prisma'; // Prisma client untuk query DB
 import logger from '../utils/logger'; // Logger aplikasi
 import { ZkDeviceClient, AttendanceRecord } from '../infrastructure/zk-client'; // Client konektivitas ZKTeco
+import { WebPushService } from './webpush.service';
 
 // ─── Tipe Data ────────────────────────────────────────────────────────────────
 
@@ -306,6 +307,12 @@ export class ZkSyncService {
           updated_at: new Date()
         },
       });
+      
+      WebPushService.broadcastToAdmins({
+        title: 'Absen Pulang',
+        body: `${resolvedName} pulang pada ${timePart.toISOString().substring(11, 16)}`,
+        data: { type: 'checkout', userId: resolvedUserId }
+      }).catch(() => {});
     } else {
       // TIDAK ADA OPEN SESSION (record baru / sesi sebelumnya sudah ditutup):
       // Wajib buat Absen Masuk (jam_masuk) sesi baru
@@ -324,6 +331,12 @@ export class ZkSyncService {
             status_keluar: afternoonStatus,
           },
         });
+
+        WebPushService.broadcastToAdmins({
+          title: 'Absen Masuk',
+          body: `${resolvedName} masuk pada ${timePart.toISOString().substring(11, 16)}`,
+          data: { type: 'checkin', userId: resolvedUserId }
+        }).catch(() => {});
       } catch (createErr: any) {
         const isDuplicate = createErr?.code === 'P2002' ||
           (typeof createErr?.message === 'string' && createErr.message.includes('Unique constraint'));

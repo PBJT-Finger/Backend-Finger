@@ -138,6 +138,18 @@ export const env = cleanEnv(process.env, {
     desc: 'Timeout internal soket ZKLib dalam milidetik.',
     default: 5_000,
   }),
+
+  // ─── Web Push API (Notifikasi) ────────────────────────────────────────────────
+  VAPID_PUBLIC_KEY: str({
+    desc: 'Public key untuk otentikasi VAPID Push Notification',
+  }),
+  VAPID_PRIVATE_KEY: str({
+    desc: 'Private key untuk otentikasi VAPID Push Notification',
+  }),
+  VAPID_SUBJECT: str({
+    desc: 'Identitas subjek (email/URL) untuk VAPID Push Notification',
+    default: 'mailto:admin@fingerattendance.com',
+  }),
 });
 
 /**

@@ -38,6 +38,8 @@ export interface AuthenticatedUser {
   username: string;
   /** Kontrol akses berbasis peran (role): 'admin' | 'viewer' */
   role: string;
+  /** Terikat dengan tabel employees. Jika null, berarti bukan pegawai biasa */
+  employee_id?: string | null;
 }
 
 export {};
