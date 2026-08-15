@@ -9,6 +9,7 @@ import {
 // Mengimpor modul bawaan Node.js untuk operasi file system dan penanganan path file
 import fs from 'fs';
 import path from 'path';
+import bcrypt from 'bcrypt';
 
 // Inisialisasi instance PrismaClient untuk melakukan query database
 const prisma = new PrismaClient();
@@ -263,6 +264,45 @@ async function main() {
   }
   // Menampilkan log jumlah pegawai yang berhasil disinkronkan ke database
   console.log(`Upserted ${employees.length} employees from device.`);
+
+  // 5. Seed akun Admin dan Pimpinan
+  console.log('Seeding akun Admin dan Pimpinan...');
+  const adminPasswordHash = await bcrypt.hash('BajaAdmin#2026', 10);
+  await prisma.admins.upsert({
+    where: { email: 'admin.pbjt@gmail.com' },
+    update: {
+      password_hash: adminPasswordHash,
+      role: 'ADMIN',
+      is_active: true,
+    },
+    create: {
+      username: 'admin.pbjt',
+      email: 'admin.pbjt@gmail.com',
+      password_hash: adminPasswordHash,
+      full_name: 'Admin Utama',
+      role: 'ADMIN',
+      is_active: true,
+    }
+  });
+
+  const pimpinanPasswordHash = await bcrypt.hash('BajaPimpinan@gmail.com', 10);
+  await prisma.admins.upsert({
+    where: { email: 'pimpinan.pbjt@gmail.com' },
+    update: {
+      password_hash: pimpinanPasswordHash,
+      role: 'PIMPINAN',
+      is_active: true,
+    },
+    create: {
+      username: 'pimpinan.pbjt',
+      email: 'pimpinan.pbjt@gmail.com',
+      password_hash: pimpinanPasswordHash,
+      full_name: 'Pimpinan',
+      role: 'PIMPINAN',
+      is_active: true,
+    }
+  });
+  console.log('Akun Admin dan Pimpinan berhasil disinkronkan.');
 
   // Menampilkan pesan sukses akhir bahwa seluruh proses pembenihan database selesai
   console.log('Seed completed successfully!');
