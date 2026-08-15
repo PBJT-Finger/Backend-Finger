@@ -142,9 +142,11 @@ export const env = cleanEnv(process.env, {
   // ─── Web Push API (Notifikasi) ────────────────────────────────────────────────
   VAPID_PUBLIC_KEY: str({
     desc: 'Public key untuk otentikasi VAPID Push Notification',
+    default: '',
   }),
   VAPID_PRIVATE_KEY: str({
     desc: 'Private key untuk otentikasi VAPID Push Notification',
+    default: '',
   }),
   VAPID_SUBJECT: str({
     desc: 'Identitas subjek (email/URL) untuk VAPID Push Notification',
