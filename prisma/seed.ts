@@ -285,7 +285,7 @@ async function main() {
     }
   });
 
-  const pimpinanPasswordHash = await bcrypt.hash('BajaPimpinan@gmail.com', 10);
+  const pimpinanPasswordHash = await bcrypt.hash('BajaPimpinan#2026', 10);
   await prisma.admins.upsert({
     where: { email: 'pimpinan.pbjt@gmail.com' },
     update: {
