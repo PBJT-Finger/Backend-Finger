@@ -218,6 +218,8 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
         run: |
           # Fail loudly if any critical secret is missing
           : "${DEPLOY_PATH:?❌ Secret DEPLOY_PATH is not set!}"
@@ -247,6 +249,8 @@ jobs:
           B64_TZ=$(echo -n "${TZ:-Asia/Jakarta}" | base64 -w 0)
           B64_POLLING_INTERVAL_MS=$(echo -n "${POLLING_INTERVAL_MS:-30000}" | base64 -w 0)
           B64_RECONNECT_DELAY_MS=$(echo -n "${RECONNECT_DELAY_MS:-30000}" | base64 -w 0)
+          B64_VAPID_PUBLIC_KEY=$(echo -n "${VAPID_PUBLIC_KEY}" | base64 -w 0)
+          B64_VAPID_PRIVATE_KEY=$(echo -n "${VAPID_PRIVATE_KEY}" | base64 -w 0)
 
           # Encode DB_PASSWORD on GitHub Runner which has jq installed
           ENCODED_DB_PASS=$(jq -nr --arg v "$DB_PASSWORD" '$v|@uri')
@@ -275,6 +279,8 @@ jobs:
              TZ=\$(echo '${B64_TZ}' | base64 -d)
              POLLING_INTERVAL_MS=\$(echo '${B64_POLLING_INTERVAL_MS}' | base64 -d)
              RECONNECT_DELAY_MS=\$(echo '${B64_RECONNECT_DELAY_MS}' | base64 -d)
+             VAPID_PUBLIC_KEY=\$(echo '${B64_VAPID_PUBLIC_KEY}' | base64 -d)
+             VAPID_PRIVATE_KEY=\$(echo '${B64_VAPID_PRIVATE_KEY}' | base64 -d)
 
              cd \"\$DEPLOY_PATH\"
 
@@ -338,6 +344,8 @@ jobs:
                --env-add FINGERPRINT_IP=\"\$FINGERPRINT_IP\" \
                --env-add POLLING_INTERVAL_MS=\"\$POLLING_INTERVAL_MS\" \
                --env-add RECONNECT_DELAY_MS=\"\$RECONNECT_DELAY_MS\" \
+               --env-add VAPID_PUBLIC_KEY=\"\$VAPID_PUBLIC_KEY\" \
+               --env-add VAPID_PRIVATE_KEY=\"\$VAPID_PRIVATE_KEY\" \
                --health-cmd \"wget -qO- http://127.0.0.1:3333/health || exit 1\" \
                --with-registry-auth finger-be_backend \
                || { 
