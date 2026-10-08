@@ -4,7 +4,7 @@
 // maupun format berkas template manual Excel/CSV).
 // Layanan ini memproses data secara berurutan dan menyimpannya ke database via Prisma transaction.
 
-import * as xlsx from 'xlsx'; // Library untuk parsing format lembar kerja Excel/CSV
+import * as xlsx from 'xlsx-js-style'; // Library untuk parsing format lembar kerja Excel/CSV
 import prisma from '../config/prisma'; // Prisma client untuk manipulasi data DB
 import logger from '../utils/logger'; // Logger aplikasi
 
