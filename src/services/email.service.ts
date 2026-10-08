@@ -4,7 +4,7 @@
  * Menggunakan pustaka nodemailer dengan konfigurasi SMTP.
  */
 
-import nodemailer from 'nodemailer'; // Modul Node.js untuk mengirim email
+import nodemailer, { Transporter } from 'nodemailer'; // Modul Node.js untuk mengirim email
 import logger from '../utils/logger'; // Logger internal aplikasi
 import { env } from '../config/env'; // Pembaca variabel lingkungan (.env)
 
@@ -23,12 +23,12 @@ const fromEmail = env.EMAIL_FROM || 'noreply@fingerattendance.com';
 const fromName = env.EMAIL_FROM_NAME || 'Finger Attendance System';
 
 // Membuat objek transporter nodemailer reusable
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
 /**
  * Menginisialisasi transporter SMTP email.
  */
-const initializeTransporter = (): nodemailer.Transporter | null => {
+const initializeTransporter = (): Transporter | null => {
   if (!env.SMTP_USER || !env.SMTP_PASSWORD) {
     logger.warn('Kredensial SMTP tidak terkonfigurasi. Layanan email akan dialihkan ke mode log konsol saja.');
     return null;
