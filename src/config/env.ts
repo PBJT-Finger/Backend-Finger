@@ -74,7 +74,7 @@ export const env = cleanEnv(process.env, {
   CORS_ORIGINS: str({
     desc: 'Daftar origin web yang diizinkan melakukan CORS (dipisah koma)',
     default:
-      'http://localhost:5555,http://localhost:3000,http://localhost:3333,https://finger.pbjt.web.id,https://finger-be.pbjt.web.id',
+      'http://localhost:5555,http://localhost:3000,http://localhost:3333,https://finger.pbjt.ac.id,https://finger-be.pbjt.ac.id,https://finger.pbjt.web.id,https://finger-be.pbjt.web.id',
   }),
 
   // ─── Logging System ──────────────────────────────────────────────────────────

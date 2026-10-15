@@ -114,6 +114,8 @@ const allowedOrigins = process.env['CORS_ORIGINS']
       'http://localhost:5555',
       'http://localhost:3000',
       'http://localhost:3333',
+      'https://finger.pbjt.ac.id',
+      'https://finger-be.pbjt.ac.id',
       'https://finger.pbjt.web.id',
       'https://finger-be.pbjt.web.id',
     ];

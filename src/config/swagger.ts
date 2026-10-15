@@ -34,8 +34,12 @@ API REST yang komprehensif untuk mengelola absensi karyawan dengan kemampuan imp
         description: 'Deteksi Otomatis Lingkungan (Auto-detect)',
       },
       {
+        url: 'https://finger-be.pbjt.ac.id',
+        description: 'Server Produksi (Online - .ac.id)',
+      },
+      {
         url: 'https://finger-be.pbjt.web.id',
-        description: 'Server Produksi (Online)',
+        description: 'Server Produksi Legacy (.web.id)',
       },
       {
         url: `http://localhost:${env.PORT}`,
